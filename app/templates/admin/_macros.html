@@ -138,15 +138,29 @@
   <div class="service-tags">
     {% for svc in items %}
       {% if svc is mapping %}
-        {% set key = svc.get('service_key') or svc.get('key') or 'unknown' %}
-        {% set protocol = svc.get('protocol') or '-' %}
-        {% set port = svc.get('port') or '-' %}
-        {% set enabled = svc.get('enabled', true) %}
-        <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ key }} · {{ protocol|upper }}:{{ port }}">
-          <span class="service-tag-dot"></span>
-          <span class="service-tag-name">{{ names.get(key, fallback_names.get(key, key)) }}</span>
-          <span class="service-tag-meta">{{ protocol|upper }}:{{ port }}</span>
-        </span>
+        {% if svc.get('type') == 'web-app-honeypot' or (svc.get('deploy_port') and not svc.get('service_key')) %}
+          {# web-app honeypot deployment: port + route + artifact identity #}
+          {% set port = svc.get('deploy_port') or '-' %}
+          {% set route = svc.get('deploy_route') or '/' %}
+          {% set enabled = svc.get('enabled', true) %}
+          {% set label = 'Web 蜜罐' %}
+          {% if svc.get('web_stack') and svc.get('web_stack') != '自定义页面' %}{% set label = svc.get('web_stack') %}{% endif %}
+          <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ svc.get('artifact_name') or 'web-app honeypot' }} · 来源: {{ svc.get('clone_source_url') or '手动上传' }} · {{ '运行中' if enabled else '已停用' }}">
+            <span class="service-tag-dot"></span>
+            <span class="service-tag-name">{{ label }}</span>
+            <span class="service-tag-meta">HTTP:{{ port }}{{ route }}</span>
+          </span>
+        {% else %}
+          {% set key = svc.get('service_key') or svc.get('key') or 'unknown' %}
+          {% set protocol = svc.get('protocol') or '-' %}
+          {% set port = svc.get('port') or '-' %}
+          {% set enabled = svc.get('enabled', true) %}
+          <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ key }} · {{ protocol|upper }}:{{ port }}">
+            <span class="service-tag-dot"></span>
+            <span class="service-tag-name">{{ names.get(key, fallback_names.get(key, key)) }}</span>
+            <span class="service-tag-meta">{{ protocol|upper }}:{{ port }}</span>
+          </span>
+        {% endif %}
       {% else %}
         <span class="service-tag" title="{{ svc }}">
           <span class="service-tag-dot"></span>
