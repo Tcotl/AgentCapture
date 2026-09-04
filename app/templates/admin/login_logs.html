@@ -12,9 +12,9 @@
 <section class="panel">
   {% set toolbar %}
   <div class="actions-inline">
-    <a class="chip" href="{{ export_href }}">导出 CSV</a>
+    <a class="chip primary" href="{{ export_href }}" style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">导出 CSV</a>
     <form method="post" action="/admin/login-logs/cleanup" style="margin:0">
-      <button class="danger btn-sm" type="submit" onclick="return confirm('确定清空所有登录日志？此操作不可撤销。')">清空日志</button>
+      <button class="danger" type="submit" style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important" onclick="return confirm('确定清空所有登录日志？此操作不可撤销。')">清空日志</button>
     </form>
   </div>
   {% endset %}
@@ -27,7 +27,8 @@
     <input type="text" name="login_status" value="{{ filters.login_status }}" placeholder="状态 success/failed" />
     <div class="actions-inline" style="grid-column:1 / -1">
       <button type="submit" style="width:auto">应用筛选</button>
-      <a class="chip" href="/admin/login-logs">重置</a>
+      <a class="chip primary" href="/admin/login-logs" data-filter-action="clear"
+         style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
     </div>
   </form>
   <div class="table-wrap">

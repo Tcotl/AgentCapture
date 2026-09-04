@@ -13,7 +13,8 @@
     <input type="text" name="status" value="{{ filters.status }}" placeholder="状态 success/failed" />
     <div class="actions-inline" style="grid-column:1 / -1">
       <button type="submit" style="width:auto">应用筛选</button>
-      <a class="chip" href="/admin/execution-history">重置</a>
+      <a class="chip primary" href="/admin/execution-history" data-filter-action="clear"
+         style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
     </div>
   </form>
   <div class="table-wrap">
