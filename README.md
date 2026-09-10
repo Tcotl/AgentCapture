@@ -356,9 +356,9 @@ AgentCapture 仅用于授权环境下的安全监测、蜜罐运营、攻防演�
 
 <div align="center">
 
-<img src="docs/wechat-group.jpg" alt="AgentCapture 交流群" width="240" />
+<img src="docs/wechat-group.jpg" alt="AgentCapture 交流群" width="240" height="240" />
 &nbsp;&nbsp;&nbsp;&nbsp;
-<img src="docs/author-wechat.jpg" alt="作者微信" width="240" />
+<img src="docs/author-wechat.jpg" alt="作者微信" width="240" height="240" />
 
 **扫码加入微信交流群**，获取部署实践、反制案例与版本动态；或添加**作者微信**交流合作与技术探讨。
 
