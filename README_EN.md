@@ -354,9 +354,12 @@ This project is licensed under AGPL-3.0. See [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-<img src="docs/wechat-group.png" alt="AgentCapture WeChat group" width="240" />
+<img src="docs/wechat-group.jpg" alt="AgentCapture WeChat group" width="240" />
+&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="docs/author-wechat.jpg" alt="Author WeChat" width="240" />
 
-Scan to join the WeChat group for deployment practices, counter-measure
-case studies, and release updates.
+**Scan to join the WeChat group** for deployment practices, counter-measure
+case studies, and release updates — or add the **author's WeChat** for
+collaboration and technical discussion.
 
 </div>
