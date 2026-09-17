@@ -54,6 +54,10 @@ SKIP_PREFIXES = (
     "/c2",
     "/api/agent-control",
     "/api/node",
+    # Open intelligence API: auth is the api_key itself, consumers are
+    # server-side scripts — the risk engine must not challenge/block them
+    # (a curl UA alone scored into challenge and made the API unusable).
+    "/api/v1",
     # Admin-only preview mount for cloned templates — not an attack surface.
     "/_preview",
 )

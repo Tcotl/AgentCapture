@@ -29,6 +29,10 @@ from app.models.managed import (
 
 MANAGED_STALE_AFTER_SECONDS = 90
 MANAGED_OFFLINE_AFTER_SECONDS = 300
+# Hosts offline longer than this get metadata flag archived=true so stale
+# test/recon hosts stop cluttering the roster (roster can filter them).
+# 0 disables. Archived hosts revive on their next heartbeat.
+MANAGED_HOST_ARCHIVE_DAYS = 30
 MANAGED_LEASE_TTL_SECONDS = 90
 MANAGED_LEASE_MAX_RETRIES = 3
 
@@ -422,8 +426,27 @@ def refresh_presence(db: Session) -> dict[str, int]:
     reclaimed = expire_stale_leases(db, now=now)
 
     hosts = list(db.scalars(select(ManagedHost)).all())
+    archive_cutoff = (
+        now - timedelta(days=MANAGED_HOST_ARCHIVE_DAYS)
+        if MANAGED_HOST_ARCHIVE_DAYS > 0 else None
+    )
     for host in hosts:
         host.status = _host_presence(host.last_seen_at, now)
+        # Archive long-dead hosts lazily: a metadata flag (not a status) so
+        # presence math is untouched, and the next heartbeat clears it.
+        if archive_cutoff is not None:
+            last = _as_utc(host.last_seen_at)
+            if last and last < archive_cutoff:
+                meta = host.metadata_json or {}
+                if not meta.get("archived"):
+                    meta["archived"] = True
+                    meta["archived_at"] = now.isoformat()
+                    host.metadata_json = meta
+        elif host.metadata_json and host.metadata_json.get("archived"):
+            meta = dict(host.metadata_json)
+            meta.pop("archived", None)
+            meta.pop("archived_at", None)
+            host.metadata_json = meta
         db.add(host)
     db.commit()
     return reclaimed

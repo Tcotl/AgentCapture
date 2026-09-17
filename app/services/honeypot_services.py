@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import socket
+import ssl
 import struct
 import threading
 from datetime import datetime, timezone
@@ -197,6 +198,29 @@ def _honeypot_session(service_key: str, addr: tuple) -> str:
     return f"{service_key}:{source_ip}:{uuid4().hex[:8]}"
 
 
+def _outbound_advertised_ip(addr: tuple) -> str:
+    """Best local address to advertise in a PASV reply to this client.
+
+    The data channel must point the client at an address that reaches this
+    host — for the common honeypot topologies that is either the same-loopback
+    case (frontend proxies on the box) or the interface the client connected
+    through.
+    """
+    client_ip = addr[0] if addr else ""
+    if client_ip in ("127.0.0.1", "::1"):
+        return "127.0.0.1"
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # No packet is actually sent (UDP connect only picks a route).
+            probe.connect((client_ip or "8.8.8.8", 80))
+            return probe.getsockname()[0]
+        finally:
+            probe.close()
+    except Exception:
+        return "127.0.0.1"
+
+
 def _match_decoy_credentials(db, username: str, password: str) -> int:
     """Trigger decoy deployments whose generated credentials were replayed.
 
@@ -329,9 +353,13 @@ MYSQL_CAP_PROTOCOL_41 = 0x00000200
 MYSQL_CAP_TRANSACTIONS = 0x00002000
 MYSQL_CAP_SECURE_CONNECTION = 0x00008000
 MYSQL_CAP_PLUGIN_AUTH = 0x00080000
+# Advertise CLIENT_SSL: without it, secure-by-default clients
+# (MariaDB 11.8+, MySQL 8 default policy) abort before sending any
+# credential. The handler upgrades the socket with a self-signed cert.
+MYSQL_CAP_SSL = 0x00000800
 MYSQL_SERVER_CAPS = (
     MYSQL_CAP_LONG_PASSWORD | MYSQL_CAP_PROTOCOL_41 | MYSQL_CAP_TRANSACTIONS
-    | MYSQL_CAP_SECURE_CONNECTION | MYSQL_CAP_PLUGIN_AUTH
+    | MYSQL_CAP_SECURE_CONNECTION | MYSQL_CAP_PLUGIN_AUTH | MYSQL_CAP_SSL
 )
 COM_QUIT = 0x01
 COM_INIT_DB = 0x02
@@ -354,8 +382,16 @@ def mysql_packet(body: bytes, seq: int) -> bytes:
     return struct.pack("<I", len(body))[:3] + bytes([seq & 0xFF]) + body
 
 
-def build_mysql_greeting(salt: bytes, thread_id: int = 42, version: str = "8.0.36") -> bytes:
-    """Server greeting (protocol 10) advertising mysql_native_password."""
+MYSQL_BANNER_VERSION = "5.7.42"
+
+
+def build_mysql_greeting(salt: bytes, thread_id: int = 42, version: str = MYSQL_BANNER_VERSION) -> bytes:
+    """Server greeting (protocol 10) advertising mysql_native_password.
+
+    The 5.x banner is deliberate: MySQL 8 / MariaDB clients demand TLS when
+    the server advertises an 8.x version and drop the connection before any
+    credential can be captured. A 5.7 greeting keeps those clients talking.
+    """
     if len(salt) < 20:
         salt = (salt + os.urandom(20))[:20]
     return (
@@ -453,7 +489,7 @@ def mysql_query_response(query: str, start_seq: int) -> bytes:
     """Canned-but-plausible answers for the common probe queries."""
     q = " ".join(query.strip().lower().split())
     if q.startswith("select version()"):
-        return build_mysql_resultset(["version()"], [["8.0.36"]], start_seq)
+        return build_mysql_resultset(["version()"], [[MYSQL_BANNER_VERSION]], start_seq)
     if q.startswith(("select user()", "select current_user()")):
         return build_mysql_resultset(["user()"], [["root@localhost"]], start_seq)
     if q.startswith("select database()"):
@@ -524,6 +560,53 @@ async def _handle_ssh(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 # MySQL Emulator
 # ---------------------------------------------------------------------------
 
+def _mysql_tls_context() -> "ssl.SSLContext":
+    """Self-signed TLS context for the MySQL honeypot (persisted like the
+    SSH host key so the fingerprint stays stable across restarts)."""
+    from pathlib import Path
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    import datetime as _dt
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    data_dir = Path(
+        settings.database_url.replace("sqlite:///", "").rsplit("/", 1)[0] or "."
+    )
+    cert_path = data_dir / "mysql_tls_cert.pem"
+    key_path = data_dir / "mysql_tls_key.pem"
+    if cert_path.exists() and key_path.exists():
+        return ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, "mysql-honeypot")]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(_dt.datetime.now(_dt.timezone.utc))
+        .not_valid_after(_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=3650))
+        .sign(key, hashes.SHA256())
+    )
+    data_dir.mkdir(parents=True, exist_ok=True)
+    key_path.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.NoEncryption(),
+    ))
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert_path, key_path)
+    return context
+
+
 async def _handle_mysql(reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
                         service_key: str, port: int):
     addr = writer.get_extra_info("peername")
@@ -537,7 +620,33 @@ async def _handle_mysql(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         header = await asyncio.wait_for(reader.readexactly(4), timeout=15)
         length = int.from_bytes(header[:3], "little")
         payload = await asyncio.wait_for(reader.readexactly(length), timeout=15)
+        # SSL Request detection must read the caps directly: the packet is
+        # exactly 32 bytes, below the parser's >=33 threshold, so the parser
+        # would zero out caps and the branch would never fire.
+        ssl_request = (
+            length <= 36
+            and int.from_bytes(payload[0:4], "little") & 0x0800
+        )
         handshake = parse_mysql_handshake_response(payload)
+        if ssl_request:
+            # SSL Request packet: the client wants TLS before sending real
+            # credentials. Modern (MariaDB 11.8+, MySQL 8.0 default-policy)
+            # clients hard-fail without it, so upgrade the socket with a
+            # self-signed certificate and read the real handshake over TLS.
+            transport = writer.transport
+            loop = asyncio.get_running_loop()
+            protocol = transport.get_protocol()
+            new_transport = await loop.start_tls(
+                transport, protocol, _mysql_tls_context(), server_side=True,
+            )
+            protocol._stream_reader._transport = new_transport
+            writer._transport = new_transport
+            _log_event(service_key, port, addr, "mysql_tls_upgrade",
+                       {"protocol": "mysql"}, session_id=session)
+            header = await asyncio.wait_for(reader.readexactly(4), timeout=15)
+            length = int.from_bytes(header[:3], "little")
+            payload = await asyncio.wait_for(reader.readexactly(length), timeout=15)
+            handshake = parse_mysql_handshake_response(payload)
         _log_event(service_key, port, addr, "mysql_login", {
             "username": handshake["username"],
             "database": handshake["database"],
@@ -697,6 +806,8 @@ async def _handle_ftp(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
                    session_id=session)
 
         username = ""
+        logged_in = False
+        data_conn: dict = {}  # "server" -> asyncio.Server, "writer" -> StreamWriter
         while True:
             line = await asyncio.wait_for(reader.readline(), timeout=30)
             if not line:
@@ -720,12 +831,16 @@ async def _handle_ftp(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
                         "password_len": len(arg),
                     }, session_id=session,
                        credential={"username": username, "password": arg})
-                    writer.write(b"530 Login incorrect.\r\n")
+                    # Accept any credential (logged above) and grant access: a
+                    # working session keeps attackers engaged far longer than
+                    # an instant 530 rejection.
+                    logged_in = True
+                    writer.write(b"230 Login successful.\r\n")
             elif verb == "QUIT":
                 writer.write(b"221 Goodbye.\r\n")
                 break
             elif verb == "FEAT":
-                writer.write(b"211-Features:\r\n UTF8\r\n211 End\r\n")
+                writer.write(b"211-Features:\r\n UTF8\r\n PASV\r\n211 End\r\n")
             elif verb == "SYST":
                 writer.write(b"215 UNIX Type: L8\r\n")
             elif verb == "PWD":
@@ -736,18 +851,110 @@ async def _handle_ftp(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
                 writer.write(b"200 NOOP ok.\r\n")
             elif verb == "CWD":
                 writer.write(b"250 CWD command successful\r\n")
-            elif verb in ("LIST", "NLST", "RETR", "STOR"):
-                # No data channel: refuse in a way that keeps control session
-                # alive and logged.
-                writer.write(b"425 Unable to build data connection.\r\n")
+            elif verb in ("PASV", "EPSV"):
+                if not logged_in:
+                    writer.write(b"530 Please login with USER and PASS.\r\n")
+                else:
+                    is_epsv = verb == "EPSV"
+                    # Close any previous data channel first.
+                    old = data_conn.pop("server", None)
+                    if old is not None:
+                        old.close()
+                    data_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    data_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    data_sock.bind(("0.0.0.0", 0))
+                    data_sock.listen(1)
+                    loop_tmp = asyncio.get_running_loop()
+                    data_server = await loop_tmp.create_server(
+                        asyncio.Protocol, sock=data_sock
+                    )
+                    data_conn["server"] = data_server
+                    data_conn["sock"] = data_sock
+                    dport = data_sock.getsockname()[1]
+                    if is_epsv:
+                        writer.write(f"229 Entering Extended Passive Mode (|||{dport}|)\r\n".encode())
+                    else:
+                        advert_ip = _outbound_advertised_ip(addr)
+                        p_hi, p_lo = dport // 256, dport % 256
+                        writer.write(
+                            b"227 Entering Passive Mode ("
+                            + ",".join(str(o).encode() for o in advert_ip.split("."))
+                            + f",{p_hi},{p_lo}".encode() + b")\r\n"
+                        )
+
+                    loop = asyncio.get_running_loop()
+
+                    async def _accept_data():
+                        try:
+                            client_sock, _ = await loop.sock_accept(
+                                data_conn["sock"]
+                            )
+                            _r, w = await asyncio.open_connection(sock=client_sock)
+                            data_conn["writer"] = w
+                        except Exception:
+                            pass
+
+                    data_conn["accept_task"] = asyncio.ensure_future(_accept_data())
+            elif verb in ("LIST", "NLST"):
+                dwriter = data_conn.get("writer")
+                if not logged_in:
+                    writer.write(b"530 Please login with USER and PASS.\r\n")
+                elif dwriter is None and data_conn.get("accept_task") is not None:
+                    # The client's data connection may race our accept task;
+                    # give it a moment before giving up.
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.shield(data_conn["accept_task"]), timeout=3
+                        )
+                    except Exception:
+                        pass
+                    dwriter = data_conn.get("writer")
+                if dwriter is None:
+                    writer.write(b"425 Use PASV first.\r\n")
+                else:
+                    writer.write(b"150 Here comes the directory listing.\r\n")
+                    listing = (
+                        "total 28\r\n"
+                        "drwxr-xr-x  2 root root 4096 Mar 14 09:32 .\r\n"
+                        "drwxr-xr-x  3 root root 4096 Mar 14 09:32 ..\r\n"
+                        "-rw-------  1 root root  220 Mar 14 09:32 .bash_history\r\n"
+                        "-rw-r--r--  1 root root  3771 Mar  9 14:11 .bashrc\r\n"
+                        "drwxr-xr-x  2 root root 4096 Mar 12 18:04 backup\r\n"
+                        "drwxr-xr-x  2 root root 4096 Mar 11 10:47 conf\r\n"
+                        "drwxr-xr-x  2 root root 4096 Feb 28 21:20 logs\r\n"
+                        "-rw-r--r--  1 root root 18954 Mar 13 22:58 nohup.out\r\n"
+                    )
+                    try:
+                        dwriter.write(
+                            listing.encode() if verb == "LIST"
+                            else "\n".join(
+                                ln.split()[-1] for ln in listing.strip().splitlines()
+                            ).encode() + b"\r\n"
+                        )
+                        await dwriter.drain()
+                    except Exception:
+                        pass
+                    finally:
+                        dwriter.close()
+                        data_conn.pop("writer", None)
+                    writer.write(b"226 Directory send OK.\r\n")
+            elif verb in ("RETR", "STOR", "APPE", "DELE", "MKD", "RMD"):
+                writer.write(b"550 Permission denied.\r\n")
             elif verb == "HELP":
-                writer.write(b"214-Commands supported:\r\n USER PASS QUIT FEAT SYST PWD CWD LIST\r\n214 End\r\n")
+                writer.write(b"214-Commands supported:\r\n USER PASS QUIT FEAT SYST PWD CWD LIST PASV\r\n214 End\r\n")
             else:
                 writer.write(b"500 Unknown command.\r\n")
             await writer.drain()
     except Exception:
         pass
     finally:
+        try:
+            if data_conn.get("server"):
+                data_conn["server"].close()
+            if data_conn.get("sock"):
+                data_conn["sock"].close()
+        except Exception:
+            pass
         writer.close()
 
 

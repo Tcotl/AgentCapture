@@ -28,6 +28,30 @@ logger = logging.getLogger("honeypot_ssh")
 
 try:
     import paramiko
+
+    class _ScannerNoiseFilter(logging.Filter):
+        """Drop paramiko's ERROR-level tracebacks for pre-banner probe noise.
+
+        Port scanners and low-quality clients constantly open connections and
+        disappear before the SSH banner exchange; paramiko's transport thread
+        logs a full traceback for each. That is expected background noise for
+        a honeypot, not a fault — keep everything else.
+        """
+
+        _NOISE = (
+            "Error reading SSH protocol banner",
+            "EOF when attempting to read the banner",
+            "Connection reset by peer",
+            "Socket exception",
+        )
+
+        def filter(self, record: logging.LogRecord) -> bool:
+            try:
+                return not any(n in record.getMessage() for n in self._NOISE)
+            except Exception:
+                return True
+
+    logging.getLogger("paramiko").addFilter(_ScannerNoiseFilter())
 except ImportError:  # pragma: no cover - exercised only without the extra
     paramiko = None
 

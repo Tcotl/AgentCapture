@@ -17,7 +17,7 @@ from urllib.request import Request as UrlRequest, urlopen
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import delete, desc, func, select, update as sa_update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -620,6 +620,41 @@ def _execute_sensitive_action(db: Session, actor: User, pending: dict) -> str:
     elif action == "delete_template":
         item = db.get(ServiceTemplate, params["template_id"])
         if item:
+            # events.template_id references this template (no DB-level cascade
+            # by design); null the references and stop any live deployment
+            # before the delete, or a FOREIGN KEY constraint aborts it.
+            db.execute(
+                sa_update(Event)
+                .where(Event.template_id == item.id)
+                .values(template_id=None)
+            )
+            for node_row in db.scalars(select(Node)).all():
+                entries = [
+                    e for e in (node_row.deployed_services_json or [])
+                    if not (
+                        isinstance(e, dict) and e.get("template_id") == item.id
+                    )
+                ]
+                if len(entries) != len(node_row.deployed_services_json or []):
+                    for entry in node_row.deployed_services_json or []:
+                        if (
+                            isinstance(entry, dict)
+                            and entry.get("template_id") == item.id
+                            and entry.get("deploy_port")
+                        ):
+                            try:
+                                from app.services.deployed_server import (
+                                    unregister_deployed,
+                                )
+
+                                unregister_deployed(
+                                    int(entry["deploy_port"]),
+                                    str(entry.get("deploy_route", "/") or "/"),
+                                )
+                            except Exception:
+                                pass
+                    node_row.deployed_services_json = entries
+                    db.add(node_row)
             db.delete(item)
             db.commit()
             log_execution(
@@ -3283,6 +3318,11 @@ def admin_attacks(
         source_ip=source_ip or None,
         site_id=site_id or None,
     )
+    from app.models.isolation import IsolationEntry
+
+    active_isolations = int(
+        db.scalar(select(func.count()).select_from(IsolationEntry)) or 0
+    )
     return _render(
         request,
         "admin/attacks.html",
@@ -3290,6 +3330,7 @@ def admin_attacks(
             "title": "攻击流量",
             "current_user": user,
             "items": items,
+            "active_isolations": active_isolations,
             "filters": {
                 "date_from": date_from,
                 "date_to": date_to,
@@ -4670,7 +4711,34 @@ def enable_template(
     new_entry["enabled"] = True
     new_entry["template_id"] = template.id  # internal annotation
 
+    # Re-deploy of the same template supersedes older instances: stop the old
+    # live servers and drop their entries, otherwise every clone run leaves
+    # another zombie honeypot listening on a new port.
+    from app.services.deployed_server import unregister_deployed
+
     deployed = list(node.deployed_services_json or [])
+    superseded = [
+        e for e in deployed
+        if isinstance(e, dict) and e.get("type") == WEB_TEMPLATE_KIND
+        and e.get("template_id") == template.id
+        and not (
+            int(e.get("deploy_port", 0) or 0) == deploy_port
+            and str(e.get("deploy_route", "/") or "/") == deploy_route
+        )
+    ]
+    for old in superseded:
+        try:
+            unregister_deployed(
+                int(old.get("deploy_port", 0) or 0),
+                str(old.get("deploy_route", "/") or "/"),
+            )
+        except Exception:
+            pass
+    if superseded:
+        deployed = [
+            e for e in deployed
+            if e not in superseded
+        ]
     deployed.append(new_entry)
     node.deployed_services_json = deployed
     # Last-write-wins FK — also helps the templates page list which node
@@ -5592,6 +5660,12 @@ def revoke_isolation_entry(entry_id: int, request: Request, db: Session = Depend
             target_type="entry",
             target_ref=str(entry_id),
         )
+    return _redirect("/admin/alerts")
+
+
+@router.get("/admin/isolation")
+def admin_isolation_redirect():
+    """Isolation management lives inside the alerts page; GET lands there."""
     return _redirect("/admin/alerts")
 
 

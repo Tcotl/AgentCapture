@@ -612,7 +612,7 @@ function renderHosts(hosts) {
       + '<td><code class="mc-mono">' + esc((h.externalIps||[])[0] || '-') + '</code></td>'
       + '<td><code class="mc-mono">' + esc((h.internalIps||[])[0] || '-') + '</code></td>'
       + '<td>' + esc(h.username || '-') + '</td>'
-      + '<td>' + esc(h.hostname || h.displayName || '-') + '</td>'
+      + '<td>' + esc(h.hostname || h.displayName || '-') + (h.metadata && h.metadata.archived ? ' <span class="badge badge-warning" style="margin-left:4px">已归档</span>' : '') + '</td>'
       + '<td>' + esc(h.osVersion || h.platform || '-') + '</td>'
       + '<td>' + esc(h.architecture || '-') + '</td>'
       + '<td>' + esc(listenerName(h.listenerId)) + '</td>'

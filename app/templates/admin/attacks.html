@@ -155,6 +155,11 @@
       <p class="panel-subtitle" style="margin:0">{{ request.query_params.get('saved') }}</p>
     </div>
     {% endif %}
+    {% if active_isolations %}
+    <div class="panel page-banner" style="border-left:3px solid var(--warning,#f59e0b)">
+      <p class="panel-subtitle" style="margin:0">⚠ 当前有 <strong>{{ active_isolations }}</strong> 条活动隔离——被隔离来源的访问会收到伪装的「503 维护中」页面（属正常反制行为，不是平台故障）。可在 <a href="/admin/alerts">告警配置 → 主动隔离</a> 中查看/解除。</p>
+    </div>
+    {% endif %}
     <section class="panel">
       {{ section_header('筛选控制台', 'FILTER CONSOLE · 按时间窗 / 来源 IP / 站点收窄聚合结果') }}
       <form method="get" action="/admin/attacks" class="at-filter" data-recent-filter-key="admin-attacks">
