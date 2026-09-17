@@ -219,6 +219,8 @@ AgentCapture/
 │   ├── services/           # 风险引擎、SSH 蜜罐、欺骗文件系统、告警、保留策略等
 │   ├── static/             # beacon.js、recon.js、Logo、Agent 样例
 │   └── templates/          # 管理后台与公开页面模板
+├── api/                    # Vercel 无服务器入口（Web 反制层）
+├── vercel.json             # Vercel 部署配置
 ├── data/                   # 运行期数据目录（Docker volume 持久化）
 ├── docs/                   # 架构说明与实拍截图
 ├── scripts/                # 自检与运维脚本
@@ -280,6 +282,20 @@ source .venv/bin/activate
 pip install -e .
 uvicorn app.main:app --reload --host 0.0.0.0 --port 4877
 ```
+
+### 方式四：Vercel 无服务器部署（Web 反制层）
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTcotl%2FAgentCapture&env=SECRET_KEY&demoTitle=AgentCapture)
+
+或使用 Vercel CLI：
+
+```bash
+npm i -g vercel
+vercel env add SECRET_KEY        # 必填：随机 32+ 字符
+vercel --prod                    # 一键部署（仓库内置 vercel.json）
+```
+
+**能力边界（重要）**：Vercel 为无服务器平台，运行 **Web 反制层**——采集注入中间件、全部蜜饵面（Portal / 指令文件 / MCP / 数据集 / 云元数据 / 内网 wiki）、后台控制台与开放 API；协议蜜罐（SSH/MySQL 等 TCP 监听）与 Web 克隆实例需要长驻进程，**无法在 Vercel 运行**——用一台自托管 Docker 节点承担（见接入文档 §5.4-5.5），两者共用同一外部数据库即组成完整蜜网。SQLite 默认落在 /tmp（实例间不保证持久），生产建议在 Vercel 环境变量中配置 `DATABASE_URL` 指向外部 PostgreSQL（如 Neon / Supabase）。
 
 ---
 

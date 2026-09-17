@@ -219,6 +219,8 @@ AgentCapture/
 │   ├── services/           # Risk engine, SSH honeypot, deceptive FS, alerts, retention…
 │   ├── static/             # beacon.js, recon.js, logo, agent samples
 │   └── templates/          # Admin & public templates
+├── api/                    # Vercel serverless entrypoint (web layer)
+├── vercel.json             # Vercel deployment config
 ├── data/                   # Runtime data (persisted Docker volume)
 ├── docs/                   # Architecture notes & live screenshots
 ├── scripts/                # Self-check & ops scripts

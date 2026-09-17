@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -124,9 +125,23 @@ app.include_router(demo_router)
 
 @app.on_event("startup")
 def on_startup() -> None:
+    # Serverless targets (Vercel etc.): no long-running processes, no TCP
+    # listeners, ephemeral filesystem — skip everything that needs a daemon
+    # and keep only the web deception layer + console + APIs.
+    serverless = (
+        os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS_MODE") == "1"
+    )
     init_db()
     with SessionLocal() as db:
         seed_defaults(db)
+    if serverless:
+        import logging
+
+        logging.getLogger("honeypot_services").info(
+            "serverless mode: skipping deployed-server autoload, retention "
+            "scheduler and protocol honeypot autostart"
+        )
+        return
     deployed_server.MAIN_PORT = settings.port
     deployed_server.load_from_db()
     # Retention: one startup pass + hourly daemon (see services/retention.py)
@@ -135,7 +150,8 @@ def on_startup() -> None:
     try:
         with SessionLocal() as db:
             run_retention(db)
-        start_retention_scheduler()
+        if not serverless:
+            start_retention_scheduler()
     except Exception:
         import logging
 
