@@ -228,7 +228,33 @@ token = HMAC-SHA256(SECRET_KEY, session_id)[:24]
 - 显式注入模板（SYSTEM_OVERRIDE / C2_RECRUIT_PROMPT）保留用于弱防护目标（无对齐层的老旧模型、自研回路），与功能性诱饵形成覆盖梯度；
 - 诱饵注册产生的 C2 名册条目应与真实植入体区分运营（`metadata.recruited_via` 字段标注来源）。
 
-## 8. 下一步增强点
+## 8. 反制面扩展（蜜网与运营体系）
+
+在 7.x 功能性伪装主线上，反制面向四个方向扩展（实现于 `routes/counter_offense.py` 与 `services/counter_intel.py`）：
+
+### 8.1 Agent 生态深度反制
+
+- **指令文件蜜饵**：`/AGENTS.md`、`/CLAUDE.md`、`/.cursorrules` 返回项目级 Agent 指南（Agent 自动读取的信任入口），内容引导至 Portal 数据接口 / 消耗战数据集 / MCP 蜜罐，全文携带会话水印并记录识别出的产品指纹；
+- **MCP 蜜罐**（`/mcp`）：JSON-RPC 2.0，`initialize` / `tools/list` / `tools/call`；四个毒化工具（query_customer_db、read_internal_wiki、run_diagnostic、list_api_credentials）返回带审计码的水印数据，调用即事件 + 指纹归因；
+- **消耗战数据集**（`/portal/api/dataset`）：无限分页（999,999 页）水印假客户数据，逐行可溯源至 (会话, 页, 行)。
+
+### 8.2 数据毒化与 SSRF 蜜罐
+
+- 所有毒化数据统一水印函数 `_wm_code(会话, 行键)`，泄露可逐条溯源；
+- 云元数据伪装（`/latest/meta-data/...` 与 GCP token 路径）返回蜜标云凭证（`AKIA<水印>`），risk 95 + 凭证观测落库——SSRF 利用即告警 + 归因。
+
+### 8.3 内网横向蜜网
+
+- SSH 假文件系统 `/etc/hosts` 内嵌内网主机线索（intranet/git/backup.corp.local）；假 shell 的 curl/wget 对内网域名返回会话水印版内网 wiki；
+- 横向水印凭证（`Bk2026!*`）出现在任何其它捕获面时，集中采集点（`create_credential_observation`）自动产生 risk 90 的 `lateral_credential_reuse` 事件。
+
+### 8.4 运营体系
+
+- **反制剧本**（`/admin/playbooks`）：三个一键姿态（VPN 门户反制 / 内网横移诱捕 / Agent 情报收集），联动 Portal 配置、协议蜜罐启停与收编 Agent 任务广播，逐步审计；
+- **攻击者画像**（`/admin/attacker-profiles`）：按来源聚合（事件量、风险峰值、Agent 指纹、凭证数）+ 自动标签（AI Agent / 凭证尝试 / 高危 / 回头客）+ IP 级完整档案；
+- **反制 KPI**（Portal 页）：收编转化率、Stager 执行率、SSH 平均命令数、回头客占比。
+
+## 9. 下一步增强点
 
 1. PostgreSQL + Alembic
 2. 节点真实心跳和任务分发
