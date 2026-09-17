@@ -319,6 +319,7 @@ NAV_GROUPS = [
             ("态势大屏", "/admin/big-screen"),
             ("攻击流量", "/admin/attacks"),
             ("攻击来源", "/admin/attack-sources"),
+            ("攻击者画像", "/admin/attacker-profiles"),
         ],
     },
     {
@@ -342,6 +343,7 @@ NAV_GROUPS = [
             ("提示词注入管理", "/admin/prompt-injection"),
             ("Jsonp模版管理", "/admin/jsonp-templates"),
             ("功能性伪装反制", "/admin/portal"),
+            ("反制剧本", "/admin/playbooks"),
         ],
     },
     {
@@ -384,6 +386,8 @@ NAV_ICONS = {
     "/admin/decoy-management": "flag",
     "/admin/prompt-injection": "bot",
     "/admin/jsonp-templates": "monitor",
+    "/admin/playbooks": "zap",
+    "/admin/attacker-profiles": "users",
     "/admin/portal": "target",
     "/admin/c2/console": "terminal",
     "/admin/c2/agents": "bot",
@@ -410,6 +414,8 @@ NAV_DESCRIPTIONS = {
     "/admin/decoy-management": "蜜饵模板、分发路径与部署",
     "/admin/prompt-injection": "提示词注入模板与内容维护",
     "/admin/jsonp-templates": "Jsonp 请求方法与回调模板",
+    "/admin/playbooks": "一键应用成套反制姿态",
+    "/admin/attacker-profiles": "按来源聚合的攻击者持久画像",
     "/admin/portal": "功能性伪装反制通道（Portal API）运营配置",
     "/admin/alerts": "通知渠道与告警策略",
     "/admin/intel": "白名单与威胁情报",
@@ -6755,6 +6761,120 @@ def _portal_funnel_stats(db: Session) -> dict:
     return stats
 
 
+@router.get("/admin/playbooks", response_class=HTMLResponse)
+def admin_playbooks(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    from app.services.playbooks import get_playbooks
+
+    return _render(
+        request,
+        "admin/playbooks.html",
+        {"title": "反制剧本", "playbooks": get_playbooks(),
+         "applied": request.query_params.get("applied", ""),
+         "user": user},
+    )
+
+
+@router.post("/admin/playbooks/{playbook_id}/apply")
+def admin_playbook_apply(playbook_id: str, request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services.playbooks import apply_playbook
+
+    result = apply_playbook(db, playbook_id, actor=user.username)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="apply-playbook",
+        module="playbooks",
+        target_type="playbook",
+        target_ref=playbook_id,
+        detail_json=result,
+    )
+    summary = "; ".join(result.get("applied", [])) if result.get("ok") else str(result.get("error"))
+    return _redirect("/admin/playbooks" + _qs(applied=f"{result.get('playbook', playbook_id)}：{summary}"))
+
+
+@router.get("/admin/attacker-profiles", response_class=HTMLResponse)
+def admin_attacker_profiles(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    from app.models.credential import CredentialObservation
+    from app.services.counter_intel import attacker_tags
+
+    rows = db.execute(
+        select(
+            Event.source_ip,
+            func.count().label("events"),
+            func.max(Event.risk_score).label("risk_peak"),
+            func.min(Event.created_at).label("first_seen"),
+            func.max(Event.created_at).label("last_seen"),
+        )
+        .group_by(Event.source_ip)
+        .order_by(desc("events"))
+        .limit(100)
+    ).all()
+    profiles = []
+    for ip, count, peak, first, last in rows:
+        products = {
+            (p.get("agent_fingerprint") or {}).get("label")
+            for p in db.scalars(
+                select(Event.payload_json).where(Event.source_ip == ip)
+            ).all()
+            if isinstance(p, dict) and p.get("agent_fingerprint")
+        }
+        products.discard(None)
+        cred_count = int(
+            db.scalar(
+                select(func.count()).select_from(CredentialObservation).where(
+                    CredentialObservation.source_ip == ip)
+            )
+            or 0
+        )
+        stats = {
+            "events": count,
+            "risk_peak": int(peak or 0),
+            "credential_count": cred_count,
+            "agent_products": sorted(products),
+            "decoy_hits": 0,
+            "honeypot_hits": 0,
+            "active_days": len({(last or first).date()} if last else set()),
+        }
+        profiles.append({
+            "ip": ip,
+            "events": count,
+            "risk_peak": int(peak or 0),
+            "first_seen": first,
+            "last_seen": last,
+            "products": sorted(products),
+            "credentials": cred_count,
+            "tags": attacker_tags(stats),
+        })
+    return _render(
+        request,
+        "admin/attacker_profiles.html",
+        {"title": "攻击者画像", "profiles": profiles, "user": user},
+    )
+
+
+@router.get("/admin/attacker-profiles/{ip}", response_class=HTMLResponse)
+def admin_attacker_profile_detail(ip: str, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    from app.models.credential import CredentialObservation
+
+    events = db.scalars(
+        select(Event).where(Event.source_ip == ip).order_by(desc(Event.created_at)).limit(50)
+    ).all()
+    creds = db.scalars(
+        select(CredentialObservation).where(CredentialObservation.source_ip == ip)
+        .order_by(desc(CredentialObservation.created_at)).limit(50)
+    ).all()
+    return _render(
+        request,
+        "admin/attacker_profile_detail.html",
+        {"title": f"攻击者画像 · {ip}", "ip": ip, "events": events, "creds": creds,
+         "user": user},
+    )
+
+
 @router.get("/admin/portal", response_class=HTMLResponse)
 def admin_portal_config(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
@@ -6762,6 +6882,9 @@ def admin_portal_config(request: Request, db: Session = Depends(get_db)):
 
     row = get_config_row(db)
     stats = _portal_funnel_stats(db)
+    from app.services.counter_intel import counter_kpis
+
+    kpis = counter_kpis(db)
     return _render(
         request,
         "admin/portal_config.html",
@@ -6769,6 +6892,7 @@ def admin_portal_config(request: Request, db: Session = Depends(get_db)):
             "title": "功能性伪装反制",
             "config": row,
             "stats": stats,
+            "kpis": kpis,
             "saved": request.query_params.get("saved", ""),
             "user": user,
         },

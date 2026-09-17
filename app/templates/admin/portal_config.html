@@ -54,6 +54,18 @@
   {{ metric_card('24h 限速拦截', '<span id="pc-stat-throttled">' ~ stats.throttled ~ '</span>') }}
 </div>
 
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('反制效果指标', '全链路转化度量——让蜜罐运营从事件流走向 KPI') }}
+  <div class="cards">
+    {{ metric_card('收编转化率 (24h)', kpis.portal_recruit_rate ~ '%', 'success' if kpis.portal_recruit_rate else 'default') }}
+    {{ metric_card('Stager 执行率 (7d)', kpis.stager_execution_rate ~ '%', 'success' if kpis.stager_execution_rate else 'default') }}
+    {{ metric_card('Stager 下载 (7d)', kpis.stager_downloads_7d) }}
+    {{ metric_card('Stager 上线数', kpis.stager_executions, 'success' if kpis.stager_executions else 'default') }}
+    {{ metric_card('SSH 平均命令数', kpis.ssh_avg_commands) }}
+    {{ metric_card('回头客占比 (7d)', kpis.returning_ratio ~ '%') }}
+  </div>
+</section>
+
 <div class="grid-2" style="align-items:start">
   <section class="panel">
     {{ section_header('通道配置', '总开关关闭时：页脚不再展示，/portal/api/* 全部返回 404（伪装成 API 不存在）') }}

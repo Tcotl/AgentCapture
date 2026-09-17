@@ -246,7 +246,14 @@ def build_default_fs(ctx=None) -> FsNode:
 
     etc = _dir(children={
         "hostname": _file("web-prod-01\n"),
-        "hosts": _file("127.0.0.1 localhost\n10.0.7.10 web-prod-01\n10.0.7.11 db-primary.internal\n"),
+        "hosts": _file(
+            "127.0.0.1 localhost\n"
+            "10.0.7.10 web-prod-01\n"
+            "10.0.7.11 db-primary.internal\n"
+            "10.0.7.12 intranet.corp.local wiki.corp.local\n"
+            "10.0.7.13 git.corp.local\n"
+            "10.0.7.20 backup.internal\n"
+        ),
         "os-release": _file(FAKE_OS_RELEASE),
         "issue": _file(FAKE_ISSUE),
         "passwd": _file(_etc_passwd),

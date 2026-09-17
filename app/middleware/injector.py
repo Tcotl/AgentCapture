@@ -64,7 +64,14 @@ SKIP_PREFIXES = (
 # Bait paths are observe-only: never block/isolate, or the decoy chain breaks
 # before credentials/payloads can be captured (e.g. a curl UA alone scores 30,
 # and velocity/canary signals would otherwise push a bait POST past isolate).
-OBSERVE_ONLY_PREFIXES = ("/_trap/", "/d/", "/_bait/", "/portal/")
+OBSERVE_ONLY_PREFIXES = (
+    "/_trap/", "/d/", "/_bait/", "/portal/",
+    # Counter-offense bait surfaces: reading agent instruction files,
+    # probing the MCP honeypot / cloud metadata or browsing the fake
+    # intranet must never be challenged or the deception breaks.
+    "/AGENTS.md", "/CLAUDE.md", "/.cursorrules", "/robots.txt",
+    "/mcp", "/intranet", "/latest/meta-data",
+)
 # ^ "/portal/" — the advertised Developer API must behave like a real API:
 # browser challenges / isolation pages on an API endpoint are a camouflage
 # break and block the lure itself. Requests there are still fully recorded

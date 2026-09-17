@@ -12,6 +12,7 @@ from app.routes.agent_control import router as agent_control_router
 from app.routes.c2 import router as c2_router
 from app.routes.collect import router as collect_router
 from app.routes.console import router as console_router
+from app.routes.counter_offense import router as counter_offense_router
 from app.routes.counter_recon import router as counter_recon_router
 from app.routes.demo import router as demo_router
 from app.routes.health import router as health_router
@@ -114,6 +115,7 @@ app.include_router(c2_router)
 app.include_router(collect_router)
 app.include_router(console_router)
 app.include_router(counter_recon_router)
+app.include_router(counter_offense_router)
 app.include_router(traps_router)
 app.include_router(public_api_router)
 app.include_router(admin_router)

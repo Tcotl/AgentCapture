@@ -537,7 +537,26 @@ def _cmd_docker(sh, args):
     return "Cannot connect to the Docker daemon" if args and args[0] == "info" else ""
 
 
+INTERNAL_HOSTS = ("intranet.corp.local", "wiki.corp.local", "10.0.7.12")
+
+INTRANET_PAGE = (
+    "<html><head><title>内部知识库 · Corp Wiki</title></head>"
+    "<body><h1>内部知识库</h1>"
+    "<ul><li>生产数据库 db-primary.internal (10.0.7.11)</li>"
+    "<li>备份服务 backup.internal（/backup 目录）</li>"
+    "<li>运维数据接口 /portal/api/content</li></ul>"
+    "<p>本周值班：wei.chen / fang.wang（审计码 {code}）</p>"
+    "</body></html>"
+)
+
+
 def _cmd_wget_curl(sh, args, is_curl: bool = False):
+    joined = " ".join(args)
+    if any(host in joined for host in INTERNAL_HOSTS):
+        from app.services.counter_intel import watermark_token
+
+        code = watermark_token(getattr(sh, "session_fingerprint", "") or sh.session_id)
+        return INTRANET_PAGE.replace("{code}", code)
     urls = [a for a in args if a.startswith(("http://", "https://"))]
     if not urls:
         return ("curl: try 'curl --help'" if is_curl else "wget: missing URL")

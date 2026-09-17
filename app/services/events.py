@@ -582,6 +582,31 @@ def create_credential_observation(
     db.add(item)
     db.commit()
     db.refresh(item)
+
+    # Lateral-movement watermark: a credential harvested from the SSH fake
+    # filesystem (Bk2026!<fingerprint>) surfacing on any *other* capture
+    # surface proves cross-surface movement by the same attacker.
+    from app.services.counter_intel import lateral_watermark
+
+    watermark = lateral_watermark(username, password)
+    if watermark and service_name != "ssh":
+        create_event(
+            db,
+            site_id=get_settings().site_id,
+            session_id=session_id,
+            source_ip=source_ip,
+            method="cred",
+            path=path,
+            status_code=200,
+            event_type="lateral_credential_reuse",
+            user_agent="",
+            headers_json={},
+            payload_json={"watermark": watermark, "observed_via": source_label,
+                          "service": service_name},
+            signals_json=["lateral_movement", "watermark_reuse"],
+            risk_score=90,
+            decision="challenge",
+        )
     return item
 
 
