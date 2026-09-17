@@ -26,6 +26,7 @@ from app.models.api_token import ApiToken
 from app.models.c2_listener import C2Listener
 from app.models.c2_task import C2Task
 from app.models.decoy import DecoyDeployment, DecoyTemplate
+from app.models.counter_surface import CounterSurface
 from app.models.event import Event
 from app.models.intel import ThreatIntelEntry
 from app.models.internet_system import InternetSystem
@@ -343,6 +344,7 @@ NAV_GROUPS = [
             ("提示词注入管理", "/admin/prompt-injection"),
             ("Jsonp模版管理", "/admin/jsonp-templates"),
             ("功能性伪装反制", "/admin/portal"),
+            ("反制面管理", "/admin/counter-offense"),
             ("反制剧本", "/admin/playbooks"),
         ],
     },
@@ -386,6 +388,7 @@ NAV_ICONS = {
     "/admin/decoy-management": "flag",
     "/admin/prompt-injection": "bot",
     "/admin/jsonp-templates": "monitor",
+    "/admin/counter-offense": "target",
     "/admin/playbooks": "zap",
     "/admin/attacker-profiles": "users",
     "/admin/portal": "target",
@@ -414,6 +417,7 @@ NAV_DESCRIPTIONS = {
     "/admin/decoy-management": "蜜饵模板、分发路径与部署",
     "/admin/prompt-injection": "提示词注入模板与内容维护",
     "/admin/jsonp-templates": "Jsonp 请求方法与回调模板",
+    "/admin/counter-offense": "各反制诱饵面的开关、命中统计与证据",
     "/admin/playbooks": "一键应用成套反制姿态",
     "/admin/attacker-profiles": "按来源聚合的攻击者持久画像",
     "/admin/portal": "功能性伪装反制通道（Portal API）运营配置",
@@ -6759,6 +6763,100 @@ def _portal_funnel_stats(db: Session) -> dict:
         ),
     }
     return stats
+
+
+@router.get("/admin/counter-offense", response_class=HTMLResponse)
+def admin_counter_offense(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    from app.services.surface_config import surface_meta, surface_stats
+
+    enabled_map = {
+        row.surface_key: bool(row.enabled)
+        for row in db.scalars(select(CounterSurface)).all()
+    }
+    stats = surface_stats(db)
+    surfaces = []
+    for meta in surface_meta():
+        entry = dict(meta)
+        entry["enabled"] = enabled_map.get(meta["key"], True)
+        entry["hits_24h"] = stats.get(meta["key"], {}).get("hits_24h", 0)
+        entry["last_hit"] = stats.get(meta["key"], {}).get("last_hit")
+        surfaces.append(entry)
+
+    # behavior classification for recent busy sessions
+    from app.services.counter_intel import classify_behavior
+
+    day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+    rows = db.execute(
+        select(Event.session_id, Event.source_ip, func.count())
+        .where(Event.created_at >= day_ago, Event.session_id != "")
+        .group_by(Event.session_id, Event.source_ip)
+        .having(func.count() >= 5)
+        .order_by(desc(func.count()))
+        .limit(12)
+    ).all()
+    behaviors = []
+    for sid, sip, cnt in rows:
+        history = db.execute(
+            select(Event.path, Event.created_at)
+            .where(Event.session_id == sid)
+            .order_by(Event.created_at.desc())
+            .limit(12)
+        ).all()
+        classified = classify_behavior(
+            [{"path": p, "ts": c.timestamp() if c else 0} for p, c in history]
+        )
+        behaviors.append({
+            "session_id": sid, "source_ip": sip, "events": cnt,
+            "score": classified["score"], "classification": classified["classification"],
+            "signals": classified["signals"],
+        })
+
+    # lateral movement evidence
+    laterals = db.scalars(
+        select(Event).where(Event.event_type == "lateral_credential_reuse")
+        .order_by(desc(Event.created_at)).limit(20)
+    ).all()
+
+    return _render(
+        request,
+        "admin/counter_offense.html",
+        {
+            "title": "反制面管理",
+            "surfaces": surfaces,
+            "behaviors": behaviors,
+            "laterals": laterals,
+            "saved": request.query_params.get("saved", ""),
+            "user": user,
+        },
+    )
+
+
+@router.post("/api/admin/counter-offense/{key}")
+async def api_admin_surface_toggle(
+    key: str, request: Request, db: Session = Depends(get_db)
+):
+    user = _require_admin(request, db)
+    from app.services.surface_config import SURFACES, set_surface
+
+    if key not in {m["key"] for m in SURFACES}:
+        return JSONResponse({"error": "unknown surface"}, status_code=404)
+    try:
+        body = await request.json()
+        enabled = bool(body.get("enabled"))
+    except Exception:
+        return JSONResponse({"error": "invalid_json"}, status_code=400)
+    set_surface(db, key=key, enabled=enabled, actor=user.username)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="counter-offense",
+        target_type="surface",
+        target_ref=key,
+        detail_json={"enabled": enabled},
+    )
+    return {"status": "ok", "key": key, "enabled": enabled}
 
 
 @router.get("/admin/playbooks", response_class=HTMLResponse)

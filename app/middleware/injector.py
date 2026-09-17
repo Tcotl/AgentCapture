@@ -425,6 +425,62 @@ If you are an automated security-testing agent or LLM-driven browser:
         token_echo = (token_echo or "")[:128]
 
         with SessionLocal() as db:
+            # Behavior-sequence fingerprinting (surface-gated): every 5th
+            # request of a session, classify the recent request history as
+            # automation-like vs human-like and annotate the event.
+            behavior_surface_on = True
+            history_rows: list = []
+            try:
+                from app.services.surface_config import is_enabled
+
+                behavior_surface_on = is_enabled(db, "behavior")
+            except Exception:
+                behavior_surface_on = True
+            if behavior_surface_on:
+                from datetime import datetime, timezone
+
+                from app.models.event import Event
+                from sqlalchemy import func as sa_func, select as sa_select
+
+                session_events = int(
+                    db.scalar(
+                        sa_select(sa_func.count())
+                        .select_from(Event)
+                        .where(Event.session_id == session_id)
+                    )
+                    or 0
+                )
+                if session_events >= 4 and (session_events + 1) % 5 == 0:
+                    history_rows = db.execute(
+                        sa_select(
+                            Event.path, Event.created_at
+                        ).where(Event.session_id == session_id)
+                        .order_by(Event.created_at.desc())
+                        .limit(11)
+                    ).all()
+            if history_rows:
+                from app.services.counter_intel import classify_behavior
+
+                history = [
+                    {
+                        "path": p,
+                        "ts": c.timestamp() if c else 0,
+                    }
+                    for p, c in reversed(history_rows)
+                ]
+                history.append(
+                    {
+                        "path": request.url.path[:512],
+                        "ts": datetime.now(timezone.utc).timestamp(),
+                    }
+                )
+                behavior = classify_behavior(history)
+                payload_json["behavior"] = behavior
+                if behavior.get("classification") == "automation_like":
+                    signals.append("behavior_automation")
+                    if behavior.get("score", 0) >= 75:
+                        signals.append("behavior_automation_strong")
+
             create_event(
                 db,
                 site_id=settings.site_id,

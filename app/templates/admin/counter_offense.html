@@ -1,0 +1,119 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge %}
+{% block content %}
+{{ page_header('CF', '反制面管理', '每一个反制诱饵面的独立开关、命中统计与证据查看。关闭某面后其端点即刻返回 404（伪装为不存在），≤5s 生效。', ['六个功能面', '实时生效']) }}
+
+{% if saved %}
+<div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
+  <p class="panel-subtitle" style="margin:0">{{ saved }}</p>
+</div>
+{% endif %}
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('功能面开关', '每个反制面独立启停；关闭即伪装为「不存在」') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>功能面</th><th>说明</th><th>入口</th><th>24h 命中</th><th>最近命中</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for s in surfaces %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td><small class="muted">{{ s.description }}</small></td>
+          <td><code style="font-size:11px">{{ s.paths }}</code></td>
+          <td><span class="c2-mono">{{ s.hits_24h }}</span></td>
+          <td><code style="font-size:11px">{{ s.last_hit.strftime('%m-%d %H:%M') if s.last_hit else '—' }}</code></td>
+          <td id="st-{{ s.key }}"><span class="badge {{ 'badge-success' if s.enabled else 'badge-warning' }}">{{ '启用' if s.enabled else '已停用' }}</span></td>
+          <td>
+            <button class="secondary btn-sm surface-toggle" data-key="{{ s.key }}" data-next="{{ 'off' if s.enabled else 'on' }}">
+              {{ '停用' if s.enabled else '启用' }}
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid-2" style="align-items:start">
+  <section class="panel">
+    {{ section_header('横向移动证据', '水印凭证（Bk2026!*）跨面复用即记录——同一攻击者的跨面横向证据') }}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>时间</th><th>来源</th><th>水印</th><th>捕获面</th></tr></thead>
+        <tbody>
+          {% for ev in laterals %}
+          <tr>
+            <td><code>{{ ev.created_at.strftime('%m-%d %H:%M') }}</code></td>
+            <td><code>{{ ev.source_ip }}</code></td>
+            <td><code>{{ (ev.payload_json or {}).get('watermark', '-') }}</code></td>
+            <td><span class="pill">{{ (ev.payload_json or {}).get('observed_via', '-') }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4"><span class="text-muted">暂无横向复用记录（水印凭证仅在 SSH 蜜罐内使用时属正常）</span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    {{ section_header('行为序列指纹', '最近高频会话的自动化特征分析（每 5 次请求分析一次）') }}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>会话</th><th>来源</th><th>请求数</th><th>得分</th><th>分类</th><th>信号</th></tr></thead>
+        <tbody>
+          {% for b in behaviors %}
+          <tr>
+            <td><code title="{{ b.session_id }}">{{ b.session_id[:12] }}…</code></td>
+            <td><code>{{ b.source_ip }}</code></td>
+            <td class="c2-mono">{{ b.events }}</td>
+            <td><span class="badge {% if b.score >= 75 %}badge-danger{% elif b.score >= 50 %}badge-warning{% else %}badge-info{% endif %}">{{ b.score }}</span></td>
+            <td>{{ badge('自动化' if b.classification == 'automation_like' else ('人类' if b.classification == 'human_like' else '未知'), 'danger' if b.classification == 'automation_like' else 'info') }}</td>
+            <td><small>{% for s in b.signals %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6"><span class="text-muted">暂无 ≥5 次请求的会话</span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="co-toast" style="position:fixed;right:24px;bottom:24px;z-index:80;padding:12px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:13px;opacity:0;transition:opacity 200ms ease;pointer-events:none"></div>
+
+<script>
+(function () {
+  var toast = document.getElementById('co-toast');
+  var timer = null;
+  function showToast(text, cls) {
+    toast.textContent = text;
+    toast.className = 'show ' + (cls || 'ok');
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () { toast.className = ''; }, 2400);
+  }
+  document.querySelectorAll('.surface-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.dataset.key;
+      var turningOff = btn.dataset.next === 'off';
+      if (turningOff && !confirm('停用该反制面后其端点将返回 404（伪装为不存在）。确认？')) return;
+      btn.disabled = true;
+      fetch('/api/admin/counter-offense/' + key, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !turningOff })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        btn.disabled = false;
+        if (d.status === 'ok') {
+          showToast((d.enabled ? '已启用 · ' : '已停用 · ') + key + '（≤5s 生效）');
+          setTimeout(function () { location.reload(); }, 800);
+        } else {
+          showToast('操作失败', 'err');
+        }
+      }).catch(function () { btn.disabled = false; showToast('网络错误', 'err'); });
+    });
+  });
+})();
+</script>
+{% endblock %}

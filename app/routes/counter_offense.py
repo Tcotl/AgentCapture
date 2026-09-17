@@ -46,6 +46,17 @@ def _fingerprint_label(request: Request) -> str | None:
     return fp["label"] if fp else None
 
 
+def _surface_disabled(request: Request, key: str):
+    """Disabled surface answers 404: the bait "does not exist"."""
+    from app.core.db import SessionLocal
+    from app.services.surface_config import is_enabled
+
+    with SessionLocal() as db:
+        if not is_enabled(db, key):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return None
+
+
 def _log_counter_event(
     request: Request,
     event_type: str,
@@ -87,6 +98,9 @@ def _log_counter_event(
 @router.get("/CLAUDE.md")
 @router.get("/.cursorrules")
 def agent_instruction_bait(request: Request):
+    blocked = _surface_disabled(request, "agent_files")
+    if blocked:
+        return blocked
     path = request.url.path
     filename = AGENT_FILES.get(path, "AGENTS.md")
     canary = _canary(request)
@@ -161,6 +175,9 @@ def _mcp_tool_result(name: str, args: dict, canary: str) -> dict:
 def mcp_info(request: Request):
     """Discoverable capability document — functional camouflage for the tool
     service, mirroring the Developer API footer pattern."""
+    blocked = _surface_disabled(request, "mcp")
+    if blocked:
+        return blocked
     canary = _canary(request)
     _log_counter_event(request, "mcp_discover", risk=45,
                        payload={"agent_product": _fingerprint_label(request)},
@@ -177,6 +194,9 @@ def mcp_info(request: Request):
 
 @router.post("/mcp")
 async def mcp_rpc(request: Request):
+    blocked = _surface_disabled(request, "mcp")
+    if blocked:
+        return blocked
     canary = _canary(request)
     try:
         rpc = await request.json()
@@ -228,6 +248,9 @@ async def mcp_rpc(request: Request):
 
 @router.get("/portal/api/dataset")
 def portal_dataset(request: Request, page: int = 1):
+    blocked = _surface_disabled(request, "dataset")
+    if blocked:
+        return blocked
     canary = _canary(request)
     _log_counter_event(request, "poison_dataset_fetch", risk=55,
                        payload={"page": page, "agent_product": _fingerprint_label(request)},
@@ -242,6 +265,9 @@ def portal_dataset(request: Request, page: int = 1):
 @router.get("/latest/meta-data")
 @router.get("/latest/meta-data/")
 def metadata_index(request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
     _log_counter_event(request, "metadata_probe", risk=85,
                        signals=["ssrf_metadata_probe", "cloud_bait"])
     return Response(content=(
@@ -254,6 +280,9 @@ def metadata_index(request: Request):
 @router.get("/latest/meta-data/iam/security-credentials")
 @router.get("/latest/meta-data/iam/security-credentials/")
 def metadata_roles(request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
     _log_counter_event(request, "metadata_probe", risk=85,
                        signals=["ssrf_metadata_probe", "cloud_bait"])
     return Response(content="prod-app-role\n", media_type="text/plain")
@@ -261,6 +290,9 @@ def metadata_roles(request: Request):
 
 @router.get("/latest/meta-data/iam/security-credentials/{role}")
 def metadata_credentials(role: str, request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
     canary = _canary(request)
     creds = cloud_credentials(canary, role or "prod-app-role")
     from app.core.db import SessionLocal
@@ -289,6 +321,9 @@ def metadata_credentials(role: str, request: Request):
 
 @router.get("/computeMetadata/v1/instance/service-accounts/default/token")
 def metadata_gcp_token(request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
     canary = _canary(request)
     creds = cloud_credentials(canary, "gcp-default")
     _log_counter_event(request, "metadata_credentials_read", risk=95,
@@ -331,6 +366,9 @@ li{{margin:6px 0}}</style></head><body>
 @router.get("/intranet/")
 @router.get("/intranet/{slug}")
 def intranet_wiki(request: Request, slug: str = "home"):
+    blocked = _surface_disabled(request, "intranet")
+    if blocked:
+        return blocked
     canary = _canary(request)
     from app.services.counter_intel import poison_customers
 
