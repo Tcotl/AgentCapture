@@ -44,11 +44,15 @@
     gap: 4px;
     max-width: 320px;
   }
-  .jsonp-description-cell {
-    max-width: 380px;
+  .table-wrap td.jsonp-description-cell {
+    max-width: 220px;
     color: var(--muted-foreground);
     line-height: 1.55;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+  .table-wrap td.jsonp-entry-cell code { word-break: break-all; white-space: normal; }
+  .table-wrap td { overflow-wrap: anywhere; }
   .jsonp-actions-row {
     display: flex;
     align-items: center;
@@ -58,7 +62,7 @@
   }
   .jsonp-actions-row button,
   .jsonp-actions-row form { width: auto; }
-  .jsonp-actions-row form button { min-width: 72px; }
+  .jsonp-actions-row form button { min-width: 0; }
   .jsonp-modal-backdrop[hidden] { display: none !important; }
   .jsonp-modal-backdrop {
     position: fixed;
@@ -167,6 +171,13 @@
 
 <section class="panel">
   {{ section_header('Jsonp 请求方法表格', '列表只展示关键字段；响应 JSON 模板不在页面直接展开，点击“编辑”后在弹窗中维护。') }}
+  <style>
+    .jsonp-table-wrap td, .jsonp-table-wrap th { padding: 8px 8px; }
+  /* long vendor URLs force columns past the wrapper — allow mid-token wrap */
+  .table-wrap td { overflow-wrap: anywhere; }
+  .jsonp-entry-cell code { word-break: break-all; }
+    .jsonp-desc-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
   <div class="jsonp-table-toolbar">
     <div class="jsonp-help-inline">用于管理反制溯源中的 Jsonp 请求方法、回调参数和字段采集策略。</div>
     <form method="post" action="/admin/jsonp-templates/bulk-delete" data-confirm="确认删除选中的 {n} 个模版？不可撤销。" class="bulk-del-form">
@@ -207,7 +218,7 @@
             </div>
           </td>
           <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
-          <td class="cell-prose jsonp-description-cell">{{ item.description or '暂无说明' }}</td>
+          <td class="jsonp-description-cell" title="{{ item.description or '' }}">{{ item.description or '暂无说明' }}</td>
           <td>
             <div class="jsonp-actions-row">
               <button type="button" onclick="openJsonpModal('jsonp-edit-{{ item.id }}')">编辑</button>

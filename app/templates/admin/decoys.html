@@ -258,9 +258,15 @@
       </form>
       <span class="muted" style="font-size:11px">勾选模板后批量移除</span>
     </div>
+    <style>
+      .table-wrap.compact td, .table-wrap.compact th { padding: 8px 8px; }
+      .decoy-deploy-form input { width: 92px !important; min-width: 0; }
+      .decoy-deploy-form select { width: 88px !important; min-width: 0; }
+      .decoy-deploy-form { display: flex; flex-direction: column; gap: 4px; }
+    </style>
     <div class="table-wrap compact"><table>
         <colgroup>
-          <col style="width: 4%"><col style="width: 7%"><col style="width: 28%"><col style="width: 21%"><col style="width: 17%"><col style="width: 15%"><col style="width: 8%">
+          <col style="width: 4%"><col style="width: 7%"><col style="width: 26%"><col style="width: 20%"><col style="width: 16%"><col style="width: 14%"><col style="width: 13%">
         </colgroup>
         <thead><tr><th style="width:34px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th><th>类型</th><th class="cell-prose">模板</th><th>投放 / 目标</th><th>绑定链路</th><th>生成部署</th><th>操作</th></tr></thead><tbody>
       {% for item in templates_list %}
