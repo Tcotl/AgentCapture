@@ -27,8 +27,10 @@
             <button class="secondary btn-sm surface-toggle" data-key="{{ s.key }}" data-next="{{ 'off' if s.enabled else 'on' }}">
               {{ '停用' if s.enabled else '启用' }}
             </button>
+            <button class="secondary btn-sm config-edit" data-key="{{ s.key }}">编辑配置</button>
           </td>
         </tr>
+        <script type="application/json" id="cfg-{{ s.key }}">{{ s.config | tojson }}</script>
         {% endfor %}
       </tbody>
     </table>
@@ -83,6 +85,24 @@
 
 <div id="co-toast" style="position:fixed;right:24px;bottom:24px;z-index:80;padding:12px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:13px;opacity:0;transition:opacity 200ms ease;pointer-events:none"></div>
 
+<div id="config-modal" style="position:fixed;inset:0;z-index:90;background:rgba(2,6,23,.72);display:none;place-items:center">
+  <div style="width:min(760px,92vw);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <strong id="cm-title">编辑配置</strong>
+      <button class="secondary btn-sm" onclick="document.getElementById('config-modal').style.display='none'">关闭</button>
+    </div>
+    <p class="muted" style="font-size:11.5px;margin:0 0 8px">
+      支持 <code>{{占位符}}</code>：{{portal_url}} {{ticket}} {{audit_code}} {{page}} {{slug}} {{target}}。保存即时生效（≤5s）。
+    </p>
+    <textarea id="cm-json" spellcheck="false"
+      style="width:100%;min-height:320px;font-family:'Fira Code',ui-monospace,monospace;font-size:12px"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px">
+      <button class="secondary btn-sm" onclick="document.getElementById('config-modal').style.display='none'">取消</button>
+      <button class="primary btn-sm" id="cm-save">保存配置</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   var toast = document.getElementById('co-toast');
@@ -93,6 +113,36 @@
     if (timer) clearTimeout(timer);
     timer = setTimeout(function () { toast.className = ''; }, 2400);
   }
+  var configs = {};
+  var enabledState = {};
+  document.querySelectorAll('.config-edit').forEach(function (btn) {
+    var key = btn.dataset.key;
+    var el = document.getElementById('cfg-' + key);
+    if (el) {
+      try { configs[key] = JSON.parse(el.textContent); } catch (e) { configs[key] = {}; }
+    }
+    btn.addEventListener('click', function () {
+      document.getElementById('cm-title').textContent = '编辑配置 · ' + key;
+      document.getElementById('cm-json').value = JSON.stringify(configs[key] || {}, null, 2);
+      document.getElementById('config-modal').style.display = 'grid';
+      document.getElementById('cm-save').onclick = function () {
+        var cfg;
+        try { cfg = JSON.parse(document.getElementById('cm-json').value); }
+        catch (e) { showToast('JSON 解析失败: ' + e.message, 'err'); return; }
+        fetch('/api/admin/counter-offense/' + key, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config: cfg, enabled: enabledState[key] !== false })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (d.status === 'ok') {
+            configs[key] = d.config || cfg;
+            showToast('配置已保存 · 即时生效（≤5s）');
+            setTimeout(function () { location.reload(); }, 700);
+          } else { showToast('保存失败: ' + (d.error || ''), 'err'); }
+        }).catch(function () { showToast('网络错误', 'err'); });
+      };
+    });
+  });
   document.querySelectorAll('.surface-toggle').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var key = btn.dataset.key;
@@ -102,12 +152,16 @@
       fetch('/api/admin/counter-offense/' + key, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !turningOff })
+        body: JSON.stringify({ enabled: !turningOff, config: configs[key] })
       }).then(function (r) { return r.json(); }).then(function (d) {
         btn.disabled = false;
         if (d.status === 'ok') {
+          enabledState[key] = d.enabled;
+          var badge = document.getElementById('st-' + key);
+          if (badge) badge.innerHTML = '<span class="badge ' + (d.enabled ? 'badge-success">启用' : 'badge-warning">已停用') + '</span>';
+          btn.textContent = d.enabled ? '停用' : '启用';
+          btn.dataset.next = d.enabled ? 'off' : 'on';
           showToast((d.enabled ? '已启用 · ' : '已停用 · ') + key + '（≤5s 生效）');
-          setTimeout(function () { location.reload(); }, 800);
         } else {
           showToast('操作失败', 'err');
         }

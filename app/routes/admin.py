@@ -26,7 +26,6 @@ from app.models.api_token import ApiToken
 from app.models.c2_listener import C2Listener
 from app.models.c2_task import C2Task
 from app.models.decoy import DecoyDeployment, DecoyTemplate
-from app.models.counter_surface import CounterSurface
 from app.models.event import Event
 from app.models.intel import ThreatIntelEntry
 from app.models.internet_system import InternetSystem
@@ -6770,15 +6769,16 @@ def admin_counter_offense(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
     from app.services.surface_config import surface_meta, surface_stats
 
-    enabled_map = {
-        row.surface_key: bool(row.enabled)
-        for row in db.scalars(select(CounterSurface)).all()
-    }
+    from app.services.surface_config import get_runtime_map
+
+    runtime = get_runtime_map(db)
     stats = surface_stats(db)
     surfaces = []
     for meta in surface_meta():
         entry = dict(meta)
-        entry["enabled"] = enabled_map.get(meta["key"], True)
+        rt = runtime.get(meta["key"], {})
+        entry["enabled"] = rt.get("enabled", True)
+        entry["config"] = rt.get("config", {})
         entry["hits_24h"] = stats.get(meta["key"], {}).get("hits_24h", 0)
         entry["last_hit"] = stats.get(meta["key"], {}).get("last_hit")
         surfaces.append(entry)
@@ -6844,9 +6844,13 @@ async def api_admin_surface_toggle(
     try:
         body = await request.json()
         enabled = bool(body.get("enabled"))
+        config = body.get("config")
+        if config is not None and not isinstance(config, dict):
+            return JSONResponse({"error": "config must be an object"}, status_code=400)
     except Exception:
         return JSONResponse({"error": "invalid_json"}, status_code=400)
-    set_surface(db, key=key, enabled=enabled, actor=user.username)
+    set_surface(db, key=key, enabled=enabled, actor=user.username,
+                config=config if isinstance(config, dict) else None)
     log_execution(
         db,
         actor_username=user.username,

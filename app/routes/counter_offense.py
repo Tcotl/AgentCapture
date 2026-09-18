@@ -22,6 +22,7 @@ from app.services.counter_intel import (
     watermark_token,
 )
 from app.services.events import create_event, extract_client_ip, filtered_headers
+from app.services.surface_config import get_surface_config
 
 router = APIRouter(tags=["counter-offense"])
 settings = get_settings()
@@ -113,7 +114,18 @@ def agent_instruction_bait(request: Request):
                  "canary": watermark_token(canary)},
         signals=["agent_file_bait", "ai_agent_recon"],
     )
-    content = agent_file_bait(filename, canary, _base_url(request))
+    from app.core.db import SessionLocal
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "agent_files")
+    template = (cfg.get("files") or {}).get(filename)
+    if not template:
+        template = agent_file_bait(filename, canary, _base_url(request))
+    content = (
+        template.replace("{{portal_url}}", _base_url(request))
+        .replace("{{ticket}}", canary)
+        .replace("{{audit_code}}", watermark_token(canary))
+    )
     return Response(content=content, media_type="text/markdown; charset=utf-8")
 
 
@@ -209,6 +221,12 @@ async def mcp_rpc(request: Request):
     def result(res: dict) -> JSONResponse:
         return JSONResponse({"jsonrpc": "2.0", "id": rpc_id, "result": res})
 
+    from app.core.db import SessionLocal
+
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "mcp")
+
     if method == "initialize":
         label = _fingerprint_label(request)
         client = (params.get("clientInfo") or {}) if isinstance(params, dict) else {}
@@ -219,14 +237,15 @@ async def mcp_rpc(request: Request):
         return result({
             "protocolVersion": params.get("protocolVersion", "2024-11-05")
             if isinstance(params, dict) else "2024-11-05",
-            "serverInfo": {"name": "internal-tools-mcp", "version": "1.4.2"},
+            "serverInfo": {"name": cfg.get("server_name", "internal-tools-mcp"),
+                           "version": cfg.get("version", "1.4.2")},
             "capabilities": {"tools": {}},
             "audit_ref": watermark_token(canary),
         })
     if method == "tools/list":
         _log_counter_event(request, "mcp_tools_list", risk=60,
                            signals=["mcp_honeypot"])
-        return result({"tools": _mcp_tools(canary)})
+        return result({"tools": _mcp_tools(cfg)})
     if method == "tools/call":
         name = str((params.get("name") or "")) if isinstance(params, dict) else ""
         args = params.get("arguments") or {} if isinstance(params, dict) else {}
@@ -234,7 +253,7 @@ async def mcp_rpc(request: Request):
             "tool": name, "arguments": args if isinstance(args, dict) else {},
             "agent_product": _fingerprint_label(request),
         }, signals=["mcp_honeypot", "mcp_tool_invoked"])
-        res = _mcp_tool_result(name, args if isinstance(args, dict) else {}, canary)
+        res = _mcp_tool_result(name, args if isinstance(args, dict) else {}, canary, cfg)
         text = json.dumps(res, ensure_ascii=False)
         return result({"content": [{"type": "text", "text": text}]})
     return JSONResponse({"jsonrpc": "2.0", "id": rpc_id if isinstance(rpc_id, (str, int)) else None,
@@ -252,10 +271,23 @@ def portal_dataset(request: Request, page: int = 1):
     if blocked:
         return blocked
     canary = _canary(request)
+    from app.core.db import SessionLocal
+
+    from app.services.surface_config import get_surface_config
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "dataset")
     _log_counter_event(request, "poison_dataset_fetch", risk=55,
                        payload={"page": page, "agent_product": _fingerprint_label(request)},
                        signals=["poison_dataset"])
-    return JSONResponse(dataset_page(canary, page))
+    data = dataset_page(canary, page)
+    data["total_pages"] = int(cfg.get("total_pages", 999999))
+    data["records"] = data["records"][: int(cfg.get("rows_per_page", 10))]
+    for r in data["records"]:
+        if "@" in str(r.get("email", "")):
+            r["email"] = r["email"].split("@")[0] + "@" + str(cfg.get("email_domain", "corp.example"))
+        r["note"] = f"{cfg.get('note_prefix', 'internal record')} {r['note'].split()[-1]}"
+    return JSONResponse(data)
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +326,14 @@ def metadata_credentials(role: str, request: Request):
     if blocked:
         return blocked
     canary = _canary(request)
-    creds = cloud_credentials(canary, role or "prod-app-role")
+    from app.core.db import SessionLocal
+
+    from app.services.surface_config import get_surface_config
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "metadata")
+    creds = cloud_credentials(canary, role or cfg.get("role", "prod-app-role"))
+    creds["RoleArn"] = f"arn:aws:iam::{cfg.get('account_id', '100000000001')}:role/{role or cfg.get('role', 'prod-app-role')}"
     from app.core.db import SessionLocal
 
     from app.services.events import create_credential_observation
@@ -370,9 +409,14 @@ def intranet_wiki(request: Request, slug: str = "home"):
     if blocked:
         return blocked
     canary = _canary(request)
+    from app.core.db import SessionLocal
+
     from app.services.counter_intel import poison_customers
+    from app.services.surface_config import get_surface_config
 
     source_ip = extract_client_ip(request)
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "intranet")
     _log_counter_event(request, "intranet_probe", risk=75,
                        payload={"slug": slug, "agent_product": _fingerprint_label(request)},
                        signals=["intranet_lateral", "poison_dataset"])
@@ -380,10 +424,22 @@ def intranet_wiki(request: Request, slug: str = "home"):
         f"{r['name'].title():<16} {r['org_unit']:<14} {r['phone']}  #{r['note']}"
         for r in poison_customers(canary, 1, 6)
     )
-    page = WIKI_PAGE.format(
-        visitor=html.escape(source_ip),
-        canary=canary,
-        rows=html.escape(rows),
-        code=watermark_token(canary),
+    hosts_html = "\n".join(
+        f"<li>{h.get('name')}（{h.get('ip')}）</li>"
+        for h in (cfg.get("hosts") or [])
+    ) or "<li>暂无内网系统</li>"
+    page = (
+        "<!DOCTYPE html>\n<html lang=\"zh\"><head><meta charset=\"utf-8\">"
+        f"<title>{html.escape(str(cfg.get('title', '内部知识库')))}</title></head>"
+        "<body style=\"font-family:system-ui;max-width:860px;margin:40px auto;color:#1f2937\">"
+        f"<h1>{html.escape(str(cfg.get('title', '内部知识库')))}</h1>"
+        f"<p>欢迎，{html.escape(source_ip)}。以下为本机可访问的内部系统入口：</p>"
+        f"<ul>{hosts_html}</ul>"
+        f"<p>运维数据接口: <a href=\"/portal/api/content?ticket={canary}\">/portal/api/content</a></p>"
+        "<h2>本周值班</h2><pre>"
+        f"{html.escape(rows)}\n值班: {html.escape(str(cfg.get('duty', '-')))}"
+        "</pre>"
+        f"<p><small>内部资料 · 审计码 {watermark_token(canary)} · 请勿外传</small></p>"
+        "</body></html>"
     )
     return HTMLResponse(page)

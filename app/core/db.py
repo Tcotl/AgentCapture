@@ -78,6 +78,7 @@ def init_db() -> None:
     from app.models.node_runtime import NodeHeartbeat, NodeTask  # noqa: F401
     from app.models.notification import AlertChannel, AlertPolicy  # noqa: F401
     from app.models.portal_config import PortalConfig  # noqa: F401
+    from app.models.counter_surface import CounterSurface  # noqa: F401
     from app.models.prompt_injection import PromptInjectionTemplate  # noqa: F401
     from app.models.service import ServiceCatalog, ServiceTemplate  # noqa: F401
     from app.models.user import User  # noqa: F401
@@ -107,6 +108,15 @@ def _ensure_legacy_columns() -> None:
         for column, ddl in migrations.items():
             if column not in existing:
                 conn.execute(text(ddl))
+
+    # counter_surfaces.config_json (added after first release of the table)
+    if "counter_surfaces" in table_names:
+        cs_cols = {col["name"] for col in inspector.get_columns("counter_surfaces")}
+        if "config_json" not in cs_cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE counter_surfaces ADD COLUMN config_json JSON DEFAULT '{}'")
+                )
 
     # service_catalog.status
     if "service_catalog" in table_names:
