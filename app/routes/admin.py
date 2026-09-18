@@ -6964,7 +6964,6 @@ def admin_counter_surface_toggle(
     return _redirect(f"/admin/counter-offense/{key}")
 
 
-@router.get("/admin/playbooks", response_class=HTMLResponse)
 @router.post("/api/admin/counter-offense/{key}")
 async def api_admin_surface_toggle(
     key: str, request: Request, db: Session = Depends(get_db)
