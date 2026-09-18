@@ -1,8 +1,10 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
 {% block content %}
 {{ page_header('CF', '反制面 · ' ~ surface.name, surface.description, [surface.paths],
-      actions='<span class="badge ' ~ ('badge-success' if runtime.get('enabled') else 'badge-warning') ~ '" style="cursor:default">' ~ ('运行中' if runtime.get('enabled') else '已停用') ~ '</span>') }}
+      actions='<span class="badge ' ~ ('badge-success' if runtime.get('enabled') else 'badge-warning') ~ '" id="surface-badge" style="cursor:default;margin-right:8px">' ~ ('运行中' if runtime.get('enabled') else '已停用') ~ '</span>'
+
+              ~ '<button type="button" class="chip primary" data-modal-open="config-modal">编辑配置</button>') }}
 
 {% if saved %}
 <div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
@@ -10,61 +12,21 @@
 </div>
 {% endif %}
 
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+  <span class="badge {{ 'badge-success' if runtime.get('enabled') else 'badge-warning' }}" id="surface-badge">{{ '运行中' if runtime.get('enabled') else '已停用' }}</span>
+  <button type="button" class="chip" id="quick-toggle" data-enabled="{{ '1' if runtime.get('enabled') else '0' }}">{{ '停用' if runtime.get('enabled') else '启用' }}</button>
+  <span class="muted" style="font-size:12px">快捷启停 · 配置修改点右上角「编辑配置」</span>
+</div>
+
 <div class="cards" style="margin-bottom:16px">
   <div class="card metric-card"><div class="muted metric-card-label">24h 命中</div><div class="stat-card-value">{{ stats.hits_24h }}</div></div>
   <div class="card metric-card"><div class="muted metric-card-label">入口路径</div><div class="stat-card-value" style="font-size:14px"><code>{{ surface.paths }}</code></div></div>
 </div>
 
-<section class="panel" style="margin-bottom:16px">
-  {{ section_header('状态与配置', '关闭后本面端点即刻返回 404（伪装为不存在）；参数修改即时生效（≤5s 缓存刷新）') }}
-  <form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
-    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-      <input type="checkbox" name="enabled" {% if runtime.get('enabled') %}checked{% endif %}>
-      启用本反制面
-    </label>
-    {% if fields %}
-    <div class="stack" style="margin-top:10px">
-    {% for f in fields %}
-      {% if f.type == 'number' %}
-      <label class="field-label"><span>{{ f.label }}</span>
-        <input type="number" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}" placeholder="{{ f.label }}">
-      </label>
-      {% elif f.type == 'lines' %}
-      <label class="field-label"><span>{{ f.label }}</span>
-        <textarea name="{{ f.key }}" rows="4" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{% for h in runtime.get('config', {}).get('hosts', []) %}{{ h.name }}|{{ h.ip }}
-{% endfor %}</textarea>
-      </label>
-      {% elif f.type == 'json' %}
-      <label class="field-label"><span>{{ f.label }}</span>
-        <textarea name="{{ f.key }}" rows="8" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{{ runtime.get('config', {}).get(f.key.lstrip('_'), '') if runtime.get('config', {}).get(f.key.lstrip('_')) else (runtime.get('config', {}).get('tools') | tojson(indent=2) if runtime.get('config', {}).get('tools') else '') }}</textarea>
-      </label>
-      {% else %}
-      <label class="field-label"><span>{{ f.label }}</span>
-        <input type="text" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}">
-      </label>
-      {% endif %}
-    {% endfor %}
-    </div>
-    {% endif %}
-    <button type="submit" style="width:auto;margin-top:10px">保存配置</button>
-  </form>
-</section>
-
 {% if surface.key == 'agent_files' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header('指令文件内容编辑', '支持占位符：{{portal_url}} {{ticket}} {{audit_code}}（请求时注入会话值）') }}
-  <form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
-    <input type="hidden" name="enabled" value="{{ 'on' if runtime.get('enabled') else '' }}">
-    {% set files_cfg = runtime.get('config', {}).get('files', {}) %}
-    {% for fname in ['AGENTS.md', 'CLAUDE.md', '.cursorrules'] %}
-    <label class="field-label"><span>{{ fname }}</span>
-      <textarea name="file_{{ fname }}" rows="7" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{{ files_cfg.get(fname, '') }}</textarea>
-    </label>
-    {% endfor %}
-    <button type="submit" style="width:auto">保存文件内容</button>
-  </form>
-  <div class="muted" style="margin-top:10px;font-size:12px">
-    预览：
+  {{ section_header('部署的指令文件', 'Agent 自动读取的项目级信任入口——点击预览当前生效内容') }}
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
     <a class="chip" href="/AGENTS.md" target="_blank">/AGENTS.md</a>
     <a class="chip" href="/CLAUDE.md" target="_blank">/CLAUDE.md</a>
     <a class="chip" href="/.cursorrules" target="_blank">/.cursorrules</a>
@@ -74,7 +36,7 @@
 
 {% if surface.key == 'behavior' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header('会话分类结果', '最近高频会话的实时行为分析') }}
+  {{ section_header('会话分类结果', '最近高频会话的实时行为分析（阈值来自上方配置）') }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>会话</th><th>来源</th><th>请求数</th><th>得分</th><th>分类</th><th>信号</th></tr></thead>
@@ -119,4 +81,77 @@
     </table>
   </div>
 </section>
+
+{% call modal_dialog('config-modal', '编辑配置 · ' ~ surface.name, '支持占位符：{{portal_url}} {{ticket}} {{audit_code}} {{page}} {{slug}} {{target}}（请求时注入会话值）。保存即时生效（≤5s 缓存刷新）。', wide=true) %}
+<form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
+  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+    <input type="checkbox" name="enabled" {% if runtime.get('enabled') %}checked{% endif %}>
+    启用本反制面（关闭后本面端点即刻返回 404，伪装为不存在）
+  </label>
+
+  {% if fields %}
+  <div class="stack" style="margin-top:8px">
+  {% for f in fields %}
+    {% if f.type == 'number' %}
+    <label class="field-label"><span>{{ f.label }}</span>
+      <input type="number" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}">
+    </label>
+    {% elif f.type == 'lines' %}
+    <label class="field-label"><span>{{ f.label }}</span>
+      <textarea name="{{ f.key }}" rows="4" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{% for h in runtime.get('config', {}).get('hosts', []) %}{{ h.name }}|{{ h.ip }}
+{% endfor %}</textarea>
+    </label>
+    {% elif f.type == 'json' %}
+    <label class="field-label"><span>{{ f.label }}</span>
+      <textarea name="{{ f.key }}" rows="10" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{% set _k = f.key.lstrip('_') %}{% if runtime.get('config', {}).get(_k) %}{{ runtime.get('config', {}).get(_k) | tojson(indent=2) }}{% else %}[]
+{% endif %}</textarea>
+    </label>
+    {% else %}
+    <label class="field-label"><span>{{ f.label }}</span>
+      <input type="text" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}">
+    </label>
+    {% endif %}
+  {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if surface.key == 'agent_files' %}
+  {% set files_cfg = runtime.get('config', {}).get('files', {}) %}
+  {% for fname in ['AGENTS.md', 'CLAUDE.md', '.cursorrules'] %}
+  <label class="field-label" style="margin-top:8px"><span>{{ fname }}</span>
+    <textarea name="file_{{ fname }}" rows="9" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{{ files_cfg.get(fname, '') }}</textarea>
+  </label>
+  {% endfor %}
+  {% endif %}
+
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">保存配置</button>
+  </div>
+</form>
+{% endcall %}
+
+<script>
+(function () {
+  var KEY = '{{ surface.key }}';
+  var toggleBtn = document.getElementById('quick-toggle');
+  if (toggleBtn) toggleBtn.addEventListener('click', function () {
+    var turningOn = toggleBtn.dataset.enabled !== '1';
+    toggleBtn.disabled = true;
+    fetch('/admin/counter-offense/' + KEY + '/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ enabled: turningOn ? 'on' : '' })
+    }).then(function (r) {
+      if (r.redirected || r.ok) { toggleBtn.dataset.enabled = turningOn ? '1' : '0';
+        var badge = document.getElementById('surface-badge');
+        badge.textContent = turningOn ? '运行中' : '已停用';
+        badge.className = 'badge ' + (turningOn ? 'badge-success' : 'badge-warning');
+        toggleBtn.textContent = turningOn ? '停用' : '启用';
+        toggleBtn.disabled = false;
+      } else { toggleBtn.disabled = false; }
+    }).catch(function () { toggleBtn.disabled = false; });
+  });
+})();
+</script>
 {% endblock %}
