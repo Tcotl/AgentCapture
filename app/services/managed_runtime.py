@@ -209,8 +209,6 @@ def managed_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def get_capability_action(task_type: str) -> dict[str, Any] | None:
-    return _ACTION_INDEX.get(task_type)
 
 
 def get_capability_catalog() -> list[dict[str, Any]]:

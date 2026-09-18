@@ -126,20 +126,3 @@ def generate_jsonp_response(payload: dict, callback: str = "reconCallback") -> b
     return body.encode("utf-8")
 
 
-def analyze_threat_level(fp: FingerprintResult) -> dict:
-    level = "low"
-    indicators: list[str] = []
-
-    if fp.headless_hint:
-        level = "high"
-        indicators.append("headless_browser")
-    if fp.webdriver:
-        level = "high"
-        indicators.append("webdriver_flag")
-    if fp.webrtc_ips:
-        indicators.append("webrtc_ip_leaked")
-    if not fp.fonts and not fp.plugins:
-        level = "medium" if level == "low" else level
-        indicators.append("minimal_fingerprint")
-
-    return {"level": level, "indicators": indicators}

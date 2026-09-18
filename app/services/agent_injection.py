@@ -457,21 +457,6 @@ def _build_injection_html(
     return "\n".join(parts)
 
 
-def generate_api_agent_injection(
-    session_id: str,
-    source_ip: str,
-    canary_token: str,
-    prompt_templates: list[dict] | None = None,
-) -> str:
-    context = {"source_ip": source_ip, "session_id": session_id, "canary_token": canary_token}
-    if prompt_templates is not None:
-        parts = [
-            _render_prompt_template(str(template.get("content_template") or ""), context)
-            for template in sorted(prompt_templates, key=lambda item: int(item.get("priority") or 50))
-            if template.get("target_scope") in {"api_response", "all"} and str(template.get("content_template") or "").strip()
-        ]
-        return "\n".join(parts)
-    return API_AGENT_WARNING_PROMPT.format(**context)
 
 
 def generate_block_page(

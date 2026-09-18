@@ -536,11 +536,6 @@ def _parse_admin_datetime(value: str | None, *, end_of_day: bool = False) -> dat
         return None
 
 
-def _humanize_audit_action(action: str) -> str:
-    normalized = (action or "").replace("_", "-").strip("-")
-    if not normalized:
-        return "未命名动作"
-    return normalized.replace("-", " ").title()
 
 
 def _queue_sensitive_action(
@@ -970,22 +965,6 @@ def _require_admin(request: Request, db: Session) -> User:
     return require_admin(request, db)
 
 
-def _service_specs_from_csv(db: Session, csv_text: str) -> list[dict]:
-    keys = [item.strip() for item in csv_text.split(",") if item.strip()]
-    specs = []
-    for key in keys[:10]:
-        service = db.scalar(select(ServiceCatalog).where(ServiceCatalog.service_key == key))
-        if not service:
-            continue
-        specs.append(
-            {
-                "service_key": service.service_key,
-                "protocol": (service.protocols_json or ["tcp"])[0],
-                "port": service.default_port,
-                "enabled": True,
-            }
-        )
-    return specs
 
 
 def _safe_web_template_filename(filename: str | None) -> str:

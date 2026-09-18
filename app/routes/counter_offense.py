@@ -16,13 +16,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from app.core.config import get_settings
 from app.services.agent_fingerprint import identify_from_headers
 from app.services.counter_intel import (
-    agent_file_bait,
     cloud_credentials,
     dataset_page,
     watermark_token,
 )
 from app.services.events import create_event, extract_client_ip, filtered_headers
-from app.services.surface_config import get_surface_config
+from app.services.surface_config import (
+        get_surface_config,
+    )
 
 router = APIRouter(tags=["counter-offense"])
 settings = get_settings()
@@ -120,7 +121,11 @@ def agent_instruction_bait(request: Request):
         cfg = get_surface_config(db, "agent_files")
     template = (cfg.get("files") or {}).get(filename)
     if not template:
-        template = agent_file_bait(filename, canary, _base_url(request))
+        from app.services.surface_config import DEFAULT_SURFACE_CONFIGS
+
+        template = DEFAULT_SURFACE_CONFIGS.get("agent_files", {}).get(
+            "files", {}
+        ).get(filename, "")
     content = (
         template.replace("{{portal_url}}", _base_url(request))
         .replace("{{ticket}}", canary)

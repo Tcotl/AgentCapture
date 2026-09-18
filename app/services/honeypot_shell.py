@@ -650,8 +650,6 @@ def _cmd_vim_nano(sh, args):
     return "Warning: output is not to a terminal (interactive editors are not supported here)"
 
 
-def _cmd_unknown_interactive(sh, args):
-    return ""
 
 
 _HANDLERS = {

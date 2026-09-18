@@ -466,14 +466,6 @@ def agent_stats(db: Session) -> dict:
     }
 
 
-def mark_agent_offline(db: Session, agent_id: str) -> C2Agent | None:
-    agent = get_agent(db, agent_id)
-    if agent:
-        agent.status = "offline"
-        db.add(agent)
-        db.commit()
-        db.refresh(agent)
-    return agent
 
 
 def delete_agent(db: Session, agent_id: str) -> bool:

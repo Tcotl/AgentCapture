@@ -79,12 +79,6 @@ def normalize_endpoint_path(value: str) -> str:
     return path
 
 
-def list_active_jsonp_templates(db: Session) -> list[JsonpTemplate]:
-    return db.scalars(
-        select(JsonpTemplate)
-        .where(JsonpTemplate.is_active.is_(True))
-        .order_by(JsonpTemplate.name)
-    ).all()
 
 
 def get_jsonp_template(db: Session, method_key: str | None) -> JsonpTemplate | None:

@@ -682,15 +682,3 @@ def build_artifact(
     raise ValueError(f"unsupported artifact format: {fmt!r}")
 
 
-def artifact_record_payload(build: ArtifactBuild) -> dict[str, Any]:
-    return {
-        "artifact_id": build.artifact_id,
-        "format": build.format,
-        "platform": build.platform,
-        "filename": build.filename,
-        "code": build.content,
-        "is_binary": build.is_binary,
-        "config": build.config,
-        "description": build.description,
-        "compile_log": build.compile_log,
-    }

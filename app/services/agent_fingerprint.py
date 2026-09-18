@@ -273,6 +273,3 @@ def identify_from_headers(headers: Mapping[str, str]) -> dict | None:
     return best
 
 
-def identify_agent(request) -> dict | None:
-    """Starlette-friendly wrapper: fingerprint from a live Request."""
-    return identify_from_headers(dict(request.headers))
