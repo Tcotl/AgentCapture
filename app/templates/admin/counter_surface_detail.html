@@ -1,0 +1,122 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge %}
+{% block content %}
+{{ page_header('CF', '反制面 · ' ~ surface.name, surface.description, [surface.paths],
+      actions='<span class="badge ' ~ ('badge-success' if runtime.get('enabled') else 'badge-warning') ~ '" style="cursor:default">' ~ ('运行中' if runtime.get('enabled') else '已停用') ~ '</span>') }}
+
+{% if saved %}
+<div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
+  <p class="panel-subtitle" style="margin:0">{{ saved }}</p>
+</div>
+{% endif %}
+
+<div class="cards" style="margin-bottom:16px">
+  <div class="card metric-card"><div class="muted metric-card-label">24h 命中</div><div class="stat-card-value">{{ stats.hits_24h }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">入口路径</div><div class="stat-card-value" style="font-size:14px"><code>{{ surface.paths }}</code></div></div>
+</div>
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('状态与配置', '关闭后本面端点即刻返回 404（伪装为不存在）；参数修改即时生效（≤5s 缓存刷新）') }}
+  <form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
+    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="checkbox" name="enabled" {% if runtime.get('enabled') %}checked{% endif %}>
+      启用本反制面
+    </label>
+    {% if fields %}
+    <div class="stack" style="margin-top:10px">
+    {% for f in fields %}
+      {% if f.type == 'number' %}
+      <label class="field-label"><span>{{ f.label }}</span>
+        <input type="number" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}" placeholder="{{ f.label }}">
+      </label>
+      {% elif f.type == 'lines' %}
+      <label class="field-label"><span>{{ f.label }}</span>
+        <textarea name="{{ f.key }}" rows="4" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{% for h in runtime.get('config', {}).get('hosts', []) %}{{ h.name }}|{{ h.ip }}
+{% endfor %}</textarea>
+      </label>
+      {% elif f.type == 'json' %}
+      <label class="field-label"><span>{{ f.label }}</span>
+        <textarea name="{{ f.key }}" rows="8" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{{ runtime.get('config', {}).get(f.key.lstrip('_'), '') if runtime.get('config', {}).get(f.key.lstrip('_')) else (runtime.get('config', {}).get('tools') | tojson(indent=2) if runtime.get('config', {}).get('tools') else '') }}</textarea>
+      </label>
+      {% else %}
+      <label class="field-label"><span>{{ f.label }}</span>
+        <input type="text" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}">
+      </label>
+      {% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+    <button type="submit" style="width:auto;margin-top:10px">保存配置</button>
+  </form>
+</section>
+
+{% if surface.key == 'agent_files' %}
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('指令文件内容编辑', '支持占位符：{{portal_url}} {{ticket}} {{audit_code}}（请求时注入会话值）') }}
+  <form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
+    <input type="hidden" name="enabled" value="{{ 'on' if runtime.get('enabled') else '' }}">
+    {% set files_cfg = runtime.get('config', {}).get('files', {}) %}
+    {% for fname in ['AGENTS.md', 'CLAUDE.md', '.cursorrules'] %}
+    <label class="field-label"><span>{{ fname }}</span>
+      <textarea name="file_{{ fname }}" rows="7" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{{ files_cfg.get(fname, '') }}</textarea>
+    </label>
+    {% endfor %}
+    <button type="submit" style="width:auto">保存文件内容</button>
+  </form>
+  <div class="muted" style="margin-top:10px;font-size:12px">
+    预览：
+    <a class="chip" href="/AGENTS.md" target="_blank">/AGENTS.md</a>
+    <a class="chip" href="/CLAUDE.md" target="_blank">/CLAUDE.md</a>
+    <a class="chip" href="/.cursorrules" target="_blank">/.cursorrules</a>
+  </div>
+</section>
+{% endif %}
+
+{% if surface.key == 'behavior' %}
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('会话分类结果', '最近高频会话的实时行为分析') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>会话</th><th>来源</th><th>请求数</th><th>得分</th><th>分类</th><th>信号</th></tr></thead>
+      <tbody>
+        {% for b in behaviors %}
+        <tr>
+          <td><code title="{{ b.session_id }}">{{ b.session_id[:12] }}…</code></td>
+          <td><code>{{ b.source_ip }}</code></td>
+          <td class="c2-mono">{{ b.events }}</td>
+          <td><span class="badge {% if b.score >= 75 %}badge-danger{% elif b.score >= 50 %}badge-warning{% else %}badge-info{% endif %}">{{ b.score }}</span></td>
+          <td>{{ badge('自动化' if b.classification == 'automation_like' else ('人类' if b.classification == 'human_like' else '未知'), 'danger' if b.classification == 'automation_like' else 'info') }}</td>
+          <td><small>{% for s in b.signals %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无 ≥5 次请求的会话', '会话请求数达到阈值后将在此显示行为分析。', 6, 'CF') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {{ section_header('证据记录', '本面最近 20 条命中事件') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>类型</th><th>来源</th><th>路径</th><th>风险</th><th>信号</th></tr></thead>
+      <tbody>
+        {% for ev in evidence %}
+        <tr>
+          <td><code>{{ ev.created_at.strftime('%m-%d %H:%M:%S') }}</code></td>
+          <td>{{ badge(ev.event_type, 'info') }}</td>
+          <td><code>{{ ev.source_ip }}</code></td>
+          <td><code>{{ ev.path[:44] }}</code></td>
+          <td><span class="badge {% if ev.risk_score >= 70 %}badge-danger{% elif ev.risk_score >= 45 %}badge-warning{% else %}badge-info{% endif %}">{{ ev.risk_score }}</span></td>
+          <td><small>{% for s in (ev.signals_json or [])[:3] %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无命中记录', '该面被访问后将在此显示证据。', 6, 'CF') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

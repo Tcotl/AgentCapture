@@ -144,12 +144,15 @@ def cloud_credentials(canary: str, role: str = "prod-app-role") -> dict[str, Any
 STATIC_SUFFIXES = (".js", ".css", ".png", ".jpg", ".svg", ".ico", ".woff", ".woff2", ".gif")
 
 
-def classify_behavior(history: list[dict[str, Any]]) -> dict[str, Any]:
+def classify_behavior(
+    history: list[dict[str, Any]], *, auto_at: int = 50
+) -> dict[str, Any]:
     """Classify a session's request history as automation-like or human-like.
 
     ``history`` items: {"path": str, "ts": epoch-seconds}. Automation tells:
     no static-asset fetches, many distinct API-ish paths, low path repeats,
-    near-uniform request intervals.
+    near-uniform request intervals. ``auto_at`` is the operator-tunable
+    automation threshold (from the surface config).
     """
     if not history:
         return {"score": 0, "classification": "unknown", "signals": []}
@@ -178,7 +181,7 @@ def classify_behavior(history: list[dict[str, Any]]) -> dict[str, Any]:
         score += 20
         signals.append("sustained_sequenced_requests")
     score = min(100, score)
-    classification = "automation_like" if score >= 50 else "human_like" if score >= 20 else "unknown"
+    classification = "automation_like" if score >= auto_at else "human_like" if score >= 20 else "unknown"
     return {"score": score, "classification": classification, "signals": signals}
 
 

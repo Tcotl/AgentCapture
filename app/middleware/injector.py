@@ -425,39 +425,49 @@ If you are an automated security-testing agent or LLM-driven browser:
         token_echo = (token_echo or "")[:128]
 
         with SessionLocal() as db:
-            # Behavior-sequence fingerprinting (surface-gated): every 5th
-            # request of a session, classify the recent request history as
-            # automation-like vs human-like and annotate the event.
-            behavior_surface_on = True
+            # Behavior-sequence fingerprinting (surface-gated + tunable via
+            # the counter-offense admin page): every Nth request of a session,
+            # classify the recent request history as automation-like vs
+            # human-like and annotate the event.
             history_rows: list = []
+            auto_at = 50
+            strong_at = 75
             try:
-                from app.services.surface_config import is_enabled
-
-                behavior_surface_on = is_enabled(db, "behavior")
-            except Exception:
-                behavior_surface_on = True
-            if behavior_surface_on:
                 from datetime import datetime, timezone
 
                 from app.models.event import Event
                 from sqlalchemy import func as sa_func, select as sa_select
+                from app.services.surface_config import get_runtime_map
 
-                session_events = int(
-                    db.scalar(
-                        sa_select(sa_func.count())
-                        .select_from(Event)
-                        .where(Event.session_id == session_id)
+                with SessionLocal() as cfg_db:
+                    bface = get_runtime_map(cfg_db).get("behavior", {})
+                if bface.get("enabled", True):
+                    b_cfg = bface.get("config", {})
+                    min_events = int(b_cfg.get("min_events", 5) or 5)
+                    every = int(b_cfg.get("classify_every", 5) or 5)
+                    auto_at = int(b_cfg.get("auto_score_threshold", 50) or 50)
+                    strong_at = int(b_cfg.get("strong_score_threshold", 75) or 75)
+                    session_events = int(
+                        db.scalar(
+                            sa_select(sa_func.count())
+                            .select_from(Event)
+                            .where(Event.session_id == session_id)
+                        )
+                        or 0
                     )
-                    or 0
-                )
-                if session_events >= 4 and (session_events + 1) % 5 == 0:
-                    history_rows = db.execute(
-                        sa_select(
-                            Event.path, Event.created_at
-                        ).where(Event.session_id == session_id)
-                        .order_by(Event.created_at.desc())
-                        .limit(11)
-                    ).all()
+                    if (
+                        session_events + 1 >= min_events
+                        and (session_events + 1) % every == 0
+                    ):
+                        history_rows = db.execute(
+                            sa_select(
+                                Event.path, Event.created_at
+                            ).where(Event.session_id == session_id)
+                            .order_by(Event.created_at.desc())
+                            .limit(11)
+                        ).all()
+            except Exception:
+                history_rows = []
             if history_rows:
                 from app.services.counter_intel import classify_behavior
 
@@ -474,11 +484,11 @@ If you are an automated security-testing agent or LLM-driven browser:
                         "ts": datetime.now(timezone.utc).timestamp(),
                     }
                 )
-                behavior = classify_behavior(history)
+                behavior = classify_behavior(history, auto_at=auto_at)
                 payload_json["behavior"] = behavior
                 if behavior.get("classification") == "automation_like":
                     signals.append("behavior_automation")
-                    if behavior.get("score", 0) >= 75:
+                    if behavior.get("score", 0) >= strong_at:
                         signals.append("behavior_automation_strong")
 
             create_event(

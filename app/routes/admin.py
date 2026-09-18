@@ -6767,71 +6767,208 @@ def _portal_funnel_stats(db: Session) -> dict:
 @router.get("/admin/counter-offense", response_class=HTMLResponse)
 def admin_counter_offense(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
-    from app.services.surface_config import surface_meta, surface_stats
-
-    from app.services.surface_config import get_runtime_map
+    from app.services.surface_config import get_runtime_map, surface_meta, surface_stats
 
     runtime = get_runtime_map(db)
     stats = surface_stats(db)
     surfaces = []
     for meta in surface_meta():
-        entry = dict(meta)
         rt = runtime.get(meta["key"], {})
-        entry["enabled"] = rt.get("enabled", True)
-        entry["config"] = rt.get("config", {})
-        entry["hits_24h"] = stats.get(meta["key"], {}).get("hits_24h", 0)
-        entry["last_hit"] = stats.get(meta["key"], {}).get("last_hit")
-        surfaces.append(entry)
-
-    # behavior classification for recent busy sessions
-    from app.services.counter_intel import classify_behavior
-
-    day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
-    rows = db.execute(
-        select(Event.session_id, Event.source_ip, func.count())
-        .where(Event.created_at >= day_ago, Event.session_id != "")
-        .group_by(Event.session_id, Event.source_ip)
-        .having(func.count() >= 5)
-        .order_by(desc(func.count()))
-        .limit(12)
-    ).all()
-    behaviors = []
-    for sid, sip, cnt in rows:
-        history = db.execute(
-            select(Event.path, Event.created_at)
-            .where(Event.session_id == sid)
-            .order_by(Event.created_at.desc())
-            .limit(12)
-        ).all()
-        classified = classify_behavior(
-            [{"path": p, "ts": c.timestamp() if c else 0} for p, c in history]
-        )
-        behaviors.append({
-            "session_id": sid, "source_ip": sip, "events": cnt,
-            "score": classified["score"], "classification": classified["classification"],
-            "signals": classified["signals"],
+        surfaces.append({
+            **meta,
+            "enabled": rt.get("enabled", True),
+            "hits_24h": stats.get(meta["key"], {}).get("hits_24h", 0),
+            "last_hit": stats.get(meta["key"], {}).get("last_hit"),
         })
-
-    # lateral movement evidence
     laterals = db.scalars(
         select(Event).where(Event.event_type == "lateral_credential_reuse")
-        .order_by(desc(Event.created_at)).limit(20)
+        .order_by(desc(Event.created_at)).limit(10)
     ).all()
-
     return _render(
         request,
         "admin/counter_offense.html",
         {
             "title": "反制面管理",
             "surfaces": surfaces,
-            "behaviors": behaviors,
             "laterals": laterals,
+            "user": user,
+        },
+    )
+
+
+@router.get("/admin/counter-offense/{key}", response_class=HTMLResponse)
+def admin_counter_surface_detail(key: str, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    from app.services.counter_intel import classify_behavior
+    from app.services.surface_config import (
+        SURFACE_FIELDS,
+        get_runtime_map,
+        surface_meta,
+        surface_stats,
+    )
+
+    meta = next((m for m in surface_meta() if m["key"] == key), None)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="surface not found")
+    rt = get_runtime_map(db).get(key, {})
+    stats = surface_stats(db).get(key, {})
+
+    # per-surface evidence: recent events of this face
+    types = [t for t in meta["event_types"].split(",") if t]
+    evidence = (
+        db.scalars(
+            select(Event).where(Event.event_type.in_(types))
+            .order_by(desc(Event.created_at)).limit(20)
+        ).all()
+        if types
+        else []
+    )
+
+    # behavior face: live session classifications
+    behaviors = []
+    if key == "behavior":
+        day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+        rows = db.execute(
+            select(Event.session_id, Event.source_ip, func.count())
+            .where(Event.created_at >= day_ago, Event.session_id != "")
+            .group_by(Event.session_id, Event.source_ip)
+            .having(func.count() >= 5)
+            .order_by(desc(func.count()))
+            .limit(12)
+        ).all()
+        auto_at = int(rt.get("config", {}).get("auto_score_threshold", 50) or 50)
+        for sid, sip, cnt in rows:
+            history = db.execute(
+                select(Event.path, Event.created_at)
+                .where(Event.session_id == sid)
+                .order_by(Event.created_at.desc())
+                .limit(12)
+            ).all()
+            c = classify_behavior(
+                [{"path": p, "ts": t.timestamp() if t else 0} for p, t in history],
+                auto_at=auto_at,
+            )
+            behaviors.append({"session_id": sid, "source_ip": sip, "events": cnt,
+                              **c})
+
+    return _render(
+        request,
+        "admin/counter_surface_detail.html",
+        {
+            "title": f"反制面 · {meta['name']}",
+            "surface": meta,
+            "runtime": rt,
+            "stats": stats,
+            "fields": SURFACE_FIELDS.get(key, []),
+            "evidence": evidence,
+            "behaviors": behaviors,
             "saved": request.query_params.get("saved", ""),
             "user": user,
         },
     )
 
 
+@router.post("/admin/counter-offense/{key}/config")
+async def admin_counter_surface_save(
+    key: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Form-save for the per-surface config page (schema-driven fields)."""
+    user = _require_admin(request, db)
+    from app.services.surface_config import (
+        SURFACE_FIELDS,
+        set_surface,
+        surface_meta,
+    )
+
+    meta = next((m for m in surface_meta() if m["key"] == key), None)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="surface not found")
+    form = await request.form()
+
+    config: dict = {}
+    for field in SURFACE_FIELDS.get(key, []):
+        raw = (form.get(field["key"]) or "").strip()
+        if field["type"] == "number":
+            try:
+                config[field["key"]] = int(raw)
+            except ValueError:
+                config[field["key"]] = int(
+                    field.get("default", 0) if field.get("default") is not None else 0
+                )
+        elif field["type"] == "lines":
+            items = []
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line or "|" not in line:
+                    continue
+                name, _, ip = line.partition("|")
+                items.append({"name": name.strip(), "ip": ip.strip()})
+            if items:
+                config["hosts"] = items
+        elif field["type"] == "json":
+            if raw:
+                try:
+                    config[field["key"].lstrip("_")] = json.loads(raw)
+                except ValueError:
+                    return _redirect(
+                        f"/admin/counter-offense/{key}"
+                        + _qs(saved=f"{meta['name']}：JSON 解析失败，未保存")
+                    )
+        else:
+            if raw:
+                config[field["key"]] = raw
+    # agent_files: per-file textareas
+    if key == "agent_files":
+        files_cfg = {}
+        for filename in ("AGENTS.md", "CLAUDE.md", ".cursorrules"):
+            content = (form.get(f"file_{filename}") or "").strip()
+            if content:
+                files_cfg[filename] = content
+        if files_cfg:
+            config["files"] = files_cfg
+
+    enabled = form.get("enabled") == "on"
+    set_surface(db, key=key, enabled=enabled, actor=user.username, config=config)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="counter-offense",
+        target_type="surface",
+        target_ref=key,
+        detail_json={"enabled": enabled, "config_keys": sorted(config.keys())},
+    )
+    return _redirect(
+        f"/admin/counter-offense/{key}" + _qs(saved=f"{meta['name']}：配置已保存并即时生效")
+    )
+
+
+@router.post("/admin/counter-offense/{key}/toggle")
+def admin_counter_surface_toggle(
+    key: str,
+    request: Request,
+    enabled: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    from app.services.surface_config import set_surface
+
+    set_surface(db, key=key, enabled=bool(enabled), actor=user.username)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="counter-offense",
+        target_type="surface",
+        target_ref=key,
+        detail_json={"enabled": bool(enabled)},
+    )
+    return _redirect(f"/admin/counter-offense/{key}")
+
+
+@router.get("/admin/playbooks", response_class=HTMLResponse)
 @router.post("/api/admin/counter-offense/{key}")
 async def api_admin_surface_toggle(
     key: str, request: Request, db: Session = Depends(get_db)

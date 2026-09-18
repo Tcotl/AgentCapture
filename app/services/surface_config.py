@@ -124,6 +124,40 @@ DEFAULT_SURFACE_CONFIGS: dict[str, dict] = {
     },
 }
 
+# Editable form schema per surface (rendered by the detail page).
+# type: text | number | lines ("name|ip" rows) | json | files (special)
+SURFACE_FIELDS: dict[str, list[dict]] = {
+    "agent_files": [],  # special: one textarea per instruction file
+    "mcp": [
+        {"key": "server_name", "label": "服务名称", "type": "text"},
+        {"key": "version", "label": "版本号", "type": "text"},
+        {"key": "_tools_json", "label": "工具定义（JSON 数组：name / description / response）",
+         "type": "json", "desc": "response 为 JSON 模板，支持 {{audit_code}} {{slug}} {{target}} 占位符"},
+    ],
+    "dataset": [
+        {"key": "total_pages", "label": "总页数", "type": "number"},
+        {"key": "rows_per_page", "label": "每页行数", "type": "number"},
+        {"key": "email_domain", "label": "邮箱域名", "type": "text"},
+        {"key": "note_prefix", "label": "备注前缀", "type": "text"},
+    ],
+    "metadata": [
+        {"key": "role", "label": "IAM 角色名", "type": "text"},
+        {"key": "account_id", "label": "AWS 账号 ID", "type": "text"},
+    ],
+    "intranet": [
+        {"key": "title", "label": "站点标题", "type": "text"},
+        {"key": "duty", "label": "本周值班", "type": "text"},
+        {"key": "_hosts", "label": "内网主机（每行：名称|IP）", "type": "lines"},
+    ],
+    "behavior": [
+        {"key": "min_events", "label": "最少事件数（达到后开始分析）", "type": "number"},
+        {"key": "classify_every", "label": "分析频率（每 N 次请求）", "type": "number"},
+        {"key": "auto_score_threshold", "label": "自动化判定阈值", "type": "number"},
+        {"key": "strong_score_threshold", "label": "强自动化信号阈值", "type": "number"},
+    ],
+}
+
+
 _CACHE: dict[str, dict] | None = None
 _CACHE_AT: float = 0.0
 _LOCK = threading.Lock()
