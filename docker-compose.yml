@@ -14,6 +14,7 @@ services:
       - "${HOST_REDIS_PORT:-63790}:63790"
       - "${HOST_ES_PORT:-19200}:19200"
       - "${HOST_NGINX_ADMIN_PORT:-8081}:8081"
+      - "${HOST_THINKPHP_PORT:-48777}:48777"
     environment:
       APP_ENV: production
       HOST: 0.0.0.0

@@ -129,6 +129,22 @@ DEFAULT_DECOY_TEMPLATES = [
 def seed_defaults(db: Session) -> None:
     ensure_bootstrap_admin(db)
 
+    # thinkphp web honeypot is the default bait face on the dedicated
+    # honeypot port (48777) — upsert so existing deployments get it too.
+    if not db.scalar(
+        select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp")
+    ):
+        db.add(ServiceCatalog(
+            service_key="thinkphp",
+            name="ThinkPHP Web 蜜罐",
+            category="web",
+            description="ThinkPHP 5.x 仿真站点（默认蜜罐端口 48777）：登录凭证捕获 + 经典 RCE 仿真，命令经假文件系统回显。",
+            protocols_json=["http"],
+            default_port=48777,
+            status="running",
+        ))
+        db.commit()
+
     if int(db.scalar(select(func.count()).select_from(ServiceCatalog)) or 0) == 0:
         for item in DEFAULT_SERVICES:
             db.add(ServiceCatalog(**item))

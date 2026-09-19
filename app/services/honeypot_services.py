@@ -51,7 +51,9 @@ def start_service(service_key: str, port: int, bind: str = "0.0.0.0") -> bool:
         if service_key in _running:
             return False
         handler = _HANDLERS.get(service_key)
-        if not handler:
+        # thinkphp is served by its own uvicorn-in-thread app (below), so it
+        # has no asyncio handler in _HANDLERS.
+        if not handler and service_key != "thinkphp":
             logger.warning("No handler for service_key=%s", service_key)
             return False
 
@@ -70,6 +72,17 @@ def start_service(service_key: str, port: int, bind: str = "0.0.0.0") -> bool:
             logger.warning(
                 "paramiko is not installed — ssh honeypot on :%d degrades to banner mode", port
             )
+
+        if service_key == "thinkphp":
+            # HTTP honeypot: uvicorn-in-thread (mirrors the ssh thread branch;
+            # the emulation app lives in honeypot_thinkphp)
+            from app.services.honeypot_thinkphp import ThinkPHPHoneypotServer
+
+            tp_server = ThinkPHPHoneypotServer(port, bind)
+            tp_server.start()
+            _running[service_key] = ("thread", tp_server, port)
+            logger.info("Started ThinkPHP honeypot %s on :%d", service_key, port)
+            return True
 
         loop = asyncio.new_event_loop()
         server_ref: list[asyncio.Server] = []
