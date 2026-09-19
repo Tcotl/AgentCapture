@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, badge, empty_state %}
 {% block content %}
-{{ page_header('IP', '蜜罐部署', '平台蜜罐按部署形态分为三类：Web 应用蜜罐（默认启用）、嵌入式蜜罐与端口服务蜜罐（由你按需配置开启）。', ['Web 应用', '嵌入式', '端口服务']) }}
+{{ page_header('IP', '蜜罐部署', '全部蜜罐共用同一套蜜饵与捕获引擎，按挂载方式分为三类：Web 应用蜜罐造一个假目标等人来（默认启用）；嵌入式蜜罐在自己的真目标上装绊线；端口服务蜜罐开假端口收连接（由你按需开启）。', ['Web 应用', '嵌入式', '端口服务']) }}
 
 {% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
 {% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
@@ -9,7 +9,7 @@
 <div class="grid-2" style="align-items:stretch">
 
   <section class="panel">
-    {{ section_header('Web 应用蜜罐', '默认启用 · 一个站点承载全部诱饵面') }}
+    {{ section_header('Web 应用蜜罐', '默认启用 · 主动假阵地：造一个假目标等人来') }}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
       <span class="badge badge-success">默认启用</span>
       {% if web_running %}
@@ -42,7 +42,7 @@
   </section>
 
   <section class="panel">
-    {{ section_header('嵌入式蜜罐', '默认关闭 · 蜜饵投放到你自己的业务站点') }}
+    {{ section_header('嵌入式蜜罐', '默认关闭 · 在自己的真目标上装绊线') }}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
       {% if embedded_enabled %}
       <span class="badge badge-success">已启用</span>
@@ -73,7 +73,7 @@
 </div>
 
 <section class="panel" style="margin-top:16px">
-  {{ section_header('端口服务蜜罐', '默认关闭 · 协议级仿真服务，逐项按需开启') }}
+    {{ section_header('端口服务蜜罐', '默认关闭 · 开假端口收连接') }}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
     {% if protocol_running %}
     <span class="badge badge-info">运行中 {{ protocol_running|length }} 项</span>

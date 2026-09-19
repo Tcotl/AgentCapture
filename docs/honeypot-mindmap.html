@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentCapture 蜜罐部署与管理 · 思维导图</title>
+<style>
+  :root {
+    --bg: #070B16;
+    --surface: #0D1424;
+    --surface-2: #111A30;
+    --border: rgba(96, 165, 250, 0.18);
+    --text: #E5EDFF;
+    --muted: #8FA3C8;
+    --green: #34D399;
+    --amber: #FBBF24;
+    --blue: #60A5FA;
+    --violet: #A78BFA;
+    --red: #FB7185;
+  }
+  [data-theme="light"] {
+    --bg: #F4F7FE;
+    --surface: #FFFFFF;
+    --surface-2: #EEF3FC;
+    --border: rgba(15, 23, 42, 0.12);
+    --text: #0F172A;
+    --muted: #5B6B8C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Fira Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 28px 24px 60px;
+  }
+  h1 { font-family: "Fira Code", monospace; font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  .tree { overflow-x: auto; padding-bottom: 12px; }
+  .tree ul { list-style: none; padding-left: 26px; margin: 0; position: relative; }
+  .tree ul ul::before {
+    content: ""; position: absolute; left: 9px; top: -8px; bottom: 0;
+    border-left: 1px solid var(--border);
+  }
+  .tree li { position: relative; padding: 3px 0 3px 16px; }
+  .tree li::before {
+    content: ""; position: absolute; left: -17px; top: 15px; width: 22px;
+    border-top: 1px solid var(--border);
+  }
+  .node {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 5px 11px;
+    font-size: 13px;
+    line-height: 1.5;
+    cursor: default;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .node.has-children { cursor: pointer; }
+  .node.has-children::before {
+    content: "▸"; color: var(--muted); font-size: 11px; transform: rotate(90deg);
+    transition: transform .15s ease;
+  }
+  .node.collapsed::before { transform: rotate(0deg); }
+  .node .tag {
+    font-size: 10.5px; border-radius: 999px; padding: 1px 7px; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .tag.on    { color: var(--green); border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.1); }
+  .tag.off   { color: var(--amber); border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.1); }
+  .tag.path  { color: var(--blue);  border-color: rgba(96,165,250,.35); background: rgba(96,165,250,.1); font-family: "Fira Code", monospace; }
+  .tag.entry { color: var(--violet);border-color: rgba(167,139,250,.35); background: rgba(167,139,250,.1); }
+  .tag.warn  { color: var(--red);   border-color: rgba(251,113,133,.35); background: rgba(251,113,133,.1); }
+  .node small { color: var(--muted); font-size: 11.5px; }
+
+  .root > .node {
+    background: linear-gradient(180deg, rgba(96,165,250,.16), rgba(14,165,233,.08));
+    font-size: 15px; font-weight: 600; padding: 10px 18px; border-radius: 12px;
+  }
+  .b-web   > .node { border-left: 3px solid var(--green); }
+  .b-embed > .node { border-left: 3px solid var(--amber); }
+  .b-proto > .node { border-left: 3px solid var(--red); }
+  .b-mgmt  > .node { border-left: 3px solid var(--blue); }
+  .collapsed + ul { display: none; }
+  .theme-toggle {
+    position: fixed; top: 16px; right: 18px; cursor: pointer;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 12px; padding: 6px 12px;
+  }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='light'?'':'light'">亮 / 暗主题</button>
+
+<h1>AgentCapture 蜜罐部署与管理 · 思维导图</h1>
+<div class="sub">同一套蜜饵与捕获引擎 · 三种挂载方式 · 默认只启用 48777 Web 蜜罐 · 整理于 2026-09</div>
+<div class="legend">
+  <span><i class="dot" style="background:var(--green)"></i>默认启用</span>
+  <span><i class="dot" style="background:var(--amber)"></i>默认关闭（用户开启）</span>
+  <span><i class="dot" style="background:var(--red)"></i>默认关闭（用户开启）</span>
+  <span><span class="tag path" style="--c:1">/path</span>路由</span>
+  <span><span class="tag entry">入口</span>后台管理页</span>
+</div>
+
+<div class="tree root">
+  <div class="node">AgentCapture 蜜罐体系</div>
+  <ul>
+    <li class="b-mgmt">
+      <div class="node has-children"><span class="tag entry">总览入口</span><b>蜜罐部署</b><small>三类形态状态一览 / 启停总控</small><span class="tag path">/admin/honeypots</span></div>
+      <ul>
+        <li><div class="node">部署运营导航组首项；三类卡片各自带状态徽章与启停按钮</div></li>
+        <li><div class="node">卡片联动：Web 蜜罐启停 ↔ 端口服务页同状态；嵌入式开关即时生效（≤5s）</div></li>
+      </ul>
+    </li>
+
+    <li class="b-web">
+      <div class="node has-children"><span class="tag on">默认启用</span><b>① Web 应用蜜罐</b><small>48777 · ThinkPHP 门面 + 全部诱饵面</small></div>
+      <ul>
+        <li><div class="node has-children">ThinkPHP 5.x 仿真门面</div>
+          <ul>
+            <li><div class="node">指纹页 <span class="tag path">/</span> · RCE 仿真 <span class="tag path">/index.php</span>（假 shell 回显）</div></li>
+            <li><div class="node">假后台凭证捕获 <span class="tag path">/admin.php · /login</span></div></li>
+            <li><div class="node">未知路径兜底仿真 <span class="tag path">/{path}</span></div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">七个反制诱饵面（独立开关 + 配置页）</div>
+          <ul>
+            <li><div class="node">Web 蜜罐门面 <span class="tag path">/admin/counter-offense/thinkphp</span><small>指纹字段 / 登录捕获 / RCE 开关 / 整面 404</small></div></li>
+            <li><div class="node">MCP Server 蜜罐 <span class="tag path">…/mcp</span><small>5 套反制模板 · 工具调用即 C2 注册</small></div></li>
+            <li><div class="node">Agent 指令文件蜜饵 <span class="tag path">…/agent_files</span><small>AGENTS.md / CLAUDE.md / .cursorrules</small></div></li>
+            <li><div class="node">消耗战数据集 <span class="tag path">…/dataset</span><small>无限分页水印数据</small></div></li>
+            <li><div class="node">云元数据蜜罐 <span class="tag path">…/metadata</span><small>SSRF 蜜标凭证 · risk 95</small></div></li>
+            <li><div class="node">内网横向 Wiki <span class="tag path">…/intranet</span><small>会话水印内网主机</small></div></li>
+            <li><div class="node">行为序列指纹 <span class="tag path">…/behavior</span><small>中间件自动化特征分析</small></div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">Portal 功能性伪装 <span class="tag path">/admin/portal</span></div>
+          <ul>
+            <li><div class="node">Developer API 伪装页脚 + 三级客户端链路 <span class="tag path">/portal/api/*</span></div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">管理入口：Web应用蜜罐管理 <span class="tag path">/admin/templates</span></div>
+          <ul>
+            <li><div class="node">默认蜜罐卡片<small>状态 / 启停 / 打开站点 / 门面配置 / 联动 chips</small></div></li>
+            <li><div class="node">模板上传 · 站点克隆 · 节点部署（deployed_server）</div></li>
+          </ul>
+        </li>
+        <li><div class="node">整面 observe-only：永不阻断，评分/事件/告警照常 <span class="tag warn">核心约束</span></div></li>
+      </ul>
+    </li>
+
+    <li class="b-embed">
+      <div class="node has-children"><span class="tag off">默认关闭</span><b>② 嵌入式蜜罐</b><small>蜜饵投放到你自己的业务站点</small></div>
+      <ul>
+        <li><div class="node has-children">投放片段（payload_generator）</div>
+          <ul>
+            <li><div class="node">JS 探针 / Nginx 引流 / SQL / manifest</div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">控制台回传通道（启用后开放，停用 404）</div>
+          <ul>
+            <li><div class="node"><span class="tag path">/collect/beacon · /collect/scan</span> 浏览器信号</div></li>
+            <li><div class="node"><span class="tag path">/recon/fingerprint · /recon/jsonp · /recon/callback</span> Jsonp 画像</div></li>
+            <li><div class="node"><span class="tag path">/_agent/bait · report · verify</span> Agent 注入回显</div></li>
+            <li><div class="node"><span class="tag path">/payload/{type}</span> 载荷分发</div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">蜜饵管理 <span class="tag path">/admin/decoy-management</span></div>
+          <ul>
+            <li><div class="node">API 路由蜜饵 · 凭证蜜饵 · 文件蜜饵（三类可绑定成完整链路）</div></li>
+            <li><div class="node">部署/下线 · 支持批量删除 · 链路自检脚本 <span class="tag path">scripts/verify_decoy_chain.py</span></div></li>
+          </ul>
+        </li>
+        <li><div class="node">Jsonp 模版管理 <span class="tag path">/admin/jsonp-templates</span></div></li>
+        <li><div class="node">提示词注入管理 <span class="tag path">/admin/prompt-injection</span></div></li>
+        <li><div class="node">开关位置：蜜罐部署页「启用嵌入式蜜罐」按钮 <span class="tag warn">停用后已投放探针静默失联</span></div></li>
+      </ul>
+    </li>
+
+    <li class="b-proto">
+      <div class="node has-children"><span class="tag warn">默认关闭</span><b>③ 端口服务蜜罐</b><small>协议级 TCP 仿真 · 逐项开启</small></div>
+      <ul>
+        <li><div class="node">SSH :2222 <small>paramiko 真协议栈 + 假 shell + 假文件系统 + 会话回放</small></div></li>
+        <li><div class="node">MySQL :33060 <small>greeting + 任意凭证 + 假结果集</small></div></li>
+        <li><div class="node">Redis :63790 <small>RESP 协议</small></div></li>
+        <li><div class="node">FTP :2121 <small>ProFTPD banner</small></div></li>
+        <li><div class="node">ElasticSearch :19200 <small>HTTP JSON</small></div></li>
+        <li><div class="node">nginx-admin :8081 <small>登录表单结构化解析</small></div></li>
+        <li><div class="node has-children">管理入口：端口服务蜜罐管理 <span class="tag path">/admin/services</span></div>
+          <ul>
+            <li><div class="node">逐项启停 · 端口占用检测 · status=running 随系统重启自恢复</div></li>
+            <li><div class="node">协议捕获凭证 → 凭证库比对；SSH 会话 → 回放页 <span class="tag path">/admin/honeypot-sessions</span></div></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+
+    <li class="b-mgmt">
+      <div class="node has-children"><span class="tag entry">通用底座</span><b>平台联动与溯源</b></div>
+      <ul>
+        <li><div class="node has-children">双平面架构</div>
+          <ul>
+            <li><div class="node">管理面 4877 <small>控制台 / 开放 API / C2 监听；安全路径 <span class="tag path">/{安全路径}/</span>，/admin 404</small></div></li>
+            <li><div class="node">欺骗面 48777 <small>全部蜜罐功能；蜜罐面回调经 console_base_url 指回管理面</small></div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">反制溯源记录</div>
+          <ul>
+            <li><div class="node">文件蜜饵下载 <span class="tag path">/admin/payload-tracking</span> · 凭证登陆 <span class="tag path">/admin/credentials</span></div></li>
+            <li><div class="node">提示词注入触发 <span class="tag path">/admin/agent-interactions</span> · Jsonp 反制成功 <span class="tag path">/admin/recon-data</span></div></li>
+          </ul>
+        </li>
+        <li><div class="node has-children">C2 联动</div>
+          <ul>
+            <li><div class="node">MCP 接入即注册 / 诱饵链投递 stager → Agent 名册 <span class="tag path">/admin/c2/agents</span></div></li>
+            <li><div class="node">C2 Console <span class="tag path">/admin/c2/console</span>（受管主机 / 监听器 / 任务）</div></li>
+          </ul>
+        </li>
+        <li><div class="node">系统设置 <span class="tag path">/admin/profile</span> <small>安全路径 / 密码 / 资料；首登提示改默认路径</small></div></li>
+      </ul>
+    </li>
+  </ul>
+</div>
+
+<script>
+  document.querySelectorAll(".node.has-children").forEach(function (n) {
+    n.addEventListener("click", function (e) {
+      e.stopPropagation();
+      n.classList.toggle("collapsed");
+    });
+  });
+</script>
+</body>
+</html>

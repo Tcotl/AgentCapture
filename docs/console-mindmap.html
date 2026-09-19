@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentCapture 功能导图 · 蜜罐管理补充版</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --text: #1E293B;
+    --muted: #94A3B8;
+    --line: #CBD5E1;
+    --red: #E11D48;    --red-bg: #FEF1F4;
+    --orange: #EA580C; --orange-bg: #FFF4EC;
+    --yellow: #B45309; --yellow-bg: #FFFAEB;
+    --green: #059669;  --green-bg: #ECFDF5;
+    --blue: #2563EB;   --blue-bg: #EFF6FF;
+    --violet: #7C3AED;
+  }
+  [data-theme="dark"] {
+    --bg: #070B16;
+    --text: #E5EDFF;
+    --muted: #8FA3C8;
+    --line: rgba(96,165,250,.22);
+    --red: #FB7185;    --red-bg: rgba(251,113,133,.1);
+    --orange: #FDBA74; --orange-bg: rgba(249,115,22,.1);
+    --yellow: #FDE68A; --yellow-bg: rgba(234,179,8,.1);
+    --green: #6EE7B7;  --green-bg: rgba(16,185,129,.1);
+    --blue: #93C5FD;   --blue-bg: rgba(37,99,235,.14);
+    --violet: #C4B5FD;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Fira Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 34px 30px 70px;
+    overflow-x: auto;
+  }
+  .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  h1 { font-size: 19px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 26px; }
+  .theme-toggle {
+    float: right; cursor: pointer; font-size: 12px; padding: 6px 12px;
+    border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text);
+  }
+  .new {
+    display: inline-block; font-size: 9.5px; line-height: 1; padding: 2.5px 6px;
+    border-radius: 999px; background: var(--violet); color: #fff;
+    vertical-align: 1px; margin-left: 6px; font-weight: 600; letter-spacing: 1px;
+  }
+  [data-theme="dark"] .new { color: #0F172A; }
+
+  .map { display: flex; align-items: center; min-width: 1180px; }
+  .root {
+    border: 2px solid var(--text); box-shadow: 4px 4px 0 var(--line);
+    border-radius: 4px; padding: 18px 26px; font-size: 21px; font-weight: 700;
+    background: var(--bg); position: relative; z-index: 2; white-space: nowrap;
+  }
+  .map > .link { width: 56px; height: 2px; background: var(--line); flex-shrink: 0; }
+
+  .branches { display: flex; flex-direction: column; gap: 44px; position: relative; padding-left: 56px; }
+  .branches::before {
+    content: ""; position: absolute; left: 0; top: 26px; bottom: 26px;
+    border-left: 2px solid var(--line);
+  }
+  .branch { display: flex; align-items: center; position: relative; }
+  .branch > .tick {
+    position: absolute; left: -56px; width: 56px; height: 2px; background: var(--line);
+  }
+  .branch-box {
+    position: relative; border: 2px solid var(--c); color: var(--c);
+    background: var(--bg); border-radius: 6px; padding: 12px 26px;
+    font-size: 16.5px; font-weight: 700; white-space: nowrap;
+  }
+  /* folded corner, like the note style in the reference map */
+  .branch-box::after {
+    content: ""; position: absolute; top: -2px; right: -2px;
+    border-style: solid; border-width: 0 14px 14px 0;
+    border-color: transparent var(--c) transparent transparent; opacity: .85;
+  }
+  .subtree { display: flex; flex-direction: column; gap: 10px; margin-left: 40px; position: relative; padding-left: 34px; }
+  .subtree::before {
+    content: ""; position: absolute; left: 0; top: 18px; bottom: 18px;
+    border-left: 2px solid var(--line);
+  }
+  .leaf, .group { position: relative; }
+  .leaf::before, .group::before {
+    content: ""; position: absolute; left: -34px; top: 50%; width: 34px; height: 2px;
+    background: var(--line);
+  }
+  .box {
+    display: inline-block; min-width: 208px; text-align: center;
+    border: 1.6px solid var(--c); color: var(--c); background: var(--c-bg);
+    border-radius: 8px; padding: 8px 16px; font-size: 13.5px; font-weight: 600;
+  }
+  .box small {
+    display: block; font-size: 10.5px; color: var(--muted); font-weight: 400;
+    font-family: "Fira Code", ui-monospace, monospace; margin-top: 3px;
+  }
+  .group { display: flex; align-items: center; }
+  .group > .box { min-width: 150px; }
+  .group > .leaves { display: flex; flex-direction: column; gap: 8px; margin-left: 34px; position: relative; padding-left: 30px; }
+  .group > .leaves::before {
+    content: ""; position: absolute; left: 0; top: 16px; bottom: 16px;
+    border-left: 2px solid var(--line);
+  }
+  .group > .leaves .leaf::before { left: -30px; width: 30px; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'':'dark'">亮 / 暗主题</button>
+
+<div class="head"><h1>AgentCapture 功能导图</h1><span class="sub">在原图骨架上补充 · 紫色「新」为本次新增项 · 2026-09</span></div>
+
+<div class="map">
+  <div class="root">AgentCapture</div>
+  <div class="link"></div>
+  <div class="branches">
+
+    <!-- 监测分析 -->
+    <div class="branch" style="--c:var(--red)">
+      <i class="tick"></i>
+      <div class="branch-box">监测分析</div>
+      <div class="subtree">
+        <div class="leaf"><span class="box">控制台<small>/admin · 攻击 / 捕获 / 蜜罐 KPI 总览</small></span></div>
+        <div class="leaf"><span class="box">态势大屏<small>/admin/big-screen</small></span></div>
+        <div class="leaf"><span class="box">攻击流量汇总<small>/admin/attacks · 检索 / 详情 / 批量清理</small></span></div>
+        <div class="leaf"><span class="box">攻击来源<small>/admin/attack-sources</small></span></div>
+        <div class="leaf"><span class="box">攻击者画像<small>/admin/attacker-profiles</small></span></div>
+        <div class="leaf"><span class="box">事件控制台<small>/console/events · 实时事件流</small><i class="new">新</i></span></div>
+        <div class="leaf"><span class="box">告警配置 / 威胁情报<small>/admin/alerts · /admin/intel</small><i class="new">新</i></span></div>
+      </div>
+    </div>
+
+    <!-- 反制溯源 -->
+    <div class="branch" style="--c:var(--orange)">
+      <i class="tick"></i>
+      <div class="branch-box">反制溯源</div>
+      <div class="subtree">
+        <div class="leaf"><span class="box">蜜罐会话回放<small>/admin/honeypot-sessions · 逐命令终端回放</small></span></div>
+        <div class="leaf"><span class="box">文件蜜饵下载记录<small>/admin/payload-tracking</small></span></div>
+        <div class="leaf"><span class="box">凭证蜜饵登陆记录<small>/admin/credentials</small></span></div>
+        <div class="leaf"><span class="box">提示词注入触发记录<small>/admin/agent-interactions</small></span></div>
+        <div class="leaf"><span class="box">Jsonp反制成功记录<small>/admin/recon-data</small></span></div>
+        <div class="leaf"><span class="box">反制 KPI 面板<small>控制台总览内置</small></span></div>
+      </div>
+    </div>
+
+    <!-- 蜜罐管理 -->
+    <div class="branch" style="--c:var(--yellow)">
+      <i class="tick"></i>
+      <div class="branch-box">蜜罐管理</div>
+      <div class="subtree">
+
+        <div class="group">
+          <span class="box">蜜罐部署总览 <i class="new">新</i><small>/admin/honeypots · 同一套引擎 · 三种挂载方式</small></span>
+          <div class="leaves">
+            <div class="leaf"><span class="box">Web 应用蜜罐<small>默认启用 · 假阵地：一个站点承载全部诱饵面（48777）</small></span></div>
+            <div class="leaf"><span class="box">嵌入式蜜罐<small>默认关闭 · 真实阵地上装绊线（业务站点蜜饵）</small></span></div>
+            <div class="leaf"><span class="box">端口服务蜜罐<small>默认关闭 · 假端口收连接（协议仿真逐项开启）</small></span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <span class="box">Web 应用服务蜜罐</span>
+          <div class="leaves">
+            <div class="leaf"><span class="box">Web蜜罐部署<small>/admin/templates · 默认蜜罐卡片 / 上传 / 节点部署</small></span></div>
+            <div class="leaf"><span class="box">Web站点克隆<small>/admin/templates · 克隆 + 资产改写</small></span></div>
+            <div class="leaf"><span class="box">Web 蜜罐编辑<small>/admin/counter-offense/thinkphp · 指纹 / 登录捕获 / RCE 开关</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">MCP Server 蜜罐<small>…/mcp · 5 套反制模板 · 接入即注册</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">指令文件蜜饵<small>…/agent_files · AGENTS.md / CLAUDE.md / .cursorrules</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">消耗战数据集<small>…/dataset · 无限分页水印数据</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">云元数据蜜罐<small>…/metadata · SSRF 蜜标凭证</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">行为序列指纹<small>…/behavior · 自动化特征分析</small><i class="new">新</i></span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <span class="box">端口服务蜜罐</span>
+          <div class="leaves">
+            <div class="leaf"><span class="box">端口服务启停<small>/admin/services · SSH / MySQL / Redis / FTP / ES</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">蜜网-内网横向矩阵<small>SSH 假文件系统 → 内网落点</small></span></div>
+            <div class="leaf"><span class="box">内网横向Wiki<small>…/intranet · 会话水印内网主机</small></span></div>
+            <div class="leaf"><span class="box">互联网系统接入<small>/admin/internet-systems · 接入台账</small></span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <span class="box">嵌入式蜜罐<small>同一引擎 · 真实站点载体</small></span>
+          <div class="leaves">
+            <div class="leaf"><span class="box">回传通道开关<small>/collect · /recon · /_agent · /payload（停用即 404）</small><i class="new">新</i></span></div>
+            <div class="leaf"><span class="box">蜜饵投放链路<small>API 路由 / 凭证 / 文件蜜饵 · 可绑定成链</small></span></div>
+            <div class="leaf"><span class="box">提示词注入管理<small>/admin/prompt-injection</small></span></div>
+            <div class="leaf"><span class="box">功能性伪装反制<small>/admin/portal · Developer API 伪装</small></span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- C2 控制台 -->
+    <div class="branch" style="--c:var(--green)">
+      <i class="tick"></i>
+      <div class="branch-box">C2 控制台</div>
+      <div class="subtree">
+        <div class="leaf"><span class="box">对话式 C2 管理<small>Agent 对话控制台 · 自然语言任务下发</small></span></div>
+        <div class="leaf"><span class="box">命令式 C2 管理<small>/admin/c2/agents · 任务 / 结果 / 心跳</small></span></div>
+        <div class="leaf"><span class="box">C2 Console<small>/admin/c2/console · Beacon 队列 / 生成 / 监听器 / MSF</small><i class="new">新</i></span></div>
+      </div>
+    </div>
+
+    <!-- 系统控制台 -->
+    <div class="branch" style="--c:var(--blue)">
+      <i class="tick"></i>
+      <div class="branch-box">系统控制台</div>
+      <div class="subtree">
+        <div class="leaf"><span class="box">节点管理<small>/admin/nodes · 心跳 / 任务 / Agent 接入</small></span></div>
+        <div class="leaf"><span class="box">反制剧本部署<small>/admin/playbooks</small></span></div>
+        <div class="leaf"><span class="box">蜜饵管理<small>/admin/decoy-management · CRUD / 部署 / 批量删除</small></span></div>
+        <div class="leaf"><span class="box">Jsonp 模版管理<small>/admin/jsonp-templates</small></span></div>
+        <div class="leaf"><span class="box">系统设置<small>/admin/profile · 控制台安全路径 / 密码 / 资料</small><i class="new">新</i></span></div>
+        <div class="leaf"><span class="box">用户管理 / API 令牌<small>/admin/users · /admin/api-tokens</small><i class="new">新</i></span></div>
+        <div class="leaf"><span class="box">登陆日志 / 执行历史<small>/admin/login-logs · /admin/execution-history</small><i class="new">新</i></span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
