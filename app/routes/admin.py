@@ -343,6 +343,7 @@ NAV_GROUPS = [
             ("MCP Server 蜜罐管理", "/admin/counter-offense/mcp"),
             ("消耗战数据集", "/admin/counter-offense/dataset"),
             ("行为序列指纹", "/admin/counter-offense/behavior"),
+            ("Web 蜜罐门面", "/admin/counter-offense/thinkphp"),
             ("互联网系统接入", "/admin/internet-systems"),
             ("提示词注入管理", "/admin/prompt-injection"),
             ("功能性伪装反制", "/admin/portal"),
@@ -400,6 +401,7 @@ NAV_ICONS = {
     "/admin/counter-offense/metadata": "cloud",
     "/admin/counter-offense/intranet": "globe",
     "/admin/counter-offense/behavior": "activity",
+    "/admin/counter-offense/thinkphp": "server",
     "/admin/playbooks": "zap",
     "/admin/attacker-profiles": "users",
     "/admin/portal": "target",
@@ -436,6 +438,7 @@ NAV_DESCRIPTIONS = {
     "/admin/counter-offense/metadata": "云元数据 SSRF 蜜罐配置",
     "/admin/counter-offense/intranet": "内网横向 Wiki 蜜罐配置",
     "/admin/counter-offense/behavior": "行为序列指纹参数配置",
+    "/admin/counter-offense/thinkphp": "Web 蜜罐门面（ThinkPHP 仿真）开关与指纹配置",
     "/admin/playbooks": "一键应用成套反制姿态",
     "/admin/attacker-profiles": "按来源聚合的攻击者持久画像",
     "/admin/portal": "功能性伪装反制通道（Portal API）运营配置",
@@ -6902,6 +6905,10 @@ async def admin_counter_surface_save(
                 config[field["key"]] = int(
                     field.get("default", 0) if field.get("default") is not None else 0
                 )
+        elif field["type"] == "bool":
+            # Unchecked checkboxes don't submit — always persist the explicit
+            # value so toggling off actually overrides the default.
+            config[field["key"]] = form.get(field["key"]) == "on"
         elif field["type"] == "lines":
             items = []
             for line in raw.splitlines():

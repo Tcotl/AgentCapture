@@ -131,18 +131,25 @@ def seed_defaults(db: Session) -> None:
 
     # thinkphp web honeypot is the default bait face on the dedicated
     # honeypot port (48777) — upsert so existing deployments get it too.
-    if not db.scalar(
-        select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp")
-    ):
+    _tp_desc = (
+        "Web 蜜罐平面宿主（默认蜜罐端口 48777）：ThinkPHP 5.x 门面 + 全部蜜罐诱饵面"
+        "（MCP / 指令文件 / Portal / 元数据 / 内网 / 蜜饵链路）共用此端口。"
+        "停止本服务即下线整个蜜罐平面；门面与各诱饵面可在「Web 蜜罐门面」及对应反制面页面单独开关。"
+    )
+    _tp_row = db.scalar(select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp"))
+    if _tp_row is None:
         db.add(ServiceCatalog(
             service_key="thinkphp",
             name="ThinkPHP Web 蜜罐",
             category="web",
-            description="ThinkPHP 5.x 仿真站点（默认蜜罐端口 48777）：登录凭证捕获 + 经典 RCE 仿真，命令经假文件系统回显。",
+            description=_tp_desc,
             protocols_json=["http"],
             default_port=48777,
             status="running",
         ))
+        db.commit()
+    elif _tp_row.description != _tp_desc:
+        _tp_row.description = _tp_desc
         db.commit()
 
     if int(db.scalar(select(func.count()).select_from(ServiceCatalog)) or 0) == 0:

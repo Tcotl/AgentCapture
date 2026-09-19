@@ -39,6 +39,10 @@ SURFACES: list[dict[str, str]] = [
      "description": "SSH 假文件系统内网主机的落点：返回会话水印版内网 wiki（横向探测即 risk 75）",
      "paths": "/intranet/* · SSH shell 内网 curl",
      "event_types": "intranet_probe"},
+    {"key": "thinkphp", "name": "Web 蜜罐门面 · ThinkPHP",
+     "description": "48777 蜜罐端口的默认门面：TP5 指纹页 + 假管理后台凭证捕获 + 经典 RCE 仿真（假 shell 回显）",
+     "paths": "/ · /index.php · /admin.php · /login · /*",
+     "event_types": "thinkphp_probe,thinkphp_login,thinkphp_rce"},
     {"key": "behavior", "name": "行为序列指纹",
      "description": "对会话请求历史做自动化特征分析（无静态资源/高路径多样性/匀速间隔），命中即附加信号",
      "paths": "中间件（全请求）",
@@ -196,6 +200,14 @@ DEFAULT_SURFACE_CONFIGS: dict[str, dict] = {
         "auto_score_threshold": 50,
         "strong_score_threshold": 75,
     },
+    "thinkphp": {
+        "app_name": "ThinkPHP V5.0.24",
+        "slogan": "十年磨一剑 — 为API开发设计的高性能PHP框架",
+        "runtime_path": "/var/www/html/app/runtime",
+        "login_title": "内容管理后台",
+        "login_page_enabled": True,
+        "rce_simulation_enabled": True,
+    },
 }
 
 # Editable form schema per surface (rendered by the detail page).
@@ -228,6 +240,16 @@ SURFACE_FIELDS: dict[str, list[dict]] = {
         {"key": "classify_every", "label": "分析频率（每 N 次请求）", "type": "number"},
         {"key": "auto_score_threshold", "label": "自动化判定阈值", "type": "number"},
         {"key": "strong_score_threshold", "label": "强自动化信号阈值", "type": "number"},
+    ],
+    "thinkphp": [
+        {"key": "app_name", "label": "框架显示名称（标题 / 指纹 / 版权行）", "type": "text"},
+        {"key": "slogan", "label": "首页标语", "type": "text"},
+        {"key": "runtime_path", "label": "Runtime 路径指纹", "type": "text"},
+        {"key": "login_title", "label": "假后台登录页标题", "type": "text"},
+        {"key": "login_page_enabled", "label": "假管理后台登录捕获（/admin.php · /login）",
+         "type": "bool", "desc": "关闭后这两个路径返回 404，伪装后台不存在"},
+        {"key": "rce_simulation_enabled", "label": "经典 RCE 仿真回显（s=captcha · _method=__construct）",
+         "type": "bool", "desc": "关闭后漏洞探测返回普通首页（事件与告警照常记录）"},
     ],
 }
 

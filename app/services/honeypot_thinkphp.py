@@ -161,6 +161,36 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
+_NOT_FOUND_PAGE = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>404 Not Found</title></head>
+<body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>"""
+
+
+def _surface_state() -> tuple[bool, dict]:
+    """Console-managed face state: (enabled, config). Disabled => bare 404."""
+    from app.core.db import SessionLocal
+    from app.services.surface_config import get_surface_config, is_enabled
+
+    with SessionLocal() as db:
+        return is_enabled(db, "thinkphp"), get_surface_config(db, "thinkphp")
+
+
+def _render_home(cfg: dict) -> str:
+    app_name = str(cfg.get("app_name") or "ThinkPHP V5.0.24")
+    return (
+        _TP_HOME_PAGE
+        .replace("ThinkPHP V5.0.24", app_name)
+        .replace("十年磨一剑 — 为API开发设计的高性能PHP框架",
+                 str(cfg.get("slogan") or "十年磨一剑 — 为API开发设计的高性能PHP框架"))
+        .replace("/var/www/html/app/runtime", str(cfg.get("runtime_path") or "/var/www/html/app/runtime"))
+    )
+
+
+def _render_login(cfg: dict) -> str:
+    return _TP_LOGIN_PAGE.replace(
+        "内容管理后台", str(cfg.get("login_title") or "内容管理后台"))
+
+
 def _log(request: Request, event_type: str, payload: dict, *,
          credential: dict | None = None, risk: int = 85,
          signals: list | None = None, decision: str = "observe") -> None:
@@ -204,16 +234,25 @@ def _log(request: Request, event_type: str, payload: dict, *,
 
 
 async def tp_home(request: Request) -> Response:
+    enabled, cfg = _surface_state()
+    if not enabled:
+        return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
     _log(request, "thinkphp_probe", {"path": request.url.path},
          risk=35, signals=["thinkphp_fingerprint"])
-    return HTMLResponse(_TP_HOME_PAGE)
+    return HTMLResponse(_render_home(cfg))
 
 
 async def tp_login_page(request: Request) -> Response:
-    return HTMLResponse(_TP_LOGIN_PAGE)
+    enabled, cfg = _surface_state()
+    if not enabled or not cfg.get("login_page_enabled", True):
+        return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
+    return HTMLResponse(_render_login(cfg))
 
 
 async def tp_login_submit(request: Request) -> Response:
+    enabled, cfg = _surface_state()
+    if not enabled or not cfg.get("login_page_enabled", True):
+        return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
     form = await request.form()
     username = str(form.get("username") or "")
     password = str(form.get("password") or "")
@@ -221,12 +260,16 @@ async def tp_login_submit(request: Request) -> Response:
     _log(request, "thinkphp_login", {"username": username, "source_ip": ip},
          credential={"username": username, "password": password},
          risk=70, signals=["thinkphp_login", "credential_captured"])
-    return HTMLResponse(_TP_LOGIN_PAGE.replace(
-        "<h1>内容管理后台</h1>",
-        "<h1>内容管理后台</h1><p class='err'>用户名或密码错误，请重新输入</p>"))
+    return HTMLResponse(_render_login(cfg).replace(
+        "<h1>" + str(cfg.get("login_title") or "内容管理后台") + "</h1>",
+        "<h1>" + str(cfg.get("login_title") or "内容管理后台")
+        + "</h1><p class='err'>用户名或密码错误，请重新输入</p>"))
 
 
 async def tp_exploit(request: Request) -> Response:
+    enabled, cfg = _surface_state()
+    if not enabled:
+        return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
     method = request.method
     query = request.url.query
     body = ""
@@ -235,7 +278,7 @@ async def tp_exploit(request: Request) -> Response:
         body = raw.decode("utf-8", errors="replace")[:8192]
 
     if not looks_like_tp_rce(method, request.url.path, query, body):
-        return HTMLResponse(_TP_HOME_PAGE)
+        return HTMLResponse(_render_home(cfg))
 
     command = extract_tp_command(query, body)
     command = strip_echo_wrapper(command) if command else ""
@@ -245,6 +288,11 @@ async def tp_exploit(request: Request) -> Response:
         "command": command[:2000], "source_ip": ip,
         "body_sample": body[:512],
     }, risk=95, signals=["thinkphp_rce", "rce_attempt", "fake_compromise"])
+
+    if not cfg.get("rce_simulation_enabled", True):
+        # Face stays up but the exploit path is a dead end: the probe is
+        # still fully logged (above), it just gets a plain fingerprint page.
+        return HTMLResponse(_render_home(cfg))
 
     if not command:
         output = "ThinkPHP V5.0.24 #exploit-accepted"
@@ -257,9 +305,12 @@ async def tp_exploit(request: Request) -> Response:
         logger.info("TP5 RCE from %s: %s", ip, command[:200])
 
     seed = ip.replace(".", "")
-    return HTMLResponse(_TP_EXCEPTION_PAGE.replace(
-        "{output}", output.replace("<", "&lt;")
-    ).replace("{seed}", seed), status_code=200)
+    app_name = str(cfg.get("app_name") or "ThinkPHP V5.0.24")
+    page = (_TP_EXCEPTION_PAGE
+            .replace("ThinkPHP V5.0.24", app_name)
+            .replace("{output}", output.replace("<", "&lt;"))
+            .replace("{seed}", seed))
+    return HTMLResponse(page, status_code=200)
 
 
 tp_router = APIRouter()

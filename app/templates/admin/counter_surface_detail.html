@@ -23,6 +23,26 @@
   <div class="card metric-card"><div class="muted metric-card-label">入口路径</div><div class="stat-card-value" style="font-size:14px"><code>{{ surface.paths }}</code></div></div>
 </div>
 
+{% if surface.key == 'thinkphp' %}
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('门面入口', 'Web 蜜罐端口（默认 48777）的默认门面——点击预览当前生效内容') }}
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a class="chip honeypot-preview" data-path="/" href="#" target="_blank">/（指纹页）</a>
+    <a class="chip honeypot-preview" data-path="/admin.php" href="#" target="_blank">/admin.php（假后台）</a>
+    <a class="chip honeypot-preview" data-path="/login" href="#" target="_blank">/login</a>
+  </div>
+  <script>
+    (function () {
+      // Bait faces live on the web honeypot port, not the console port.
+      var hp = location.protocol + '//' + location.hostname + ':48777';
+      document.querySelectorAll('.honeypot-preview').forEach(function (a) {
+        a.href = hp + a.dataset.path;
+      });
+    })();
+  </script>
+</section>
+{% endif %}
+
 {% if surface.key == 'agent_files' %}
 <section class="panel" style="margin-bottom:16px">
   {{ section_header('部署的指令文件', 'Agent 自动读取的项目级信任入口——部署在 Web 蜜罐端口（默认 48777），点击预览当前生效内容') }}
@@ -139,7 +159,12 @@
   {% if fields %}
   <div class="stack" style="margin-top:8px">
   {% for f in fields %}
-    {% if f.type == 'number' %}
+    {% if f.type == 'bool' %}
+    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="checkbox" name="{{ f.key }}" {% if runtime.get('config', {}).get(f.key) %}checked{% endif %}>
+      <span>{{ f.label }}{% if f.desc %} <span class="muted" style="font-size:11.5px">— {{ f.desc }}</span>{% endif %}</span>
+    </label>
+    {% elif f.type == 'number' %}
     <label class="field-label"><span>{{ f.label }}</span>
       <input type="number" name="{{ f.key }}" value="{{ runtime.get('config', {}).get(f.key, '') }}">
     </label>
