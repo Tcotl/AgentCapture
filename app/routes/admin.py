@@ -350,10 +350,10 @@ NAV_GROUPS = [
             ("云元数据蜜罐", "/admin/counter-offense/metadata"),
             ("内网横向 Wiki", "/admin/counter-offense/intranet"),
             ("行为序列指纹", "/admin/counter-offense/behavior"),
+            ("功能性伪装反制", "/admin/portal"),
             "嵌入式蜜罐",
             ("蜜饵管理", "/admin/decoy-management"),
             ("提示词注入管理", "/admin/prompt-injection"),
-            ("功能性伪装反制", "/admin/portal"),
             ("Jsonp模版管理", "/admin/jsonp-templates"),
             "端口服务与蜜网",
             ("端口服务蜜罐管理", "/admin/services"),
@@ -4172,24 +4172,27 @@ def delete_service(service_id: int, request: Request, db: Session = Depends(get_
 
 
 @router.post("/admin/services/{service_id}/start")
-def start_honeypot_service(service_id: int, request: Request, db: Session = Depends(get_db)):
+def start_honeypot_service(
+    service_id: int,
+    request: Request,
+    next: str = Form(""),
+    db: Session = Depends(get_db),
+):
     user = _require_admin(request, db)
     item = db.get(ServiceCatalog, service_id)
     if not item:
         return _redirect("/admin/services")
+    back = next if next.startswith("/admin") else "/admin/services"
     from app.services.honeypot_services import start_service
 
     try:
         ok = start_service(item.service_key, item.default_port)
     except OSError as exc:
-        return _redirect(
-            "/admin/services"
-            + _qs(error=f"启动 {item.name} 失败：端口 {item.default_port} 已被占用（{exc}）")
-        )
+        msg = f"启动 {item.name} 失败：端口 {item.default_port} 已被占用（{exc}）"
+        return _redirect(f"{back}{_qs(error=msg) if back == '/admin/services' else _qs(hp_err=msg)}")
     if not ok:
-        return _redirect(
-            "/admin/services" + _qs(error=f"启动 {item.name} 失败：无可用处理器或服务已在运行")
-        )
+        msg = f"启动 {item.name} 失败：无可用处理器或服务已在运行"
+        return _redirect(f"{back}{_qs(error=msg) if back == '/admin/services' else _qs(hp_err=msg)}")
     item.status = "running"
     db.add(item)
     db.commit()
@@ -4217,15 +4220,22 @@ def start_honeypot_service(service_id: int, request: Request, db: Session = Depe
             timestamp=datetime.now(timezone.utc),
         )
     )
-    return _redirect("/admin/services")
+    msg = f"{item.name} 已启动（:{item.default_port}）"
+    return _redirect(f"{back}{_qs(hp_ok=msg) if back != '/admin/services' else ''}")
 
 
 @router.post("/admin/services/{service_id}/stop")
-def stop_honeypot_service(service_id: int, request: Request, db: Session = Depends(get_db)):
+def stop_honeypot_service(
+    service_id: int,
+    request: Request,
+    next: str = Form(""),
+    db: Session = Depends(get_db),
+):
     user = _require_admin(request, db)
     item = db.get(ServiceCatalog, service_id)
     if not item:
         return _redirect("/admin/services")
+    back = next if next.startswith("/admin") else "/admin/services"
     from app.services.honeypot_services import stop_service
 
     stop_service(item.service_key)
@@ -4256,7 +4266,7 @@ def stop_honeypot_service(service_id: int, request: Request, db: Session = Depen
             timestamp=datetime.now(timezone.utc),
         )
     )
-    return _redirect("/admin/services")
+    return _redirect(f"{back}{_qs(hp_ok=f'{item.name} 已停止') if back != '/admin/services' else ''}")
 
 
 def _default_honeypot_row(db: Session) -> ServiceCatalog | None:
@@ -4265,13 +4275,19 @@ def _default_honeypot_row(db: Session) -> ServiceCatalog | None:
 
 @router.get("/admin/honeypots", response_class=HTMLResponse)
 def admin_honeypots(request: Request, db: Session = Depends(get_db)):
-    """蜜罐部署 hub — the three honeypot types, their default states and
-    entry points: Web 应用蜜罐 (default on), 嵌入式蜜罐 and 端口服务蜜罐."""
+    """蜜罐部署 — per-type deployment management. Each honeypot type gets its
+    own tab (deployment page); the bait-face configurations live in their own
+    pages (配置库) and are deployed/undeployed from here."""
     user = _require_user(request, db)
     from app.services.honeypot_services import (
         port_listening,
         running_services,
         sync_services_status,
+    )
+    from app.services.surface_config import (
+        SURFACES,
+        get_runtime_map,
+        surface_stats,
     )
     from app.services.system_settings import get_embedded_honeypot_enabled
 
@@ -4280,33 +4296,127 @@ def admin_honeypots(request: Request, db: Session = Depends(get_db)):
     web_port = tp_row.default_port if tp_row else 48777
     web_running = bool(running_services().get("thinkphp")) or port_listening(web_port)
 
-    from app.services.surface_config import is_enabled as surface_enabled
-
     running = running_services()
     protocol_items = db.scalars(
         select(ServiceCatalog).where(ServiceCatalog.service_key != "thinkphp")
         .order_by(ServiceCatalog.name)
     ).all()
-    protocol_running = [
-        {"name": item.name, "port": item.default_port}
-        for item in protocol_items
-        if running.get(item.service_key) or port_listening(item.default_port)
+
+    runtime_map = get_runtime_map(db)
+    stats = surface_stats(db)
+
+    def _face_row(key: str, name: str, paths: str, config_url: str, *, note: str = "") -> dict:
+        rt = runtime_map.get(key, {})
+        return {
+            "key": key,
+            "name": name,
+            "paths": paths,
+            "enabled": rt.get("enabled", True),
+            "hits_24h": stats.get(key, {}).get("hits_24h", 0),
+            "config_url": config_url,
+            "note": note,
+        }
+
+    web_faces = [
+        _face_row(
+            "thinkphp", "ThinkPHP 仿真门面", "/ · /index.php · /admin.php",
+            "/admin/counter-offense/thinkphp", note="门面：指纹 / 登录捕获 / RCE 仿真",
+        ),
+        _face_row("mcp", "MCP Server 蜜罐", "/mcp",
+                  "/admin/counter-offense/mcp", note="5 套反制模板 · 接入即注册"),
+        _face_row("agent_files", "Agent 指令文件蜜饵", "/AGENTS.md 等",
+                  "/admin/counter-offense/agent_files"),
+        _face_row("dataset", "消耗战数据集", "/portal/api/dataset",
+                  "/admin/counter-offense/dataset"),
+        _face_row("metadata", "云元数据蜜罐", "/latest/meta-data/*",
+                  "/admin/counter-offense/metadata"),
+        _face_row("intranet", "内网横向 Wiki", "/intranet/*",
+                  "/admin/counter-offense/intranet"),
+        _face_row("behavior", "行为序列指纹", "中间件（全请求）",
+                  "/admin/counter-offense/behavior", note="非独立端点，随门面生效"),
     ]
+    from app.services.portal_config import get_config_row
+
+    portal_row = get_config_row(db)
+    web_faces.append({
+        "key": "portal",
+        "name": "功能性伪装反制（Portal）",
+        "paths": "/portal/api/*",
+        "enabled": bool(portal_row.enabled),
+        "hits_24h": "—",
+        "config_url": "/admin/portal",
+        "note": "Developer API 伪装页脚 + 客户端链路",
+    })
 
     qp = request.query_params
+    tab = qp.get("tab", "web")
+    if tab not in ("web", "embedded", "protocol"):
+        tab = "web"
     ctx = {
         "title": "蜜罐部署",
         "current_user": user,
+        "active_tab": tab,
         "web_port": web_port,
         "web_running": web_running,
-        "web_face_enabled": surface_enabled(db, "thinkphp"),
+        "web_faces": web_faces,
         "embedded_enabled": get_embedded_honeypot_enabled(),
         "protocol_items": protocol_items,
-        "protocol_running": protocol_running,
+        "protocol_running_states": {
+            item.service_key: bool(running.get(item.service_key) or port_listening(item.default_port))
+            for item in protocol_items
+        },
         "hp_ok": qp.get("hp_ok", ""),
         "hp_err": qp.get("hp_err", ""),
     }
     return _render(request, "admin/honeypots.html", ctx)
+
+
+@router.post("/admin/honeypots/face")
+async def toggle_honeypot_face(
+    request: Request,
+    key: str = Form(""),
+    enabled: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Deploy/undeploy one bait face on the web honeypot plane. Surface keys
+    go through surface_config; portal has its own single-row config."""
+    user = _require_admin(request, db)
+    on = enabled in ("1", "on", "true", "True")
+
+    if key == "portal":
+        from app.services.portal_config import get_config_row, save_config
+
+        row = get_config_row(db)
+        save_config(
+            db,
+            actor=user.username,
+            enabled=on,
+            footer_enabled=row.footer_enabled,
+            footer_title=row.footer_title,
+            heartbeat_interval=row.heartbeat_interval,
+            register_max_per_ip_hour=row.register_max_per_ip_hour,
+            notes=row.notes,
+        )
+        target = "portal"
+    else:
+        from app.services.surface_config import SURFACES, set_surface
+
+        if key not in {meta["key"] for meta in SURFACES}:
+            return _redirect(f"/admin/honeypots{_qs(hp_err='未知的诱饵面')}")
+        set_surface(db, key=key, enabled=on, actor=user.username)
+        target = key
+
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="honeypots",
+        target_type="web-face-deploy",
+        target_ref=target,
+        detail_json={"enabled": on},
+    )
+    state = "已部署" if on else "已下线"
+    return _redirect(f"/admin/honeypots{_qs(tab='web', hp_ok=f'诱饵面「{target}」{state}（≤5s 生效）')}")
 
 
 @router.post("/admin/honeypots/embedded/toggle")

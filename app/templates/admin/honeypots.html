@@ -1,102 +1,170 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state %}
+{% from 'admin/_macros.html' import page_header, section_header, badge %}
 {% block content %}
-{{ page_header('IP', '蜜罐部署', '全部蜜罐共用同一套蜜饵与捕获引擎，按挂载方式分为三类：Web 应用蜜罐造一个假目标等人来（默认启用）；嵌入式蜜罐在自己的真目标上装绊线；端口服务蜜罐开假端口收连接（由你按需开启）。', ['Web 应用', '嵌入式', '端口服务']) }}
+{{ page_header('IP', '蜜罐部署', '同一套蜜饵与捕获引擎，三种挂载方式。每个蜜罐类型在这里选择部署哪些诱饵面；各诱饵面的具体内容在「配置」页独立维护。', ['Web 应用', '嵌入式', '端口服务']) }}
 
 {% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
 {% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
 
-<div class="grid-2" style="align-items:stretch">
+<div class="tabs" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+  <a class="chip {% if active_tab == 'web' %}primary{% endif %}" href="/admin/honeypots?tab=web" style="cursor:pointer;text-decoration:none">Web 应用蜜罐 {% if web_running %}●{% else %}○{% endif %}</a>
+  <a class="chip {% if active_tab == 'embedded' %}primary{% endif %}" href="/admin/honeypots?tab=embedded" style="cursor:pointer;text-decoration:none">嵌入式蜜罐 {% if embedded_enabled %}●{% else %}○{% endif %}</a>
+  <a class="chip {% if active_tab == 'protocol' %}primary{% endif %}" href="/admin/honeypots?tab=protocol" style="cursor:pointer;text-decoration:none">端口服务蜜罐</a>
+</div>
 
-  <section class="panel">
-    {{ section_header('Web 应用蜜罐', '默认启用 · 主动假阵地：造一个假目标等人来') }}
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <span class="badge badge-success">默认启用</span>
-      {% if web_running %}
-      <span class="badge badge-info">运行中 :{{ web_port }}</span>
-      {% else %}
-      <span class="badge badge-warning">已停止</span>
-      {% endif %}
-      {% if not web_face_enabled %}<span class="badge badge-danger">门面已关闭（404）</span>{% endif %}
+{% if active_tab == 'web' %}
+<section class="panel" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <strong style="font-size:14.5px">Web 应用蜜罐</strong>
+      <code style="font-size:12px;color:var(--muted-foreground)">0.0.0.0:{{ web_port }}</code>
+      {% if web_running %}<span class="badge badge-success">运行中</span>{% else %}<span class="badge badge-warning">已停止</span>{% endif %}
+      <span class="muted" style="font-size:12px">主动假阵地：造一个假目标等人来</span>
     </div>
-    <p class="muted" style="font-size:12.5px;line-height:1.8">
-      48777 端口的 ThinkPHP 5.x 仿真门面，集成 MCP Server 蜜罐、Agent 指令文件蜜饵、Portal 开发者 API 伪装、
-      云元数据与内网横向蜜饵、文件/凭证蜜饵链路与页面注入。整面 observe-only——访问者永远不会被阻断，
-      评分、事件与告警照常。系统部署后即自动运行。
-    </p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开蜜罐站点</a>
-      <a class="chip" href="/admin/templates" style="cursor:pointer;text-decoration:none">Web应用蜜罐管理</a>
+      <a class="chip" href="/admin/templates" style="cursor:pointer;text-decoration:none">模板与节点部署</a>
       {% if web_running %}
       <form method="post" action="/admin/templates/honeypot/stop" style="margin:0">
-        <input type="hidden" name="next" value="/admin/honeypots">
-        <button type="submit" class="secondary btn-sm">停止</button>
+        <input type="hidden" name="next" value="/admin/honeypots?tab=web">
+        <button type="submit" class="secondary btn-sm">停止蜜罐</button>
       </form>
       {% else %}
       <form method="post" action="/admin/templates/honeypot/start" style="margin:0">
-        <input type="hidden" name="next" value="/admin/honeypots">
-        <button type="submit" class="primary btn-sm">启动</button>
+        <input type="hidden" name="next" value="/admin/honeypots?tab=web">
+        <button type="submit" class="primary btn-sm">启动蜜罐</button>
       </form>
       {% endif %}
     </div>
-  </section>
-
-  <section class="panel">
-    {{ section_header('嵌入式蜜罐', '默认关闭 · 在自己的真目标上装绊线') }}
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      {% if embedded_enabled %}
-      <span class="badge badge-success">已启用</span>
-      {% else %}
-      <span class="badge badge-warning">默认关闭</span>
-      {% endif %}
-    </div>
-    <p class="muted" style="font-size:12.5px;line-height:1.8">
-      通过投放片段（JS 探针 / Nginx 引流 / SQL / manifest）把隐藏蜜饵链接、canary 令牌与浏览器信号采集嵌入到
-      <b>你自己的业务站点</b>；浏览器回传与 Jsonp 画像经控制台的
-      <code>/collect</code>、<code>/recon</code>、<code>/_agent</code>、<code>/payload</code> 通道回传。
-      停用时这些通道返回 404——已投放的探针将静默失联，蜜罐站点自身不受影响。
-    </p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">
-      <form method="post" action="/admin/honeypots/embedded/toggle" style="margin:0">
-        <input type="hidden" name="enabled" value="{{ '0' if embedded_enabled else '1' }}">
-        {% if embedded_enabled %}
-        <button type="submit" class="secondary btn-sm">停用嵌入式蜜罐</button>
-        {% else %}
-        <button type="submit" class="primary btn-sm">启用嵌入式蜜罐</button>
-        {% endif %}
-      </form>
-      <a class="chip" href="/admin/decoy-management" style="cursor:pointer;text-decoration:none">蜜饵管理</a>
-      <a class="chip" href="/admin/jsonp-templates" style="cursor:pointer;text-decoration:none">Jsonp模版管理</a>
-    </div>
-  </section>
-
-</div>
-
-<section class="panel" style="margin-top:16px">
-    {{ section_header('端口服务蜜罐', '默认关闭 · 开假端口收连接') }}
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-    {% if protocol_running %}
-    <span class="badge badge-info">运行中 {{ protocol_running|length }} 项</span>
-    {% else %}
-    <span class="badge badge-warning">默认关闭（0 项运行）</span>
-    {% endif %}
-  </div>
-  <p class="muted" style="font-size:12.5px;line-height:1.8">
-    真实 TCP 协议栈仿真：SSH（paramiko + 假 shell + 会话回放）、MySQL（greeting + 假结果集）、
-    Redis（RESP）、FTP（ProFTPD banner）、ElasticSearch（HTTP JSON）。协议捕获的凭证自动入库并与蜜饵凭证比对。
-    服务默认全部停止，由你在端口服务蜜罐管理中逐项启动——端口占用与开机自启（status=running 的服务随系统重启自动恢复）均在同一页面管理。
-  </p>
-  {% if protocol_running %}
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px">
-    {% for s in protocol_running %}
-    <span class="pill">{{ s.name }} :{{ s.port }}</span>
-    {% endfor %}
-  </div>
-  {% endif %}
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-    <a class="chip" href="/admin/services" style="cursor:pointer;text-decoration:none">端口服务蜜罐管理</a>
   </div>
 </section>
+
+<section class="panel">
+  {{ section_header('诱饵面部署', '在本蜜罐上部署/下线各个诱饵面——配置内容在各面的「配置」页独立维护，这里只决定部署哪一个。下线后对应端点即刻返回 404（≤5s 生效）。') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>诱饵面</th><th>入口路径</th><th>24h 命中</th><th>说明</th><th style="text-align:center">部署状态</th><th style="text-align:right">配置</th></tr></thead>
+      <tbody>
+        {% for f in web_faces %}
+        <tr>
+          <td><strong style="font-size:13px">{{ f.name }}</strong></td>
+          <td><code style="font-size:11.5px">{{ f.paths }}</code></td>
+          <td>{{ f.hits_24h }}</td>
+          <td class="muted" style="font-size:12px">{{ f.note }}</td>
+          <td style="text-align:center">
+            <form method="post" action="/admin/honeypots/face" style="margin:0;display:inline-flex;align-items:center;gap:8px">
+              <input type="hidden" name="key" value="{{ f.key }}">
+              <input type="hidden" name="enabled" value="{{ '0' if f.enabled else '1' }}">
+              {% if f.enabled %}
+              <span class="badge badge-success">部署中</span>
+              <button type="submit" class="secondary btn-sm">下线</button>
+              {% else %}
+              <span class="badge badge-warning">未部署</span>
+              <button type="submit" class="primary btn-sm">部署</button>
+              {% endif %}
+            </form>
+          </td>
+          <td style="text-align:right"><a class="chip btn-sm" href="{{ f.config_url }}" style="cursor:pointer;text-decoration:none">配置</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if active_tab == 'embedded' %}
+<section class="panel" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <strong style="font-size:14.5px">嵌入式蜜罐</strong>
+      {% if embedded_enabled %}<span class="badge badge-success">已启用</span>{% else %}<span class="badge badge-warning">默认关闭</span>{% endif %}
+      <span class="muted" style="font-size:12px">在自己的真目标上装绊线</span>
+    </div>
+    <form method="post" action="/admin/honeypots/embedded/toggle" style="margin:0">
+      <input type="hidden" name="enabled" value="{{ '0' if embedded_enabled else '1' }}">
+      {% if embedded_enabled %}
+      <button type="submit" class="secondary btn-sm">停用嵌入式蜜罐</button>
+      {% else %}
+      <button type="submit" class="primary btn-sm">启用嵌入式蜜罐</button>
+      {% endif %}
+    </form>
+  </div>
+  <p class="muted" style="font-size:12.5px;line-height:1.8;margin:10px 0 0">
+    与 Web 蜜罐共用同一套蜜饵与捕获引擎，载体是<b>你自己的业务站点</b>：通过投放片段
+    （JS 探针 / Nginx 引流 / SQL / manifest）把蜜饵与信号采集埋进真实页面。
+    总开关控制控制台回传通道的开放：
+    <code>/collect</code> <code>/recon</code> <code>/_agent</code> <code>/payload</code>
+    {% if embedded_enabled %}<span class="badge badge-success" style="margin-left:6px">通道开放</span>{% else %}<span class="badge badge-danger" style="margin-left:6px">通道 404</span>{% endif %}
+    —— 停用后已投放探针静默失联，蜜罐站点自身不受影响。
+  </p>
+</section>
+
+<section class="panel">
+  {{ section_header('嵌入式资产部署', '可嵌入到业务站点的蜜饵资产——内容在各管理页独立配置，部署状态随各页操作即时生效。') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>资产</th><th>说明</th><th style="text-align:right">配置 / 投放</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong style="font-size:13px">蜜饵投放链路</strong></td>
+          <td class="muted" style="font-size:12px">API 路由蜜饵 / 凭证蜜饵 / 文件蜜饵，可绑定成完整攻击链；逐个部署</td>
+          <td style="text-align:right"><a class="chip btn-sm" href="/admin/decoy-management" style="cursor:pointer;text-decoration:none">蜜饵管理</a></td>
+        </tr>
+        <tr>
+          <td><strong style="font-size:13px">Jsonp 画像探针</strong></td>
+          <td class="muted" style="font-size:12px">浏览器指纹采集与回调反制，模板独立维护</td>
+          <td style="text-align:right"><a class="chip btn-sm" href="/admin/jsonp-templates" style="cursor:pointer;text-decoration:none">Jsonp 模版管理</a></td>
+        </tr>
+        <tr>
+          <td><strong style="font-size:13px">提示词注入</strong></td>
+          <td class="muted" style="font-size:12px">针对 AI Agent 的隐藏指令注入，逐模板启用</td>
+          <td style="text-align:right"><a class="chip btn-sm" href="/admin/prompt-injection" style="cursor:pointer;text-decoration:none">提示词注入管理</a></td>
+        </tr>
+        <tr>
+          <td><strong style="font-size:13px">投放片段生成</strong></td>
+          <td class="muted" style="font-size:12px">JS 探针 / Nginx 引流 / SQL / manifest 投放代码</td>
+          <td style="text-align:right"><a class="chip btn-sm" href="/admin/decoy-management" style="cursor:pointer;text-decoration:none">获取片段</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if active_tab == 'protocol' %}
+<section class="panel">
+  {{ section_header('端口服务蜜罐', '开假端口收连接——协议级仿真服务逐项部署，status 为运行中的服务随系统重启自动恢复。') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>服务</th><th>端口</th><th style="text-align:center">部署状态</th><th style="text-align:right">操作</th></tr></thead>
+      <tbody>
+        {% for item in protocol_items %}
+        {% set up = protocol_running_states.get(item.service_key) %}
+        <tr>
+          <td><strong style="font-size:13px">{{ item.name }}</strong></td>
+          <td><code style="font-size:11.5px">:{{ item.default_port }}</code></td>
+          <td style="text-align:center">
+            {% if up %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
+          </td>
+          <td style="text-align:right">
+            <form method="post" action="/admin/services/{{ item.id }}/{{ 'stop' if up else 'start' }}" style="margin:0;display:inline-block">
+              <input type="hidden" name="next" value="/admin/honeypots?tab=protocol">
+              {% if up %}
+              <button type="submit" class="secondary btn-sm">下线</button>
+              {% else %}
+              <button type="submit" class="primary btn-sm">部署</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12px;margin:10px 0 0">协议细节与高级管理见 <a href="/admin/services">端口服务蜜罐管理</a>。</p>
+</section>
+{% endif %}
 
 <script>
   (function () {
