@@ -6854,7 +6854,7 @@ def admin_counter_surface_detail(key: str, request: Request, db: Session = Depen
         request,
         "admin/counter_surface_detail.html",
         {
-            "title": f"反制面 · {meta['name']}",
+            "title": meta['name'],
             "surface": meta,
             "runtime": rt,
             "stats": stats,

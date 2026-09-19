@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
 {% block content %}
-{{ page_header('CF', '反制面 · ' ~ surface.name, surface.description, [surface.paths],
+{{ page_header('CF', surface.name, surface.description, [surface.paths],
       actions='<span class="badge ' ~ ('badge-success' if runtime.get('enabled') else 'badge-warning') ~ '" id="surface-badge" style="cursor:default;margin-right:8px">' ~ ('运行中' if runtime.get('enabled') else '已停用') ~ '</span>'
 
               ~ '<button type="button" class="chip primary" data-modal-open="config-modal">编辑配置</button>') }}
