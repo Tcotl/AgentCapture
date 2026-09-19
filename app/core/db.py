@@ -81,6 +81,7 @@ def init_db() -> None:
     from app.models.counter_surface import CounterSurface  # noqa: F401
     from app.models.prompt_injection import PromptInjectionTemplate  # noqa: F401
     from app.models.service import ServiceCatalog, ServiceTemplate  # noqa: F401
+    from app.models.system_setting import SystemSetting  # noqa: F401
     from app.models.user import User  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

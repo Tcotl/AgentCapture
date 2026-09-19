@@ -129,6 +129,12 @@ DEFAULT_DECOY_TEMPLATES = [
 def seed_defaults(db: Session) -> None:
     ensure_bootstrap_admin(db)
 
+    # Console security access path: shipped default, inserted once and never
+    # overridden — operators customize it from 系统设置 after first login.
+    from app.services.system_settings import seed_admin_access_path
+
+    seed_admin_access_path(db)
+
     # thinkphp web honeypot is the default bait face on the dedicated
     # honeypot port (48777) — upsert so existing deployments get it too.
     _tp_desc = (

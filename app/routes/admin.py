@@ -367,7 +367,7 @@ NAV_GROUPS = [
             ("登陆日志", "/admin/login-logs"),
             ("用户管理", "/admin/users"),
             ("API 令牌", "/admin/api-tokens"),
-            ("个人信息", "/admin/profile"),
+            ("系统设置", "/admin/profile"),
         ],
     },
     {
@@ -450,7 +450,7 @@ NAV_DESCRIPTIONS = {
     "/admin/execution-history": "后台操作流水",
     "/admin/login-logs": "登录成功与失败记录",
     "/admin/users": "账号、角色与密码",
-    "/admin/profile": "个人资料与密码",
+    "/admin/profile": "个人资料、密码与控制台安全路径",
 }
 
 
@@ -482,11 +482,21 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
         nav_groups.append({"title": group["title"], "links": rendered_items})
     if "current_user" not in context and "user" in context:
         context["current_user"] = context["user"]
+    from app.services.system_settings import (
+        DEFAULT_ADMIN_ACCESS_PATH,
+        get_admin_access_path,
+    )
+
+    admin_access_path = get_admin_access_path()
+    path_banner_dismissed = bool(request.session.get("admin_path_banner_dismissed"))
     full_context = {
         "request": request,
         "nav_groups": nav_groups,
         "active_path": active_path,
         "site_id": get_settings().site_id,
+        "admin_access_path": admin_access_path,
+        "admin_path_is_default": admin_access_path == DEFAULT_ADMIN_ACCESS_PATH,
+        "admin_path_banner_dismissed": path_banner_dismissed,
         **context,
     }
     return templates.TemplateResponse(request, template_name, full_context)
@@ -3278,7 +3288,7 @@ def _dashboard_context(db: Session) -> dict:
                 {"label": "执行历史", "href": "/admin/execution-history"},
                 {"label": "登陆日志", "href": "/admin/login-logs"},
                 {"label": "用户管理", "href": "/admin/users"},
-                {"label": "个人信息", "href": "/admin/profile"},
+                {"label": "系统设置", "href": "/admin/profile"},
             ],
         },
     ]
@@ -6327,7 +6337,49 @@ def reset_user_password(
 @router.get("/admin/profile", response_class=HTMLResponse)
 def admin_profile(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
-    return _render(request, "admin/profile.html", {"title": "个人信息", "current_user": user})
+    from app.core.config import get_settings as _gs
+
+    return _render(
+        request,
+        "admin/profile.html",
+        {
+            "title": "系统设置",
+            "current_user": user,
+            "settings_port": _gs().port,
+            "saved": request.query_params.get("saved", ""),
+            "path_error": request.query_params.get("path_error", ""),
+        },
+    )
+
+
+@router.post("/admin/profile/access-path")
+async def admin_profile_access_path(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Console security access path — takes effect immediately (≤5s cache)."""
+    user = _require_admin(request, db)
+    from app.services.system_settings import (
+        set_admin_access_path,
+        validate_admin_path,
+    )
+
+    form = await request.form()
+    access_path = (form.get("access_path") or "").strip()
+    error = validate_admin_path(access_path)
+    if error:
+        return _redirect(f"/admin/profile{_qs(path_error=error)}")
+    set_admin_access_path(db, access_path, actor=user.username)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="system-settings",
+        target_type="admin_access_path",
+        target_ref=access_path,
+        detail_json={"access_path": access_path},
+    )
+    return _redirect(f"/admin/profile{_qs(saved='安全路径已更新并即时生效，请使用新地址访问控制台')}")
 
 
 @router.get("/admin/big-screen", response_class=HTMLResponse)
@@ -7007,6 +7059,14 @@ def admin_counter_surface_toggle(
         detail_json={"enabled": bool(enabled)},
     )
     return _redirect(f"/admin/counter-offense/{key}")
+
+
+@router.post("/api/admin/dismiss-path-banner")
+def api_admin_dismiss_path_banner(request: Request, db: Session = Depends(get_db)):
+    """Per-session dismissal of the default-access-path security banner."""
+    _require_user(request, db)
+    request.session["admin_path_banner_dismissed"] = True
+    return JSONResponse({"ok": True})
 
 
 @router.post("/api/admin/counter-offense/{key}")

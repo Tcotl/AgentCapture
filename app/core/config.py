@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     host: str = "0.0.0.0"
     port: int = 4877
+    # Console security access path. The admin console answers on
+    # /{admin_access_path}/... while /admin is answered with 404 so the
+    # console is not discoverable at the well-known location. DB value
+    # (system_settings.admin_access_path, editable from 系统设置) wins.
+    admin_access_path: str = "agentcapture"
     site_id: str = "local-demo"
     database_url: str = "sqlite:///./agent_capture.db"
     secret_key: str = "change-me-before-production"

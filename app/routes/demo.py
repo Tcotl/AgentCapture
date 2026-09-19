@@ -11,16 +11,23 @@ templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / 
 
 @router.get("/")
 def home(request: Request):
+    from app.services.system_settings import get_admin_access_path
+
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "title": "AgentCapture - 嵌入式蜜罐与 Agent 检测平台",
             "session_id": getattr(request.state, "session_id", "unknown"),
+            "admin_prefix": get_admin_access_path(),
         },
     )
 
 
 @router.get("/help")
-def help_page(request: Request):
-    return RedirectResponse(url="/admin/login", status_code=302)
+def help_page():
+    from app.services.system_settings import get_admin_access_path
+
+    return RedirectResponse(
+        url=f"/{get_admin_access_path()}/admin/login", status_code=302
+    )

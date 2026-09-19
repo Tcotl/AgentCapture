@@ -290,7 +290,7 @@ The platform uses a **dual-plane architecture**: the management plane hosts only
 **Management plane (default 4877)**:
 
 - **Home**: http://127.0.0.1:4877/
-- **Admin login**: http://127.0.0.1:4877/admin/login
+- **Admin login**: http://127.0.0.1:4877/agentcapture/ (default security path; redirects to the login page when unauthenticated)
 - **Big screen**: http://127.0.0.1:4877/admin/big-screen
 - **Honeypot session replay**: http://127.0.0.1:4877/admin/honeypot-sessions
 - **Event console**: http://127.0.0.1:4877/console/events (admin session required)
@@ -308,6 +308,8 @@ The platform uses a **dual-plane architecture**: the management plane hosts only
 - **Health check**: http://127.0.0.1:48777/healthz (returns `face: honeypot`)
 
 Beacons recruited on a bait face call back to the management plane automatically (override with `payload_callback_host`); the honeypot plane is observe-only end to end — risk scoring, events and alerts still fire, but nothing is ever blocked, keeping the deception chain intact.
+
+The console uses a **security access path**: it is served under `/agentcapture/` by default while `/admin` answers 404 so the console cannot be discovered by scanners. The first login after deployment prompts you to change it; customize it under **System Settings → Console Access Path** (takes effect immediately, the old path stops working right away).
 
 **Default admin account**:
 

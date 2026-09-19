@@ -96,6 +96,12 @@ app.add_middleware(
     same_site="lax",
     https_only=False,
 )
+# Console security path: serves /admin routes under the configured prefix
+# (default /agentcapture/) and 404s the well-known /admin. Must sit inside
+# SessionMiddleware (sessions are path-independent) but outside the routers.
+from app.middleware.admin_path import AdminAccessPathMiddleware  # noqa: E402
+
+app.add_middleware(AdminAccessPathMiddleware)
 app.mount("/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static")), name="static")
 
 # Serve cloned/uploaded web template assets so preview can resolve relative paths.

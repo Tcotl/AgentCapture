@@ -71,14 +71,17 @@ def main() -> int:
     parser.add_argument("--base", default="http://localhost:4877")
     parser.add_argument("--honeypot-base", default="http://localhost:48777",
                         help="Web 蜜罐源（蜜饵下载与触发端点所在平面）")
+    parser.add_argument("--admin-path", default="agentcapture",
+                        help="控制台安全路径前缀（系统设置中配置）")
     parser.add_argument("--username", default="admin")
     parser.add_argument("--password", default="admin")
     args = parser.parse_args()
     base = args.base.rstrip("/")
     hp = args.honeypot_base.rstrip("/")
+    A = "/" + args.admin_path.strip("/")  # console security path prefix
     opener = build_opener()
 
-    status, url, _ = post_form(opener, base, "/admin/login", {"username": args.username, "password": args.password})
+    status, url, _ = post_form(opener, base, A + "/admin/login", {"username": args.username, "password": args.password})
     must(status == 200 and not url.endswith("/admin/login"), "admin login failed")
 
     nonce = str(int(time.time() * 1000))
@@ -87,7 +90,7 @@ def main() -> int:
     file_name = f"自检文件蜜饵{nonce}"
     route_path = f"/api/private/self-check-{nonce}"
 
-    post_form(opener, base, "/admin/decoys/templates", {
+    post_form(opener, base, A + "/admin/decoys/templates", {
         "return_to": "/admin/decoy-management",
         "decoy_type": "api_route",
         "name": api_name,
@@ -95,7 +98,7 @@ def main() -> int:
         "exposure_channel": "js",
         "description": "self-check api route",
     })
-    post_form(opener, base, "/admin/decoys/templates", {
+    post_form(opener, base, A + "/admin/decoys/templates", {
         "return_to": "/admin/decoy-management",
         "decoy_type": "credential",
         "name": cred_name,
@@ -104,12 +107,12 @@ def main() -> int:
         "password_length": "14",
         "description": "self-check credential",
     })
-    status, html = get_text(opener, base, "/admin/decoy-management")
+    status, html = get_text(opener, base, A + "/admin/decoy-management")
     must(status == 200, "cannot read decoy management after create")
     api_id = find_template_id(html, api_name)
     cred_id = find_template_id(html, cred_name)
 
-    post_form(opener, base, "/admin/decoys/templates", {
+    post_form(opener, base, A + "/admin/decoys/templates", {
         "return_to": "/admin/decoy-management",
         "decoy_type": "file",
         "name": file_name,
@@ -120,20 +123,20 @@ def main() -> int:
         "description": "self-check chained file",
         "content_template": "api=$api_route\nlogin=$credential_login\nuser=$credential_username\npass=$credential_password\n",
     })
-    status, html = get_text(opener, base, "/admin/decoy-management")
+    status, html = get_text(opener, base, A + "/admin/decoy-management")
     file_id = find_template_id(html, file_name)
-    post_form(opener, base, f"/admin/decoys/templates/{file_id}/deploy", {
+    post_form(opener, base, A + f"/admin/decoys/templates/{file_id}/deploy", {
         "return_to": "/admin/decoy-management",
         "deployed_host": "self-check-system",
     })
 
     # Verify the built-in default chain shortcut is functional too.
-    post_form(opener, base, "/admin/decoys/deploy-default-chain", {
+    post_form(opener, base, A + "/admin/decoys/deploy-default-chain", {
         "return_to": "/admin/decoy-management",
         "deployed_host": "self-check-default-chain",
     })
 
-    status, html = get_text(opener, base, "/admin/decoy-management")
+    status, html = get_text(opener, base, A + "/admin/decoy-management")
     must("一键生成默认攻击链路" in html, "default chain shortcut missing")
     must("默认攻击链路文件蜜饵" in html, "default chain template missing")
     must("JS 投放片段" in html and "凭证投放 SQL" in html and "文件下载链接" in html, "delivery snippets missing")
@@ -142,7 +145,7 @@ def main() -> int:
     file_path = file_path_match.group(1)
     manifest_match = re.search(r'/admin/decoys/deployments/(\d+)/manifest\.json', html)
     must(bool(manifest_match), "deployment manifest link missing")
-    status, manifest = get_text(opener, base, f"/admin/decoys/deployments/{manifest_match.group(1)}/manifest.json")
+    status, manifest = get_text(opener, base, A + f"/admin/decoys/deployments/{manifest_match.group(1)}/manifest.json")
     must(status == 200 and '"snippets"' in manifest and '"bindings"' in manifest, "manifest download invalid")
 
     status, file_body = get_text(opener, hp, file_path)
@@ -161,9 +164,9 @@ def main() -> int:
     })
     must(status == 403, "credential decoy login did not block")
 
-    status, creds = get_text(opener, base, "/admin/credentials")
+    status, creds = get_text(opener, base, A + "/admin/credentials")
     must("credential-decoy" in creds and user_match.group(1) in creds, "credential record missing")
-    status, decoy_ops = get_text(opener, base, "/admin/decoy-management")
+    status, decoy_ops = get_text(opener, base, A + "/admin/decoy-management")
     must(status == 200 and (file_path in decoy_ops or "fetched" in decoy_ops), "decoy deployment record missing")
 
     print("[OK] decoy chain verified")
