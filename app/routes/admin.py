@@ -335,6 +335,7 @@ NAV_GROUPS = [
     {
         "title": "部署运营",
         "items": [
+            ("蜜罐部署", "/admin/honeypots"),
             ("节点管理", "/admin/nodes"),
             ("蜜饵管理", "/admin/decoy-management"),
             ("反制剧本", "/admin/playbooks"),
@@ -395,6 +396,7 @@ NAV_ICONS = {
     "/admin/prompt-injection": "bot",
     "/admin/jsonp-templates": "monitor",
     "/admin/counter-offense": "target",
+    "/admin/honeypots": "radar",
     "/admin/counter-offense/agent_files": "file-text",
     "/admin/counter-offense/mcp": "terminal",
     "/admin/counter-offense/dataset": "database",
@@ -432,6 +434,7 @@ NAV_DESCRIPTIONS = {
     "/admin/prompt-injection": "提示词注入模板与内容维护",
     "/admin/jsonp-templates": "Jsonp 请求方法与回调模板",
     "/admin/counter-offense": "六个反制诱饵面总览与横向移动告警",
+    "/admin/honeypots": "三类蜜罐部署总览：Web 应用（默认启用）/ 嵌入式 / 端口服务",
     "/admin/counter-offense/agent_files": "AGENTS.md / CLAUDE.md / .cursorrules 指令文件蜜饵配置",
     "/admin/counter-offense/mcp": "MCP 工具服务蜜罐配置",
     "/admin/counter-offense/dataset": "消耗战毒化数据集配置",
@@ -4240,21 +4243,100 @@ def _default_honeypot_row(db: Session) -> ServiceCatalog | None:
     return db.scalar(select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp"))
 
 
+@router.get("/admin/honeypots", response_class=HTMLResponse)
+def admin_honeypots(request: Request, db: Session = Depends(get_db)):
+    """蜜罐部署 hub — the three honeypot types, their default states and
+    entry points: Web 应用蜜罐 (default on), 嵌入式蜜罐 and 端口服务蜜罐."""
+    user = _require_user(request, db)
+    from app.services.honeypot_services import (
+        port_listening,
+        running_services,
+        sync_services_status,
+    )
+    from app.services.system_settings import get_embedded_honeypot_enabled
+
+    sync_services_status(db)
+    tp_row = _default_honeypot_row(db)
+    web_port = tp_row.default_port if tp_row else 48777
+    web_running = bool(running_services().get("thinkphp")) or port_listening(web_port)
+
+    from app.services.surface_config import is_enabled as surface_enabled
+
+    running = running_services()
+    protocol_items = db.scalars(
+        select(ServiceCatalog).where(ServiceCatalog.service_key != "thinkphp")
+        .order_by(ServiceCatalog.name)
+    ).all()
+    protocol_running = [
+        {"name": item.name, "port": item.default_port}
+        for item in protocol_items
+        if running.get(item.service_key) or port_listening(item.default_port)
+    ]
+
+    qp = request.query_params
+    ctx = {
+        "title": "蜜罐部署",
+        "current_user": user,
+        "web_port": web_port,
+        "web_running": web_running,
+        "web_face_enabled": surface_enabled(db, "thinkphp"),
+        "embedded_enabled": get_embedded_honeypot_enabled(),
+        "protocol_items": protocol_items,
+        "protocol_running": protocol_running,
+        "hp_ok": qp.get("hp_ok", ""),
+        "hp_err": qp.get("hp_err", ""),
+    }
+    return _render(request, "admin/honeypots.html", ctx)
+
+
+@router.post("/admin/honeypots/embedded/toggle")
+def toggle_embedded_honeypot(
+    request: Request,
+    enabled: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    from app.services.system_settings import set_embedded_honeypot_enabled
+
+    on = enabled in ("1", "on", "true", "True")
+    set_embedded_honeypot_enabled(db, on, actor=user.username)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="honeypots",
+        target_type="embedded-honeypot",
+        target_ref="embedded",
+        detail_json={"enabled": on},
+    )
+    msg = (
+        "嵌入式蜜罐已启用：控制台回传通道（/collect · /recon · /_agent · /payload）已开放"
+        if on
+        else "嵌入式蜜罐已停用：控制台回传通道返回 404，已投放的探针将静默失联"
+    )
+    return _redirect(f"/admin/honeypots{_qs(hp_ok=msg)}")
+
+
 @router.post("/admin/templates/honeypot/start")
-def start_default_web_honeypot(request: Request, db: Session = Depends(get_db)):
+def start_default_web_honeypot(
+    request: Request,
+    next: str = Form(""),
+    db: Session = Depends(get_db),
+):
     user = _require_admin(request, db)
     from app.services.honeypot_services import start_service
 
+    back = next if next.startswith("/admin") else "/admin/templates"
     item = _default_honeypot_row(db)
     port = item.default_port if item else 48777
     try:
         ok = start_service("thinkphp", port)
     except OSError as exc:
         return _redirect(
-            f"/admin/templates{_qs(hp_err=f'启动 Web 蜜罐失败：端口 {port} 已被占用（{exc}）')}"
+            f"{back}{_qs(hp_err=f'启动 Web 蜜罐失败：端口 {port} 已被占用（{exc}）')}"
         )
     if not ok:
-        return _redirect(f"/admin/templates{_qs(hp_err='启动 Web 蜜罐失败：服务已在运行')}")
+        return _redirect(f"{back}{_qs(hp_err='启动 Web 蜜罐失败：服务已在运行')}")
     if item:
         item.status = "running"
         db.add(item)
@@ -4267,14 +4349,19 @@ def start_default_web_honeypot(request: Request, db: Session = Depends(get_db)):
         target_type="web-honeypot",
         target_ref=f"thinkphp:{port}",
     )
-    return _redirect(f"/admin/templates{_qs(hp_ok='Web 蜜罐已启动')}")
+    return _redirect(f"{back}{_qs(hp_ok='Web 蜜罐已启动')}")
 
 
 @router.post("/admin/templates/honeypot/stop")
-def stop_default_web_honeypot(request: Request, db: Session = Depends(get_db)):
+def stop_default_web_honeypot(
+    request: Request,
+    next: str = Form(""),
+    db: Session = Depends(get_db),
+):
     user = _require_admin(request, db)
     from app.services.honeypot_services import stop_service
 
+    back = next if next.startswith("/admin") else "/admin/templates"
     stop_service("thinkphp")
     item = _default_honeypot_row(db)
     if item:
@@ -4289,7 +4376,7 @@ def stop_default_web_honeypot(request: Request, db: Session = Depends(get_db)):
         target_type="web-honeypot",
         target_ref="thinkphp",
     )
-    return _redirect(f"/admin/templates{_qs(hp_ok='Web 蜜罐已停止（48777 整个欺骗面随之下线）')}")
+    return _redirect(f"{back}{_qs(hp_ok='Web 蜜罐已停止（48777 整个欺骗面随之下线）')}")
 
 
 @router.post("/admin/templates/honeypot/config")

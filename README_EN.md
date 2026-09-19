@@ -311,6 +311,12 @@ Beacons recruited on a bait face call back to the management plane automatically
 
 The console uses a **security access path**: it is served under `/agentcapture/` by default while `/admin` answers 404 so the console cannot be discovered by scanners. The first login after deployment prompts you to change it; customize it under **System Settings → Console Access Path** (takes effect immediately, the old path stops working right away).
 
+**Honeypots come in three deployment types** (overview: **Deployment → Honeypot Deployment**):
+
+1. **Web application honeypot** (on by default): the ThinkPHP facade on 48777 plus every bait face — runs out of the box;
+2. **Embedded honeypot** (off by default): bait snippets (JS probe / Nginx routing) embedded into your own business sites; the console callback channels (`/collect`, `/recon`, `/_agent`, `/payload`) only open once enabled;
+3. **Protocol honeypots** (off by default): SSH / MySQL / Redis / FTP / ElasticSearch simulations, started per service on demand.
+
 **Default admin account**:
 
 - Username: `admin`

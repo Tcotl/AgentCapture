@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
@@ -10,8 +10,29 @@ router = APIRouter(prefix="/collect", tags=["collect"])
 settings = get_settings()
 
 
-@router.post("/beacon", status_code=204)
+def _embedded_gate(request: Request) -> Response | None:
+    """Console-plane callback channel: 404 while the embedded honeypot is
+    disabled (the web honeypot plane's own /collect stays available)."""
+    from app.services.system_settings import embedded_disabled_response
+
+    return embedded_disabled_response(request)
+
+
+def _require_embedded(request: Request) -> None:
+    """Route dependency: bare 404 (raised before body validation) while the
+    embedded honeypot master switch is off. No-op on the web honeypot plane."""
+    from fastapi import HTTPException
+
+    gated = _embedded_gate(request)
+    if gated is not None:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
+@router.post("/beacon", status_code=204, dependencies=[Depends(_require_embedded)])
 def collect_beacon(payload: BeaconPayload, request: Request) -> Response:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     decision = classify_beacon(
         webdriver=payload.webdriver,
         headless_hint=payload.headless_hint,
@@ -43,8 +64,11 @@ def collect_beacon(payload: BeaconPayload, request: Request) -> Response:
     return Response(status_code=204)
 
 
-@router.post("/scan", status_code=204)
+@router.post("/scan", status_code=204, dependencies=[Depends(_require_embedded)])
 def collect_scan(payload: dict, request: Request) -> Response:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     session_id = request.cookies.get(settings.session_cookie_name) or getattr(
         request.state, "session_id", "unknown"
     )

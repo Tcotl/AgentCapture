@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.core.config import get_settings
@@ -23,8 +23,29 @@ router = APIRouter(tags=["counter-recon"])
 settings = get_settings()
 
 
+def _embedded_gate(request: Request) -> Response | None:
+    """Console-plane bait callback channel: 404 while the embedded honeypot
+    is disabled (the web honeypot plane's own instances stay available)."""
+    from app.services.system_settings import embedded_disabled_response
+
+    return embedded_disabled_response(request)
+
+
+
+def _require_embedded(request: Request) -> None:
+    """Route dependency on the console-plane mirror: bare 404 (raised before
+    body validation) while the embedded honeypot master switch is off."""
+    from fastapi import HTTPException
+
+    gated = _embedded_gate(request)
+    if gated is not None:
+        raise HTTPException(status_code=404, detail="Not Found")
+
 @router.post("/recon/fingerprint", status_code=204)
 def collect_fingerprint(payload: ReconPayload, request: Request) -> Response:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     # WebRTC candidates may carry mDNS hostnames (uuid.local) instead of
     # IPs — sanitize before detection, storage and display.
     clean_ips, dropped_ips = sanitize_webrtc_ips(payload.webrtc_ips)
@@ -85,6 +106,9 @@ def jsonp_callback(
     fingerprint: str = Query(default=""),
     method: str = Query(default="browser_fingerprint"),
 ) -> Response:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     query_params = dict(request.query_params)
     with SessionLocal() as db:
         template = get_jsonp_template(db, method)
@@ -107,6 +131,9 @@ def payload_callback(
     host: str = Query(default=""),
     user: str = Query(default=""),
 ) -> Response:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     source_ip = extract_client_ip(request)
     with SessionLocal() as db:
         create_event(
@@ -150,6 +177,9 @@ def payload_callback(
 
 @router.get("/_agent/bait")
 def agent_bait_page(request: Request) -> HTMLResponse:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     source_ip = extract_client_ip(request)
     session_id = getattr(request.state, "session_id", "unknown")
     from app.services.canary import issue_canary_token
@@ -204,6 +234,9 @@ button{{margin-top:16px;padding:8px 24px;background:#238636;border:none;border-r
 
 @router.post("/_agent/report")
 async def agent_report(request: Request) -> JSONResponse:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     source_ip = extract_client_ip(request)
     session_id = getattr(request.state, "session_id", "unknown")
 
@@ -281,6 +314,9 @@ def agent_verify(
     request: Request,
     token: str = Query(default=""),
 ) -> JSONResponse:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     from app.services.canary import matches_canary_token
 
     session_id = getattr(request.state, "session_id", "unknown")
@@ -333,6 +369,9 @@ def download_payload(
     request: Request,
     dl: str = Query(default="1"),
 ) -> Response:
+    gated = _embedded_gate(request)
+    if gated:
+        return gated
     session_id = getattr(request.state, "session_id", "unknown")
     source_ip = extract_client_ip(request)
 
@@ -577,3 +616,19 @@ async def portal_client_heartbeat(request: Request):
         "agent_id": agent.agent_id,
         "next_task": serialize_task(task) if task else None,
     })
+
+
+# Console-plane mirror of the embedded honeypot's callback channels. The web
+# honeypot plane serves these routes always-on (they are part of its bait
+# faces); the management app mounts THIS router and every handler above gates
+# on the embedded honeypot master switch — disabled (default) they answer a
+# bare 404 so deployed probes go dark until 嵌入式蜜罐 is enabled.
+embedded_router = APIRouter(tags=["embedded"])
+_EMBEDDED_DEPS = [Depends(_require_embedded)]
+embedded_router.add_api_route("/recon/fingerprint", collect_fingerprint, methods=["POST"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/recon/jsonp", jsonp_callback, methods=["GET"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/recon/callback/{tracking_id}", payload_callback, methods=["GET"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/_agent/bait", agent_bait_page, methods=["GET"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/_agent/report", agent_report, methods=["POST"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/_agent/verify", agent_verify, methods=["GET"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/payload/{payload_type}", download_payload, methods=["GET"], dependencies=_EMBEDDED_DEPS)

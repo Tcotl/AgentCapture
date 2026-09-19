@@ -10,7 +10,9 @@ from app.core.db import SessionLocal, init_db
 from app.routes.admin import router as admin_router
 from app.routes.agent_control import router as agent_control_router
 from app.routes.c2 import router as c2_router
+from app.routes.collect import router as collect_router
 from app.routes.console import router as console_router
+from app.routes.counter_recon import embedded_router as embedded_router
 from app.routes.demo import router as demo_router
 from app.routes.health import router as health_router
 from app.routes.node_agent import router as node_agent_router
@@ -114,6 +116,11 @@ app.include_router(agent_control_router)
 app.include_router(node_agent_router)
 app.include_router(c2_router)
 app.include_router(console_router)
+# 嵌入式蜜罐 channels (collect beacon/scan, recon, agent echo, payload
+# distribution): handlers gate on the embedded master switch — with the
+# embedded honeypot disabled (deployment default) they answer 404.
+app.include_router(embedded_router)
+app.include_router(collect_router)
 app.include_router(public_api_router)
 app.include_router(admin_router)
 app.include_router(demo_router)

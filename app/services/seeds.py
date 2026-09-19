@@ -131,9 +131,12 @@ def seed_defaults(db: Session) -> None:
 
     # Console security access path: shipped default, inserted once and never
     # overridden — operators customize it from 系统设置 after first login.
-    from app.services.system_settings import seed_admin_access_path
+    from app.services.system_settings import seed_admin_access_path, seed_embedded_honeypot
 
     seed_admin_access_path(db)
+    # Deployment defaults: only the 48777 web honeypot is on out of the box;
+    # the embedded layer stays off until the user enables it.
+    seed_embedded_honeypot(db)
 
     # thinkphp web honeypot is the default bait face on the dedicated
     # honeypot port (48777) — upsert so existing deployments get it too.
@@ -158,10 +161,16 @@ def seed_defaults(db: Session) -> None:
         _tp_row.description = _tp_desc
         db.commit()
 
-    if int(db.scalar(select(func.count()).select_from(ServiceCatalog)) or 0) == 0:
-        for item in DEFAULT_SERVICES:
+    # Protocol honeypots (端口服务蜜罐): opt-in — upsert each default so new
+    # deployments get the full catalog with status defaulting to "stopped",
+    # regardless of whether the web honeypot row already exists.
+    _existing_keys = set(
+        db.scalars(select(ServiceCatalog.service_key)).all()
+    )
+    for item in DEFAULT_SERVICES:
+        if item["service_key"] not in _existing_keys:
             db.add(ServiceCatalog(**item))
-        db.commit()
+    db.commit()
 
     if int(db.scalar(select(func.count()).select_from(ServiceTemplate)) or 0) == 0:
         template = ServiceTemplate(

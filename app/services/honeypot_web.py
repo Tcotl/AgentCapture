@@ -23,6 +23,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.middleware.injector import CaptureAndInjectMiddleware
 
+WEB_HONEYPOT_APP_TITLE = "AgentCapture Web Honeypot"
+
 
 def create_web_honeypot_app() -> FastAPI:
     from app.routes.collect import router as collect_router
@@ -32,7 +34,7 @@ def create_web_honeypot_app() -> FastAPI:
     from app.services.honeypot_thinkphp import tp_router
 
     app = FastAPI(
-        title="AgentCapture Web Honeypot",
+        title=WEB_HONEYPOT_APP_TITLE,
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
