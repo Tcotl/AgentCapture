@@ -1,8 +1,100 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog %}
 {% block content %}
-{{ page_header('TP', title or 'Web应用蜜罐管理', '只管理 Web 应用蜜罐的模板页面上传与节点部署，把仿真登录页、管理后台、业务入口等页面沉淀为可复用部署单元。', ['Web 应用', '节点部署'],
+{{ page_header('TP', title or 'Web应用蜜罐管理', '只管理 Web 应用蜜罐的模板页面上传与节点部署，把仿真登录页、管理后台、业务入口等页面沉淀为可复用部署单元。', ['默认蜜罐', 'Web 应用', '节点部署'],
       actions='<button type="button" class="chip primary" data-modal-open="clone-modal">＋ 克隆站点</button><button type="button" class="chip primary" data-modal-open="upload-modal">＋ 上传模板</button>') }}
+
+{% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
+{% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
+
+<section class="panel" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="pill">默认蜜罐</span>
+      <strong style="font-size:15px">{{ default_honeypot.name }}</strong>
+      <code style="font-size:12px;color:var(--muted-foreground)">0.0.0.0:{{ default_honeypot.port }}</code>
+      {% if default_honeypot.running %}
+      <span class="badge badge-success">运行中</span>
+      {% else %}
+      <span class="badge badge-warning">已停止</span>
+      {% endif %}
+      {% if default_honeypot.enabled %}
+      <span class="badge badge-info">门面启用</span>
+      {% else %}
+      <span class="badge badge-danger">门面已关闭（404）</span>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开蜜罐站点</a>
+      {% if default_honeypot.running %}
+      <form method="post" action="/admin/templates/honeypot/stop" style="margin:0">
+        <button type="submit" class="secondary btn-sm">停止蜜罐</button>
+      </form>
+      {% else %}
+      <form method="post" action="/admin/templates/honeypot/start" style="margin:0">
+        <button type="submit" class="primary btn-sm">启动蜜罐</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <p class="muted" style="font-size:12.5px;margin:0 0 12px">
+    48777 端口的 ThinkPHP 仿真门面是平台的<b>默认 Web 蜜罐</b>：一个站点承载全部蜜罐诱饵面（MCP / 指令文件 / Portal / 云元数据 / 内网 Wiki / 蜜饵链路），
+    整面 observe-only——攻击者永远不被阻断。停止本蜜罐即下线整个欺骗面；门面指纹与下方诱饵面开关互相联动。
+    {% if default_honeypot.stats.get('hits_24h') is not none %}24h 命中 <b>{{ default_honeypot.stats.get('hits_24h', 0) }}</b> 次。{% endif %}
+  </p>
+
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    {% for face in default_honeypot.faces %}
+    <a class="chip" href="/admin/counter-offense/{{ face.key }}" style="cursor:pointer;text-decoration:none"
+       title="{{ face.name }}——点击进入配置">
+      {% if face.enabled %}<span style="color:var(--success,#34d399)">●</span>{% else %}<span style="color:var(--muted-foreground)">○</span>{% endif %}
+      {{ face.name.split(' · ')[0] }}
+    </a>
+    {% endfor %}
+    <a class="chip" href="/admin/decoy-management" style="cursor:pointer;text-decoration:none">蜜饵管理</a>
+    <a class="chip" href="/admin/services" style="cursor:pointer;text-decoration:none">端口服务蜜罐管理</a>
+  </div>
+
+  <details {% if not default_honeypot.running or not default_honeypot.enabled %}open{% endif %}>
+    <summary style="cursor:pointer;font-size:13px;color:var(--muted-foreground);margin-bottom:10px">门面配置（指纹与能力开关）</summary>
+    <form method="post" action="/admin/templates/honeypot/config" class="stack" style="max-width:860px">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if default_honeypot.enabled %}checked{% endif %}>
+        启用门面（关闭后 48777 上所有 ThinkPHP 路径返回 404，其余诱饵面不受影响）
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>框架显示名称</span>
+          <input name="app_name" value="{{ default_honeypot.config.get('app_name', 'ThinkPHP V5.0.24') }}"></label>
+        <label class="field-label"><span>首页标语</span>
+          <input name="slogan" value="{{ default_honeypot.config.get('slogan', '十年磨一剑 — 为API开发设计的高性能PHP框架') }}"></label>
+        <label class="field-label"><span>Runtime 路径指纹</span>
+          <input name="runtime_path" value="{{ default_honeypot.config.get('runtime_path', '/var/www/html/app/runtime') }}"></label>
+        <label class="field-label"><span>假后台登录页标题</span>
+          <input name="login_title" value="{{ default_honeypot.config.get('login_title', '内容管理后台') }}"></label>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap">
+        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="login_page_enabled" {% if default_honeypot.config.get('login_page_enabled', True) %}checked{% endif %}>
+          假后台登录捕获（/admin.php · /login）
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="rce_simulation_enabled" {% if default_honeypot.config.get('rce_simulation_enabled', True) %}checked{% endif %}>
+          经典 RCE 仿真回显（探测照常记录）
+        </label>
+      </div>
+      <div><button type="submit" class="primary btn-sm">保存门面配置</button></div>
+    </form>
+  </details>
+  <script>
+    (function () {
+      var hp = location.protocol + '//' + location.hostname + ':{{ default_honeypot.port }}';
+      document.querySelectorAll('[data-honeypot-open]').forEach(function (a) {
+        a.href = hp + a.dataset.path;
+      });
+    })();
+  </script>
+</section>
+
 
 <style>
   .web-template-hero {

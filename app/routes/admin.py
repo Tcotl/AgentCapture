@@ -4236,12 +4236,144 @@ def stop_honeypot_service(service_id: int, request: Request, db: Session = Depen
     return _redirect("/admin/services")
 
 
+def _default_honeypot_row(db: Session) -> ServiceCatalog | None:
+    return db.scalar(select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp"))
+
+
+@router.post("/admin/templates/honeypot/start")
+def start_default_web_honeypot(request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services.honeypot_services import start_service
+
+    item = _default_honeypot_row(db)
+    port = item.default_port if item else 48777
+    try:
+        ok = start_service("thinkphp", port)
+    except OSError as exc:
+        return _redirect(
+            f"/admin/templates{_qs(hp_err=f'启动 Web 蜜罐失败：端口 {port} 已被占用（{exc}）')}"
+        )
+    if not ok:
+        return _redirect(f"/admin/templates{_qs(hp_err='启动 Web 蜜罐失败：服务已在运行')}")
+    if item:
+        item.status = "running"
+        db.add(item)
+        db.commit()
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="start-service",
+        module="templates",
+        target_type="web-honeypot",
+        target_ref=f"thinkphp:{port}",
+    )
+    return _redirect(f"/admin/templates{_qs(hp_ok='Web 蜜罐已启动')}")
+
+
+@router.post("/admin/templates/honeypot/stop")
+def stop_default_web_honeypot(request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services.honeypot_services import stop_service
+
+    stop_service("thinkphp")
+    item = _default_honeypot_row(db)
+    if item:
+        item.status = "stopped"
+        db.add(item)
+        db.commit()
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="stop-service",
+        module="templates",
+        target_type="web-honeypot",
+        target_ref="thinkphp",
+    )
+    return _redirect(f"/admin/templates{_qs(hp_ok='Web 蜜罐已停止（48777 整个欺骗面随之下线）')}")
+
+
+@router.post("/admin/templates/honeypot/config")
+async def config_default_web_honeypot(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Save the default web honeypot face config — same storage as the
+    Web 蜜罐门面 page (surface key ``thinkphp``), so both pages stay in sync."""
+    user = _require_admin(request, db)
+    from app.services.surface_config import set_surface
+
+    form = await request.form()
+    config = {
+        "app_name": (form.get("app_name") or "").strip() or "ThinkPHP V5.0.24",
+        "slogan": (form.get("slogan") or "").strip() or "十年磨一剑 — 为API开发设计的高性能PHP框架",
+        "runtime_path": (form.get("runtime_path") or "").strip() or "/var/www/html/app/runtime",
+        "login_title": (form.get("login_title") or "").strip() or "内容管理后台",
+        "login_page_enabled": form.get("login_page_enabled") == "on",
+        "rce_simulation_enabled": form.get("rce_simulation_enabled") == "on",
+    }
+    set_surface(
+        db,
+        key="thinkphp",
+        enabled=form.get("enabled") == "on",
+        actor=user.username,
+        config=config,
+    )
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="templates",
+        target_type="web-honeypot-config",
+        target_ref="thinkphp",
+        detail_json={"enabled": form.get("enabled") == "on", "config_keys": sorted(config)},
+    )
+    return _redirect(f"/admin/templates{_qs(hp_ok='默认 Web 蜜罐配置已保存并即时生效')}")
+
+
 @router.get("/admin/templates", response_class=HTMLResponse)
 def admin_templates(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
     templates_query = db.scalars(select(ServiceTemplate).order_by(ServiceTemplate.name)).all()
     items = _web_template_rows(templates_query)
     nodes = db.scalars(select(Node).order_by(Node.name)).all()
+
+    # Default web honeypot (the 48777 ThinkPHP plane hosting every bait face):
+    # status from the live runtime, config from the shared thinkphp surface.
+    from app.services.honeypot_services import (
+        port_listening,
+        running_services,
+        sync_services_status,
+    )
+    from app.services.surface_config import (
+        SURFACES,
+        get_enabled_map,
+        get_runtime_map,
+        surface_stats,
+    )
+
+    sync_services_status(db)
+    tp_row = db.scalar(select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp"))
+    tp_port = tp_row.default_port if tp_row else 48777
+    runtime_map = get_runtime_map(db)
+    tp_runtime = runtime_map.get("thinkphp", {})
+    default_honeypot = {
+        "name": tp_row.name if tp_row else "ThinkPHP Web 蜜罐",
+        "port": tp_port,
+        "running": bool(running_services().get("thinkphp")) or port_listening(tp_port),
+        "service_status": tp_row.status if tp_row else "stopped",
+        "enabled": tp_runtime.get("enabled", True),
+        "config": tp_runtime.get("config", {}),
+        "stats": surface_stats(db).get("thinkphp", {}),
+        "faces": [
+            {
+                "key": meta["key"],
+                "name": meta["name"],
+                "enabled": get_enabled_map(db).get(meta["key"], True),
+            }
+            for meta in SURFACES
+            if meta["key"] != "thinkphp"
+        ],
+    }
 
     # Collect deployed web-app-honeypot info from nodes
     deployed: list[dict] = []
@@ -4280,6 +4412,9 @@ def admin_templates(request: Request, db: Session = Depends(get_db)):
         "nodes": nodes,
         "deployed": deployed,
         "deployed_urls": deployed_urls,
+        "default_honeypot": default_honeypot,
+        "hp_ok": qp.get("hp_ok", ""),
+        "hp_err": qp.get("hp_err", ""),
         "clone_ok": qp.get("clone_ok", ""),
         "clone_name": qp.get("clone_name", ""),
         "clone_assets": qp.get("clone_assets", ""),
