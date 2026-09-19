@@ -34,6 +34,44 @@
 </section>
 {% endif %}
 
+{% if surface.key == 'mcp' %}
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('反制模板库', '五套默认反制模板：恶意 Agent 发现并接入即被反向控制（注册上线 / stager 投递）或信息泄露（水印凭证 / 配置窃取）。当前生效模板以「运行中」标记。') }}
+  <div class="grid-2" style="align-items:stretch">
+    {% for tkey, tpl in mcp_templates.items() %}
+    <section class="panel" style="display:flex;flex-direction:column;margin-bottom:0;
+             {% if active_template == tkey %}border-color:var(--success,#34d399){% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>{{ tpl.name }}</strong>
+        {% if active_template == tkey %}{{ badge('运行中', 'success') }}{% endif %}
+      </div>
+      <code style="font-size:11px;color:var(--muted-foreground)">{{ tpl.server_name }} v{{ tpl.version }}</code>
+      <p class="muted" style="font-size:12px;line-height:1.7;margin:8px 0">{{ tpl.description }}</p>
+      <div style="margin:4px 0 10px">
+        {% for t in tpl.tools %}
+        <div style="font-size:11.5px;margin:3px 0;display:flex;gap:6px;align-items:baseline">
+          <span class="pill" style="flex-shrink:0">{{ t.name }}</span>
+          <span class="muted" style="font-size:11px">{{ t.description[:52] }}{% if t.description|length > 52 %}…{% endif %}</span>
+          {% if t.get('on_call') == 'register' %}<span class="badge badge-danger">接入即注册</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:auto">
+        {% if active_template == tkey %}
+        <button class="secondary btn-sm" disabled>当前生效</button>
+        {% else %}
+        <form method="post" action="/admin/counter-offense/mcp/template">
+          <input type="hidden" name="template_key" value="{{ tkey }}">
+          <button class="primary btn-sm" type="submit">启用此模板</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% if surface.key == 'behavior' %}
 <section class="panel" style="margin-bottom:16px">
   {{ section_header('会话分类结果', '最近高频会话的实时行为分析（阈值来自上方配置）') }}

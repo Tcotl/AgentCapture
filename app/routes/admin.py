@@ -340,7 +340,7 @@ NAV_GROUPS = [
             ("反制剧本", "/admin/playbooks"),
             ("元数据蜜罐", "/admin/counter-offense/metadata"),
             ("指令文件蜜饵", "/admin/counter-offense/agent_files"),
-            ("MCP 蜜罐", "/admin/counter-offense/mcp"),
+            ("MCP Server 蜜罐管理", "/admin/counter-offense/mcp"),
             ("消耗战数据集", "/admin/counter-offense/dataset"),
             ("行为序列指纹", "/admin/counter-offense/behavior"),
             ("互联网系统接入", "/admin/internet-systems"),
@@ -409,7 +409,6 @@ NAV_ICONS = {
     "/admin/execution-history": "history",
     "/admin/login-logs": "file-text",
     "/admin/users": "users",
-    "/admin/api-tokens": "key",
     "/admin/profile": "settings",
     "/admin/api-tokens": "开放 API Key 签发与管理",
 }
@@ -6811,6 +6810,11 @@ def admin_counter_surface_detail(key: str, request: Request, db: Session = Depen
         raise HTTPException(status_code=404, detail="surface not found")
     rt = get_runtime_map(db).get(key, {})
     stats = surface_stats(db).get(key, {})
+    mcp_templates = {}
+    if key == "mcp":
+        from app.services.surface_config import DEFAULT_SURFACE_CONFIGS
+
+        mcp_templates = DEFAULT_SURFACE_CONFIGS.get("mcp", {}).get("templates", {})
 
     # per-surface evidence: recent events of this face
     types = [t for t in meta["event_types"].split(",") if t]
@@ -6861,6 +6865,8 @@ def admin_counter_surface_detail(key: str, request: Request, db: Session = Depen
             "fields": SURFACE_FIELDS.get(key, []),
             "evidence": evidence,
             "behaviors": behaviors,
+            "mcp_templates": mcp_templates,
+            "active_template": rt.get("config", {}).get("active_template", ""),
             "saved": request.query_params.get("saved", ""),
             "user": user,
         },
@@ -6941,6 +6947,35 @@ async def admin_counter_surface_save(
     )
     return _redirect(
         f"/admin/counter-offense/{key}" + _qs(saved=f"{meta['name']}：配置已保存并即时生效")
+    )
+
+
+@router.post("/admin/counter-offense/mcp/template")
+async def admin_counter_mcp_template(
+    request: Request,
+    template_key: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    from app.services.surface_config import DEFAULT_SURFACE_CONFIGS, set_surface
+
+    templates = DEFAULT_SURFACE_CONFIGS.get("mcp", {}).get("templates", {})
+    if template_key not in templates:
+        return JSONResponse({"error": "unknown template"}, status_code=404)
+    set_surface(db, key="mcp", enabled=True, actor=user.username,
+                config={"active_template": template_key})
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="counter-offense",
+        target_type="mcp-template",
+        target_ref=template_key,
+        detail_json={"active_template": template_key},
+    )
+    return _redirect(
+        "/admin/counter-offense/mcp"
+        + _qs(saved=f"MCP Server 模板已切换为《{templates[template_key]['name']}》")
     )
 
 
