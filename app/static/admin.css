@@ -1452,6 +1452,22 @@
 }
 .nav-group-inner { overflow: hidden; min-height: 0; }
 .nav-group.is-collapsed .nav-group-items { grid-template-rows: 0fr; }
+/* in-group section divider (e.g. 蜜罐管理 → Web 应用蜜罐 / 嵌入式蜜罐) */
+.nav-section {
+  margin: 10px 12px 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(96, 165, 250, 0.12);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground, #8fa3c8);
+  opacity: 0.85;
+}
+.nav-section:first-child { margin-top: 2px; border-top: 0; padding-top: 0; }
+[data-theme="light"] .nav-section {
+  border-top-color: rgba(15, 23, 42, 0.07);
+  color: #64748b;
+}
 @media (prefers-reduced-motion: reduce) {
   .nav-group-items, .nav-group > button.nav-group-title .nav-chevron { transition: none; }
 }
@@ -2272,6 +2288,16 @@ input[type="checkbox"], input[type="radio"] { accent-color: #e5e7eb; }
 }
 .sidebar-collapsed .nav-link { justify-content: center; padding: 6px 0; }
 .sidebar-collapsed .nav-link .nav-label { display: none; }
+/* collapsed rail: section dividers shrink to a short rule, no text */
+.sidebar-collapsed .nav-section {
+  margin: 8px 14px;
+  padding: 0;
+  border-top: 1px solid rgba(96, 165, 250, 0.16);
+  font-size: 0;
+  text-indent: -9999px;
+  overflow: hidden;
+}
+[data-theme="light"].sidebar-collapsed .nav-section { border-top-color: rgba(15, 23, 42, 0.1); }
 .sidebar-collapsed .nav-link .dot { width: 30px; height: 30px; }
 .sidebar-collapsed .profile-meta { display: none; }
 .sidebar-collapsed .profile-card { flex-direction: column; gap: 8px; }
@@ -2289,6 +2315,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: #e5e7eb; }
   .sidebar-collapsed .nav-group > button.nav-group-title::before { content: none; }
   .sidebar-collapsed .nav-link { justify-content: flex-start; padding: 6px 10px; }
   .sidebar-collapsed .profile-card { flex-direction: row; }
+  .sidebar-collapsed .nav-section {
+    margin: 10px 12px 4px;
+    padding-top: 8px;
+    font-size: 10.5px;
+    text-indent: 0;
+    overflow: visible;
+    border-top: 1px solid rgba(96, 165, 250, 0.12);
+  }
 }
 .sidebar-collapsed .nav-home .nav-link span:not(.dot) { display: none; }
 

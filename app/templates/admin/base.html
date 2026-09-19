@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.9.1" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.9.2" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -66,10 +66,14 @@
               <div class="nav-group-items">
                 <div class="nav-group-inner">
                 {% for item in group.links %}
+                  {% if item.header %}
+                  <div class="nav-section">{{ item.label }}</div>
+                  {% else %}
                   <a href="{{ item.href }}" class="nav-link {% if item.active %}active{% endif %}"{% if item.description %} title="{{ item.description }}"{% endif %}>
                     <span class="dot">{{ icon(name=item.icon, class_name='ui-icon ui-icon-sm') }}</span>
                     <span class="nav-label">{{ item.label }}</span>
                   </a>
+                  {% endif %}
                 {% endfor %}
                 </div>
               </div>

@@ -320,6 +320,10 @@ NAV_GROUPS = [
             ("攻击流量", "/admin/attacks"),
             ("攻击来源", "/admin/attack-sources"),
             ("攻击者画像", "/admin/attacker-profiles"),
+            ("事件控制台", "/console/events"),
+            "告警与情报",
+            ("告警配置", "/admin/alerts"),
+            ("威胁情报", "/admin/intel"),
         ],
     },
     {
@@ -333,25 +337,28 @@ NAV_GROUPS = [
         ],
     },
     {
-        "title": "部署运营",
+        # 三类蜜罐共用同一套蜜饵与捕获引擎，按挂载方式分组（蜜罐部署为总览）。
+        "title": "蜜罐管理",
         "items": [
             ("蜜罐部署", "/admin/honeypots"),
-            ("节点管理", "/admin/nodes"),
-            ("蜜饵管理", "/admin/decoy-management"),
-            ("反制剧本", "/admin/playbooks"),
-            ("元数据蜜罐", "/admin/counter-offense/metadata"),
-            ("指令文件蜜饵", "/admin/counter-offense/agent_files"),
-            ("MCP Server 蜜罐管理", "/admin/counter-offense/mcp"),
-            ("消耗战数据集", "/admin/counter-offense/dataset"),
-            ("行为序列指纹", "/admin/counter-offense/behavior"),
+            "Web 应用蜜罐",
+            ("Web应用蜜罐管理", "/admin/templates"),
             ("Web 蜜罐门面", "/admin/counter-offense/thinkphp"),
-            ("互联网系统接入", "/admin/internet-systems"),
+            ("MCP Server 蜜罐管理", "/admin/counter-offense/mcp"),
+            ("指令文件蜜饵", "/admin/counter-offense/agent_files"),
+            ("消耗战数据集", "/admin/counter-offense/dataset"),
+            ("云元数据蜜罐", "/admin/counter-offense/metadata"),
+            ("内网横向 Wiki", "/admin/counter-offense/intranet"),
+            ("行为序列指纹", "/admin/counter-offense/behavior"),
+            "嵌入式蜜罐",
+            ("蜜饵管理", "/admin/decoy-management"),
             ("提示词注入管理", "/admin/prompt-injection"),
             ("功能性伪装反制", "/admin/portal"),
-            ("端口服务蜜罐管理", "/admin/services"),
-            ("Web应用蜜罐管理", "/admin/templates"),
             ("Jsonp模版管理", "/admin/jsonp-templates"),
-            ("内网横向 Wiki", "/admin/counter-offense/intranet"),
+            "端口服务与蜜网",
+            ("端口服务蜜罐管理", "/admin/services"),
+            ("互联网系统接入", "/admin/internet-systems"),
+            ("反制剧本", "/admin/playbooks"),
         ],
     },
     {
@@ -364,24 +371,19 @@ NAV_GROUPS = [
     {
         "title": "平台设置",
         "items": [
-            ("执行历史", "/admin/execution-history"),
-            ("登陆日志", "/admin/login-logs"),
+            ("系统设置", "/admin/profile"),
             ("用户管理", "/admin/users"),
             ("API 令牌", "/admin/api-tokens"),
-            ("系统设置", "/admin/profile"),
-        ],
-    },
-    {
-        "title": "告警与情报",
-        "items": [
-            ("告警配置", "/admin/alerts"),
-            ("威胁情报", "/admin/intel"),
+            ("登陆日志", "/admin/login-logs"),
+            ("执行历史", "/admin/execution-history"),
+            ("节点管理", "/admin/nodes"),
         ],
     },
 ]
 
 NAV_ICONS = {
     "/admin": "dashboard",
+    "/console/events": "activity",
     "/admin/big-screen": "monitor",
     "/admin/attacks": "activity",
     "/admin/credentials": "key",
@@ -418,6 +420,7 @@ NAV_ICONS = {
 }
 
 NAV_DESCRIPTIONS = {
+    "/console/events": "实时事件流（管理员会话）",
     "/admin": "全局指标与联动入口",
     "/admin/big-screen": "值守展示与趋势大屏",
     "/admin/attacks": "攻击流量聚合与回溯",
@@ -463,7 +466,10 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
     # Find the best-matching nav item (longest prefix match)
     best_match = ""
     for group in NAV_GROUPS:
-        for _, href in group["items"]:
+        for entry in group["items"]:
+            if isinstance(entry, str):
+                continue
+            href = entry[1]
             if active_path == href or active_path.startswith(f"{href}/"):
                 if len(href) > len(best_match):
                     best_match = href
@@ -471,15 +477,29 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
     nav_groups = []
     for group in NAV_GROUPS:
         rendered_items = []
-        for label, href in group["items"]:
-            is_active = href == best_match
+        for entry in group["items"]:
+            if isinstance(entry, str):
+                # bare string = section divider inside the group
+                rendered_items.append(
+                    {
+                        "label": entry,
+                        "href": "",
+                        "active": False,
+                        "icon": "nav-section",
+                        "description": "",
+                        "header": True,
+                    }
+                )
+                continue
+            label, href = entry
             rendered_items.append(
                 {
                     "label": label,
                     "href": href,
-                    "active": is_active,
+                    "active": href == best_match,
                     "icon": NAV_ICONS.get(href, "dashboard"),
                     "description": NAV_DESCRIPTIONS.get(href, ""),
+                    "header": False,
                 }
             )
         nav_groups.append({"title": group["title"], "links": rendered_items})
