@@ -365,6 +365,7 @@ NAV_GROUPS = [
             ("执行历史", "/admin/execution-history"),
             ("登陆日志", "/admin/login-logs"),
             ("用户管理", "/admin/users"),
+            ("API 令牌", "/admin/api-tokens"),
             ("个人信息", "/admin/profile"),
         ],
     },
@@ -408,7 +409,9 @@ NAV_ICONS = {
     "/admin/execution-history": "history",
     "/admin/login-logs": "file-text",
     "/admin/users": "users",
+    "/admin/api-tokens": "key",
     "/admin/profile": "settings",
+    "/admin/api-tokens": "开放 API Key 签发与管理",
 }
 
 NAV_DESCRIPTIONS = {
