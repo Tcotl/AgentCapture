@@ -25,12 +25,21 @@
 
 {% if surface.key == 'agent_files' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header('部署的指令文件', 'Agent 自动读取的项目级信任入口——点击预览当前生效内容') }}
+  {{ section_header('部署的指令文件', 'Agent 自动读取的项目级信任入口——部署在 Web 蜜罐端口（默认 48777），点击预览当前生效内容') }}
   <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <a class="chip" href="/AGENTS.md" target="_blank">/AGENTS.md</a>
-    <a class="chip" href="/CLAUDE.md" target="_blank">/CLAUDE.md</a>
-    <a class="chip" href="/.cursorrules" target="_blank">/.cursorrules</a>
+    <a class="chip honeypot-preview" data-path="/AGENTS.md" href="#" target="_blank">/AGENTS.md</a>
+    <a class="chip honeypot-preview" data-path="/CLAUDE.md" href="#" target="_blank">/CLAUDE.md</a>
+    <a class="chip honeypot-preview" data-path="/.cursorrules" href="#" target="_blank">/.cursorrules</a>
   </div>
+  <script>
+    (function () {
+      // Bait faces live on the web honeypot port, not the console port.
+      var hp = location.protocol + '//' + location.hostname + ':48777';
+      document.querySelectorAll('.honeypot-preview').forEach(function (a) {
+        a.href = hp + a.dataset.path;
+      });
+    })();
+  </script>
 </section>
 {% endif %}
 

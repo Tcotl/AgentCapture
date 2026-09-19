@@ -7,19 +7,14 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal, init_db
-from app.middleware.injector import CaptureAndInjectMiddleware
 from app.routes.admin import router as admin_router
 from app.routes.agent_control import router as agent_control_router
 from app.routes.c2 import router as c2_router
-from app.routes.collect import router as collect_router
 from app.routes.console import router as console_router
-from app.routes.counter_offense import router as counter_offense_router
-from app.routes.counter_recon import router as counter_recon_router
 from app.routes.demo import router as demo_router
 from app.routes.health import router as health_router
 from app.routes.node_agent import router as node_agent_router
 from app.routes.public_api import router as public_api_router
-from app.routes.traps import router as traps_router
 from app.services.seeds import seed_defaults
 from app.services import deployed_server
 
@@ -101,7 +96,6 @@ app.add_middleware(
     same_site="lax",
     https_only=False,
 )
-app.add_middleware(CaptureAndInjectMiddleware)
 app.mount("/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static")), name="static")
 
 # Serve cloned/uploaded web template assets so preview can resolve relative paths.
@@ -113,11 +107,7 @@ app.include_router(health_router)
 app.include_router(agent_control_router)
 app.include_router(node_agent_router)
 app.include_router(c2_router)
-app.include_router(collect_router)
 app.include_router(console_router)
-app.include_router(counter_recon_router)
-app.include_router(counter_offense_router)
-app.include_router(traps_router)
 app.include_router(public_api_router)
 app.include_router(admin_router)
 app.include_router(demo_router)

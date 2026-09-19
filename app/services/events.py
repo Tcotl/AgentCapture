@@ -1,5 +1,6 @@
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
@@ -292,6 +293,29 @@ def extract_client_ip(request: Request, *, trust_proxy: bool | None = None) -> s
     if peer:
         return peer
     return "unknown"
+
+
+def console_base_url(request: Request) -> str:
+    """Origin of the management plane where C2 endpoints actually live.
+
+    Bait surfaces are served by the web honeypot app (default port 48777) while
+    ``/c2/*`` listeners stay on the management console (default port 4877), so
+    any callback URL handed to a recruited agent must point at the console
+    origin, not at the origin that served the bait. Explicit
+    ``payload_callback_host`` still wins for non-standard deployments.
+    """
+    cfg = get_settings()
+    if cfg.payload_callback_host:
+        return cfg.payload_callback_host.rstrip("/")
+    scheme = request.url.scheme or "http"
+    netloc = request.url.netloc or "127.0.0.1"
+    parts = urlparse(f"{scheme}://{netloc}")
+    if parts.port == cfg.port:
+        return f"{scheme}://{netloc}"
+    host = parts.hostname or "127.0.0.1"
+    if ":" in host:  # bare IPv6 needs brackets back
+        host = f"[{host}]"
+    return f"{scheme}://{host}:{cfg.port}"
 
 
 def filtered_headers(request: Request) -> dict[str, str]:

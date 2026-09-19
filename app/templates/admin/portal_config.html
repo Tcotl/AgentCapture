@@ -252,7 +252,8 @@ details[open] .field-help-toggle::before { transform:rotate(90deg); }
   // ---- copy portal URL ----
   var copyBtn = document.getElementById('pc-copy-btn');
   if (copyBtn) copyBtn.addEventListener('click', function () {
-    var url = location.origin + '/portal/api/content?ticket=<会话蜜标令牌>';
+    // Portal API is served by the web honeypot (port 48777), not the console.
+    var url = location.protocol + '//' + location.hostname + ':48777/portal/api/content?ticket=<会话蜜标令牌>';
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(function () { showToast('URL 已复制', 'ok'); });
     } else {

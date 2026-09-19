@@ -301,12 +301,29 @@ vercel --prod                    # 一键部署（仓库内置 vercel.json）
 
 ## 访问入口
 
+平台采用**双平面架构**：管理面与欺骗面物理分离——管理端口只承载控制台与 API，全部蜜罐诱饵面由 Web 蜜罐端口承接（默认 ThinkPHP 5.x 仿真门面），控制台故障不影响欺骗面的业务可用性。
+
+**管理平面（默认 4877）**：
+
 - **首页**：http://127.0.0.1:4877/
 - **后台登录**：http://127.0.0.1:4877/admin/login
 - **态势大屏**：http://127.0.0.1:4877/admin/big-screen
 - **蜜罐会话回放**：http://127.0.0.1:4877/admin/honeypot-sessions
 - **事件控制台**：http://127.0.0.1:4877/console/events（需管理员登录）
+- **C2 监听 API**：http://127.0.0.1:4877/c2/*
 - **健康检查**：http://127.0.0.1:4877/healthz
+
+**Web 蜜罐平面（默认 48777）**——对外呈现为一个"存在漏洞的 ThinkPHP 站点"，并承载全部蜜罐诱饵面：
+
+- **ThinkPHP 门面**：http://127.0.0.1:48777/（指纹页 / 假管理后台凭证捕获 / 经典 RCE 仿真）
+- **MCP Server 蜜罐**：http://127.0.0.1:48777/mcp
+- **Agent 指令文件蜜饵**：http://127.0.0.1:48777/AGENTS.md（及 /CLAUDE.md、/.cursorrules）
+- **Portal 开发者 API 伪装**：http://127.0.0.1:48777/portal/api/content
+- **云元数据 / 内网横向蜜饵**：http://127.0.0.1:48777/latest/meta-data/、/intranet/
+- **文件蜜饵 / 凭证蜜饵 / 备份蜜饵**：`/d/*`、`/_bait/*`、`/_trap/*`
+- **健康检查**：http://127.0.0.1:48777/healthz（返回 `face: honeypot`）
+
+诱饵面上被招募的 Beacon 回调地址自动指向管理平面（`payload_callback_host` 可显式覆盖）；蜜罐平面整体 observe-only——风险评分、事件与告警照常，但永不阻断，保证欺骗链路完整。
 
 **默认管理员账户**：
 
@@ -345,7 +362,7 @@ vercel --prod                    # 一键部署（仓库内置 vercel.json）
 部署完成后可运行自检脚本验证三类蜜饵链路：
 
 ```bash
-python3 scripts/verify_decoy_chain.py --base http://localhost:4877
+python3 scripts/verify_decoy_chain.py --base http://localhost:4877 --honeypot-base http://localhost:48777
 ```
 
 脚本会自动验证：登录后台 → 创建 API 路由蜜饵 → 创建凭证蜜饵 → 创建绑定两者的文件蜜饵 → 部署下载 → 访问 API 路由 → 使用生成凭证登录 → 校验凭证记录、部署记录和 manifest。

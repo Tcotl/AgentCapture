@@ -80,6 +80,16 @@ _SESSION_ID_RE = re.compile(r"^[0-9a-f]{16,64}$")
 
 
 class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
+    # observe_only_all=True marks the whole served plane as a honeypot face
+    # (web honeypot on :48777): risk scoring, events and alerts still run,
+    # but block/isolate/challenge are never enforced — stopping a "hostile"
+    # visitor at the deception layer defeats the purpose of the honeypot.
+    observe_only_all: bool
+
+    def __init__(self, app, *, observe_only_all: bool = False):
+        super().__init__(app)
+        self.observe_only_all = observe_only_all
+
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith(SKIP_PREFIXES):
             return await call_next(request)
@@ -129,7 +139,10 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
             ] + ["whitelisted_source"]
         request.state.risk_decision = decision
 
-        enforce_decision = not request.url.path.startswith(OBSERVE_ONLY_PREFIXES)
+        enforce_decision = (
+            not self.observe_only_all
+            and not request.url.path.startswith(OBSERVE_ONLY_PREFIXES)
+        )
 
         if isolation and enforce_decision:
             return self._isolation_response(request, isolation)
@@ -318,7 +331,11 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
         canary_token = getattr(request.state, "canary_token", "")
         if not canary_token:
             return ""
-        honeypot_url = f"{request.url.scheme}://{request.url.netloc}"
+        # Task-result callbacks target the management console (C2 lives there),
+        # not the honeypot origin serving this page.
+        from app.services.events import console_base_url
+
+        honeypot_url = console_base_url(request)
         with SessionLocal() as db:
             agent = find_agent_by_recruit_src(db, canary_token)
             if not agent:

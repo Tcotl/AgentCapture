@@ -285,12 +285,29 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 4877
 
 ## Access Points
 
+The platform uses a **dual-plane architecture**: the management plane hosts only the console and APIs, while every honeypot bait face is served by the dedicated web honeypot port (ThinkPHP 5.x emulation facade by default). A console outage never takes the deception plane down.
+
+**Management plane (default 4877)**:
+
 - **Home**: http://127.0.0.1:4877/
 - **Admin login**: http://127.0.0.1:4877/admin/login
 - **Big screen**: http://127.0.0.1:4877/admin/big-screen
 - **Honeypot session replay**: http://127.0.0.1:4877/admin/honeypot-sessions
 - **Event console**: http://127.0.0.1:4877/console/events (admin session required)
+- **C2 listener API**: http://127.0.0.1:4877/c2/*
 - **Health check**: http://127.0.0.1:4877/healthz
+
+**Web honeypot plane (default 48777)** — presents itself as a "vulnerable ThinkPHP site" and carries every bait face:
+
+- **ThinkPHP facade**: http://127.0.0.1:48777/ (fingerprint page / fake admin credential capture / classic RCE simulation)
+- **MCP Server honeypot**: http://127.0.0.1:48777/mcp
+- **Agent instruction-file baits**: http://127.0.0.1:48777/AGENTS.md (plus /CLAUDE.md, /.cursorrules)
+- **Portal developer-API camouflage**: http://127.0.0.1:48777/portal/api/content
+- **Cloud metadata / intranet baits**: http://127.0.0.1:48777/latest/meta-data/, /intranet/
+- **File / credential / backup baits**: `/d/*`, `/_bait/*`, `/_trap/*`
+- **Health check**: http://127.0.0.1:48777/healthz (returns `face: honeypot`)
+
+Beacons recruited on a bait face call back to the management plane automatically (override with `payload_callback_host`); the honeypot plane is observe-only end to end — risk scoring, events and alerts still fire, but nothing is ever blocked, keeping the deception chain intact.
 
 **Default admin account**:
 
@@ -329,7 +346,7 @@ Override in production via `.env.docker` or deploy flags:
 After deployment, run the smoke script to verify the three-decoy chain:
 
 ```bash
-python3 scripts/verify_decoy_chain.py --base http://localhost:4877
+python3 scripts/verify_decoy_chain.py --base http://localhost:4877 --honeypot-base http://localhost:48777
 ```
 
 It automatically verifies: admin login → create an API-route decoy → create a credential decoy → create a file decoy binding both → deploy & download → hit the API route → log in with the generated credential → validate credential records, deployment records, and the manifest.

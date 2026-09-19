@@ -375,7 +375,11 @@ def generate_agent_injection(
     if agent_type == AgentType.NONE and risk_score < 20:
         return InjectionResult(injected=False, injection_html="", agent_type=AgentType.NONE, confidence=0.0, injection_type="none")
 
-    honeypot_url = f"{request.url.scheme}://{request.url.netloc}"
+    # C2 callbacks inside the prompts must reach the management console even
+    # when this injection is served from the web honeypot app (bait port).
+    from app.services.events import console_base_url
+
+    honeypot_url = console_base_url(request)
     injection_html = _build_injection_html(
         agent_type=agent_type,
         confidence=confidence,

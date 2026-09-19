@@ -9,7 +9,13 @@ from sqlalchemy import select
 
 from app.core.db import SessionLocal
 from app.models.decoy import DecoyDeployment, DecoyTemplate
-from app.services.events import create_credential_observation, create_event, extract_client_ip, filtered_headers
+from app.services.events import (
+    console_base_url,
+    create_credential_observation,
+    create_event,
+    extract_client_ip,
+    filtered_headers,
+)
 
 router = APIRouter(tags=["traps"])
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -687,10 +693,10 @@ def clone_payload(platform: str, request: Request) -> Response:
     source_ip = extract_client_ip(request)
     tid = hashlib.md5(f"{session_id}:{platform}:{requested_file}".encode()).hexdigest()[:12]
 
-    # The stager must call home to an address the attacker's device can reach:
-    # the same origin that served the cloned page (payload_callback_host wins
-    # when an explicit callback address is configured).
-    c2_addr = settings.payload_callback_host or f"{request.url.scheme}://{request.url.netloc}"
+    # The stager must call home to the management console where C2 listeners
+    # live — NOT the honeypot origin that served this bait (default 48777 vs
+    # console 4877). payload_callback_host wins when explicitly configured.
+    c2_addr = settings.payload_callback_host or console_base_url(request)
     stager_agent_id = f"cln{tid}"
 
     if platform == "windows":

@@ -69,10 +69,13 @@ def find_template_id(html: str, name: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://localhost:4877")
+    parser.add_argument("--honeypot-base", default="http://localhost:48777",
+                        help="Web 蜜罐源（蜜饵下载与触发端点所在平面）")
     parser.add_argument("--username", default="admin")
     parser.add_argument("--password", default="admin")
     args = parser.parse_args()
     base = args.base.rstrip("/")
+    hp = args.honeypot_base.rstrip("/")
     opener = build_opener()
 
     status, url, _ = post_form(opener, base, "/admin/login", {"username": args.username, "password": args.password})
@@ -142,7 +145,7 @@ def main() -> int:
     status, manifest = get_text(opener, base, f"/admin/decoys/deployments/{manifest_match.group(1)}/manifest.json")
     must(status == 200 and '"snippets"' in manifest and '"bindings"' in manifest, "manifest download invalid")
 
-    status, file_body = get_text(opener, base, file_path)
+    status, file_body = get_text(opener, hp, file_path)
     must(status == 200, "file decoy download failed")
     login_match = re.search(r'login=(/_bait/credential/[a-f0-9]+/login)', file_body)
     user_match = re.search(r'user=([^\n]+)', file_body)
@@ -151,8 +154,8 @@ def main() -> int:
     must(bool(login_match and user_match and pass_match and api_match), "bound chain variables not rendered")
 
     # Trigger API route and credential login.
-    get_text(opener, base, api_match.group(1))
-    status, _, _ = post_form(opener, base, login_match.group(1), {
+    get_text(opener, hp, api_match.group(1))
+    status, _, _ = post_form(opener, hp, login_match.group(1), {
         "username": user_match.group(1),
         "password": pass_match.group(1),
     })

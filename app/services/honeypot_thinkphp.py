@@ -17,10 +17,9 @@ import threading
 from typing import Any
 from urllib.parse import parse_qs
 
-from starlette.applications import Starlette
+from fastapi import APIRouter, Request
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
-from starlette.routing import Route
 
 from app.core.config import get_settings
 
@@ -204,17 +203,17 @@ def _log(request: Request, event_type: str, payload: dict, *,
         logger.debug("thinkphp event log failed", exc_info=True)
 
 
-async def home(request: Request) -> Response:
+async def tp_home(request: Request) -> Response:
     _log(request, "thinkphp_probe", {"path": request.url.path},
          risk=35, signals=["thinkphp_fingerprint"])
     return HTMLResponse(_TP_HOME_PAGE)
 
 
-async def login_page(request: Request) -> Response:
+async def tp_login_page(request: Request) -> Response:
     return HTMLResponse(_TP_LOGIN_PAGE)
 
 
-async def login_submit(request: Request) -> Response:
+async def tp_login_submit(request: Request) -> Response:
     form = await request.form()
     username = str(form.get("username") or "")
     password = str(form.get("password") or "")
@@ -227,7 +226,7 @@ async def login_submit(request: Request) -> Response:
         "<h1>内容管理后台</h1><p class='err'>用户名或密码错误，请重新输入</p>"))
 
 
-async def exploit(request: Request) -> Response:
+async def tp_exploit(request: Request) -> Response:
     method = request.method
     query = request.url.query
     body = ""
@@ -263,17 +262,15 @@ async def exploit(request: Request) -> Response:
     ).replace("{seed}", seed), status_code=200)
 
 
-def create_app() -> Starlette:
-    return Starlette(routes=[
-        Route("/", exploit),
-        Route("/index.php", exploit),
-        Route("/public/index.php", exploit),
-        Route("/admin.php", login_page, methods=["GET"]),
-        Route("/admin.php", login_submit, methods=["POST"]),
-        Route("/login", login_page, methods=["GET"]),
-        Route("/login", login_submit, methods=["POST"]),
-        Route("/{path:path}", exploit, methods=["GET", "POST"]),
-    ])
+tp_router = APIRouter()
+tp_router.add_api_route("/", tp_exploit, methods=["GET", "POST"], include_in_schema=False)
+tp_router.add_api_route("/index.php", tp_exploit, methods=["GET", "POST"], include_in_schema=False)
+tp_router.add_api_route("/public/index.php", tp_exploit, methods=["GET", "POST"], include_in_schema=False)
+tp_router.add_api_route("/admin.php", tp_login_page, methods=["GET"], include_in_schema=False)
+tp_router.add_api_route("/admin.php", tp_login_submit, methods=["POST"], include_in_schema=False)
+tp_router.add_api_route("/login", tp_login_page, methods=["GET"], include_in_schema=False)
+tp_router.add_api_route("/login", tp_login_submit, methods=["POST"], include_in_schema=False)
+tp_router.add_api_route("/{path:path}", tp_exploit, methods=["GET", "POST"], include_in_schema=False)
 
 
 class ThinkPHPHoneypotServer:
@@ -284,7 +281,9 @@ class ThinkPHPHoneypotServer:
 
         self.port = port
         self.bind = bind
-        app = create_app()
+        from app.services.honeypot_web import create_web_honeypot_app
+
+        app = create_web_honeypot_app()
         config = uvicorn.Config(app, host=bind, port=port,
                                 log_level="warning", access_log=False)
         self.server = uvicorn.Server(config)
