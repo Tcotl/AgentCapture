@@ -364,8 +364,8 @@ NAV_GROUPS = [
     {
         "title": "C2 控制",
         "items": [
-            ("Agent 管理", "/admin/c2/agents"),
-            ("C2 Console", "/admin/c2/console"),
+            ("对话式 C2 管理", "/admin/c2/agents"),
+            ("命令式 C2 管理", "/admin/c2/console"),
         ],
     },
     {
@@ -450,8 +450,8 @@ NAV_DESCRIPTIONS = {
     "/admin/portal": "功能性伪装反制通道（Portal API）运营配置",
     "/admin/alerts": "通知渠道与告警策略",
     "/admin/intel": "白名单与威胁情报",
-    "/admin/c2/console": "实时命令与 Beacon",
-    "/admin/c2/agents": "Agent 清单与状态",
+    "/admin/c2/console": "命令式 C2 管理：实时命令与 Beacon",
+    "/admin/c2/agents": "对话式 C2 管理：Agent 清单与对话控制",
     "/admin/honeypot-sessions": "交互式蜜罐会话与逐命令回放",
     "/admin/execution-history": "后台操作流水",
     "/admin/login-logs": "登录成功与失败记录",
@@ -3293,9 +3293,9 @@ def _dashboard_context(db: Session) -> dict:
             "metric_label": "活跃 Agent",
             "description": "为竞赛沙箱中的 Agent Beacon、任务队列、命令投递和样本捆绑提供独立控制面。",
             "links": [
-                {"label": "C2 Console", "href": "/admin/c2/console"},
-                {"label": "Agent 管理", "href": "/admin/c2/agents"},
-                {"label": "C2 Console · 任务队列", "href": "/admin/c2/console"},
+                {"label": "命令式 C2 管理", "href": "/admin/c2/console"},
+                {"label": "对话式 C2 管理", "href": "/admin/c2/agents"},
+                {"label": "命令式 C2 管理 · 任务队列", "href": "/admin/c2/console"},
             ],
         },
         {
@@ -7749,7 +7749,7 @@ def admin_c2_agents(request: Request, db: Session = Depends(get_db)):
     return _render(
         request,
         "admin/c2_agents.html",
-        {"agents": agents, "stats": stats, "user": user, "title": "C2 Agent 管理"},
+        {"agents": agents, "stats": stats, "user": user, "title": "对话式 C2 管理"},
     )
 
 
@@ -8230,7 +8230,7 @@ def api_admin_c2_stats(request: Request, db: Session = Depends(get_db)):
 @router.get("/admin/c2/console", response_class=HTMLResponse)
 def admin_c2_console(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
-    return _render(request, "admin/c2_console.html", {"user": user, "title": "C2 Console"})
+    return _render(request, "admin/c2_console.html", {"user": user, "title": "命令式 C2 管理"})
 
 
 @router.post("/admin/c2/bundler/generate")

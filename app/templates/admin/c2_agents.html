@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
 {% block content %}
-{{ page_header('C2', 'C2 Agent 管理', '端点注册、在线监控、批量指令与删除。超过 5 分钟无心跳自动标记离线。', ['Agent 注册', '批量操作']) }}
+{{ page_header('C2', '对话式 C2 管理', 'Agent 注册、在线监控、对话式任务下发与批量操作。超过 5 分钟无心跳自动标记离线。', ['Agent 注册', '批量操作']) }}
 
 <div class="cards">
   {{ metric_card('Agent 总数', stats.total) }}
