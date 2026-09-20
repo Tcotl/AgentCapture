@@ -234,6 +234,14 @@ AgentCapture/
 
 ---
 
+## One-line Deployment
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tcotl/AgentCapture/main/scripts/install.sh | bash
+```
+
+The installer auto-detects Linux / macOS and x86_64 / aarch64, prefers Docker, and falls back to a native venv + uvicorn deployment (registers a systemd service on Linux). Flags: `--docker`, `--native`, `--port`, `--dir`, `--admin-password`, `--no-start`, `--dry-run`.
+
 ## Quick Start
 
 ### Requirements

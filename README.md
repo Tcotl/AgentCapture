@@ -234,6 +234,14 @@ AgentCapture/
 
 ---
 
+## 一键部署
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tcotl/AgentCapture/main/scripts/install.sh | bash
+```
+
+脚本自动识别 Linux / macOS 与 x86_64 / aarch64，优先使用 Docker，否则原生 venv + uvicorn 部署（Linux 自动注册 systemd 服务）。支持 `--docker`、`--native`、`--port`、`--dir`、`--admin-password`、`--no-start`、`--dry-run` 等参数。
+
 ## 快速开始
 
 ### 环境要求
