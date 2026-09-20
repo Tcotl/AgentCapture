@@ -371,6 +371,13 @@ def create_event(
     db.add(event)
     db.commit()
     db.refresh(event)
+    # unified syslog export (AI SOC ingestion) — never blocks the capture path
+    try:
+        from app.services.syslog_export import enqueue_event
+
+        enqueue_event(event)
+    except Exception:  # noqa: BLE001 — export must never break capture
+        pass
     return event
 
 

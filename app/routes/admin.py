@@ -6541,6 +6541,8 @@ def admin_alerts(request: Request, db: Session = Depends(get_db)):
             "edit_channel_id": edit_channel_id,
             "edit_policy_id": edit_policy_id,
             "error": request.query_params.get("error", ""),
+            "syslog": __import__("app.services.syslog_export", fromlist=["get_config"]).get_config(),
+            "syslog_counters": __import__("app.services.syslog_export", fromlist=["counters"]).counters(),
         },
     )
 
@@ -6636,6 +6638,48 @@ def create_alert_channel(
         target_ref=name,
     )
     return _redirect("/admin/alerts")
+
+
+@router.post("/admin/alerts/syslog")
+async def save_alert_syslog_config(
+    request: Request,
+    enabled: str = Form(""),
+    host: str = Form(""),
+    port: int = Form(514),
+    proto: str = Form("udp"),
+    fmt: str = Form("rfc5424"),
+    facility: int = Form(16),
+    min_risk: int = Form(0),
+    db: Session = Depends(get_db),
+):
+    """统一日志外发（syslog）配置 — AI SOC 数据接入通道。"""
+    user = _require_admin(request, db)
+    from app.services.syslog_export import save_config as save_syslog_config
+
+    if enabled == "on" and not host.strip():
+        return _redirect(f"/admin/alerts{_qs(error='启用 syslog 外发需要填写 syslog 服务器地址')}")
+    save_syslog_config(db, enabled=(enabled == "on"), host=host, port=port,
+                       proto=proto, fmt=fmt, facility=facility,
+                       min_risk=min_risk, actor=user.username)
+    log_execution(db, actor_username=user.username, action="update",
+                  module="alerts", target_type="syslog-config",
+                  target_ref="syslog", detail_json={"enabled": enabled == "on"})
+    return _redirect(f"/admin/alerts{_qs(error='')}")
+
+
+@router.post("/api/admin/alerts/syslog/test")
+async def test_alert_syslog(request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services.syslog_export import send_test_message, get_config
+
+    cfg = get_config()
+    if not cfg["host"]:
+        return JSONResponse({"ok": False, "error": "未配置 syslog 服务器"}, status_code=400)
+    result = send_test_message(cfg["host"], cfg["port"], cfg["proto"], cfg["format"], cfg["facility"])
+    log_execution(db, actor_username=user.username, action="test",
+                  module="alerts", target_type="syslog", target_ref=cfg["host"],
+                  detail_json=result)
+    return JSONResponse(result)
 
 
 @router.post("/admin/alerts/channels/{channel_id}/toggle")

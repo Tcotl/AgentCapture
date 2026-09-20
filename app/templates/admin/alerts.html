@@ -68,6 +68,44 @@
 </section>
 
 <section class="panel" style="margin-bottom: 20px;">
+  {{ section_header('统一日志外发 · Syslog（AI SOC 接入）', '将全部蜜罐事件以标准 syslog（RFC5424 / RFC3164，UDP/TCP）外发到 AI SOC 平台的采集器；消息体为单行 JSON 统一数据接口，含事件类型、决策、风险、信号与来源。') }}
+  <div class="panel" style="margin-bottom:14px;padding:14px 16px">
+    <form method="post" action="/admin/alerts/syslog" class="stack" style="max-width:760px">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if syslog.enabled %}checked{% endif %}>
+        启用 syslog 外发（低于最小风险阈值的事件不外发）
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>Syslog 服务器地址</span>
+          <input name="host" value="{{ syslog.host }}" placeholder="例如 soc-collector.corp.lan"></label>
+        <label class="field-label"><span>端口</span>
+          <input type="number" name="port" value="{{ syslog.port }}" placeholder="514"></label>
+        <label class="field-label"><span>协议</span>
+          <select name="proto">
+            <option value="udp" {% if syslog.proto == 'udp' %}selected{% endif %}>UDP</option>
+            <option value="tcp" {% if syslog.proto == 'tcp' %}selected{% endif %}>TCP</option>
+          </select></label>
+        <label class="field-label"><span>消息格式</span>
+          <select name="fmt">
+            <option value="rfc5424" {% if syslog.format == 'rfc5424' %}selected{% endif %}>RFC 5424</option>
+            <option value="rfc3164" {% if syslog.format == 'rfc3164' %}selected{% endif %}>RFC 3164</option>
+          </select></label>
+        <label class="field-label"><span>Facility（local0 = 16）</span>
+          <input type="number" name="facility" value="{{ syslog.facility }}" min="0" max="23"></label>
+        <label class="field-label"><span>最小风险阈值</span>
+          <input type="number" name="min_risk" value="{{ syslog.min_risk }}" min="0" max="100"></label>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button type="submit" class="primary btn-sm">保存 syslog 配置</button>
+        <span class="muted" style="font-size:12px">已发送 {{ syslog_counters.sent }} · 错误 {{ syslog_counters.errors }} · 丢弃 {{ syslog_counters.dropped }}</span>
+      </div>
+    </form>
+    <div style="border-top:1px solid rgba(96,165,250,.12);margin-top:12px;padding-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button type="button" class="secondary btn-sm" id="syslog-test" style="cursor:pointer">发送测试消息</button>
+      <span id="syslog-test-status" class="muted" style="font-size:12px">向已配置的 syslog 服务器发送一条测试事件</span>
+    </div>
+  </div>
+
   {{ section_header('通知配置', '维护 webhook、钉钉、飞书、email 等通知参数') }}
 
     <details style="margin-bottom: 12px;">
@@ -422,5 +460,17 @@ details[open] .field-help-toggle::before { transform: rotate(90deg); }
     output.value = JSON.stringify(cfg);
   });
 })();
+</script>
+<script>
+document.getElementById('syslog-test').addEventListener('click', function () {
+  var btn = this, st = document.getElementById('syslog-test-status');
+  btn.disabled = true; st.textContent = '发送中…';
+  fetch('/agentcapture/api/admin/alerts/syslog/test', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      btn.disabled = false;
+      st.textContent = d.ok ? '测试消息已发送（检查 syslog 服务器）' : ('失败：' + (d.error || '未知错误'));
+    }).catch(function () { btn.disabled = false; st.textContent = '请求失败'; });
+});
 </script>
 {% endblock %}
