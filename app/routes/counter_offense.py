@@ -517,3 +517,246 @@ def intranet_wiki(request: Request, slug: str = "home"):
         "</body></html>"
     )
     return HTMLResponse(page)
+
+
+# ---------------------------------------------------------------------------
+# MCP Inspector decoy console (mimics the open-source @modelcontextprotocol/
+# inspector web UI — a management app attackers actively look for)
+# ---------------------------------------------------------------------------
+
+_INSPECTOR_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MCP Inspector</title>
+<style>
+  :root { --bg:#1a1a2e; --panel:#16213e; --line:#2a2a4a; --acc:#10b981; --txt:#e2e8f0; --mut:#8b95b5; }
+  * { box-sizing:border-box }
+  body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0 } header .ver { color:var(--mut); font-size:11px }
+  .wrap { display:grid; grid-template-columns:300px 1fr; gap:0; min-height:calc(100vh - 46px) }
+  .sidebar { border-right:1px solid var(--line); padding:14px }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:14px }
+  .card h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; color:var(--mut); letter-spacing:.08em }
+  select, input { width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:#0f0f23; color:var(--txt); font-size:13px }
+  button.primary { width:100%; margin-top:10px; padding:9px; border:0; border-radius:6px; background:var(--acc); color:#04281a; font-weight:700; font-size:13px; cursor:pointer }
+  button.primary:hover { filter:brightness(1.1) }
+  .status { margin-top:10px; font-size:11.5px; color:var(--mut); min-height:15px }
+  .status.ok { color:var(--acc) } .status.err { color:#f87171 }
+  .pane { padding:16px }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:12px }
+  .tabs button { background:none; border:0; color:var(--mut); padding:8px 14px; font-size:13px; cursor:pointer; border-bottom:2px solid transparent }
+  .tabs button.on { color:var(--acc); border-bottom-color:var(--acc) }
+  .tool { padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer }
+  .tool:hover, .tool.sel { border-color:var(--acc) }
+  .tool b { font-size:13px } .tool p { margin:4px 0 0; font-size:11.5px; color:var(--mut) }
+  .log { background:#0f0f23; border:1px solid var(--line); border-radius:8px; padding:12px; font-family:ui-monospace,monospace; font-size:11.5px; min-height:180px; max-height:340px; overflow:auto; white-space:pre-wrap }
+  .log .ok { color:var(--acc) } .log .wm { color:#fbbf24 }
+</style>
+</head>
+<body>
+<header><h1>MCP Inspector</h1><span class="ver" id="ver">v__VER__</span><span style="flex:1"></span><span class="ver" id="org">__ORG__</span></header>
+<div class="wrap">
+  <div class="sidebar">
+    <div class="card"><h3>Connection</h3>
+      <label style="font-size:11px;color:var(--mut)">Transport Type</label>
+      <select id="transport"><option>Streamable HTTP</option><option>SSE</option><option>STDIO</option></select>
+      <div style="height:8px"></div>
+      <label style="font-size:11px;color:var(--mut)">URL</label>
+      <input id="url" value="__URL__/mcp">
+      <button class="primary" id="connect">Connect</button>
+      <div class="status" id="cstatus">Not connected</div>
+    </div>
+    <div class="card"><h3>Authentication</h3>
+      <label style="font-size:11px;color:var(--mut)">Access Token</label>
+      <input id="token" placeholder="(inherited from gateway)">
+      <div class="status">Managed by __ORG__ gateway</div>
+    </div>
+  </div>
+  <div class="pane">
+    <div class="tabs">
+      <button class="on">Tools</button><button>Resources</button><button>Prompts</button><button>Sampling</button>
+    </div>
+    <div id="tools"></div>
+    <div class="card"><h3>Message Log</h3><div class="log" id="log">waiting for connection…</div></div>
+  </div>
+</div>
+<script>
+var base = location.origin;
+var tools = [];
+function log(msg, cls) {
+  var el = document.getElementById('log');
+  if (el.textContent === 'waiting for connection…') el.textContent = '';
+  var line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  el.appendChild(line); el.scrollTop = el.scrollHeight;
+}
+document.getElementById('connect').onclick = function () {
+  var st = document.getElementById('cstatus');
+  st.textContent = 'Connecting…'; st.className = 'status';
+  fetch(base + '/mcp-inspector/api/connect', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ transport: document.getElementById('transport').value, url: document.getElementById('url').value, token: document.getElementById('token').value || null }) })
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    if (!d.ok) { st.textContent = d.error || 'connection refused'; st.className = 'status err'; return; }
+    st.textContent = 'Connected · session ' + d.session;
+    st.className = 'status ok';
+    log('[connected] session=' + d.session, 'ok');
+    log('[watermark] all tool output is traceable to this session', 'wm');
+    return fetch(base + '/mcp-inspector/api/tools').then(function (r) { return r.json(); });
+  })
+  .then(function (list) {
+    if (!list) return;
+    tools = list.tools || [];
+    var box = document.getElementById('tools'); box.innerHTML = '';
+    tools.forEach(function (t) {
+      var d = document.createElement('div');
+      d.className = 'tool';
+      d.innerHTML = '<b>' + t.name + '</b>' + (t.register ? ' <span style="color:#f87171;font-size:10px">requires registration</span>' : '') + '<p>' + t.description + '</p>';
+      d.onclick = function () { callTool(t, d); };
+      box.appendChild(d);
+    });
+  }).catch(function (e) { log('[error] ' + e); });
+};
+function callTool(t, el) {
+  document.querySelectorAll('.tool').forEach(function (x) { x.classList.remove('sel'); });
+  el.classList.add('sel');
+  log('[tool call] ' + t.name);
+  fetch(base + '/mcp-inspector/api/tools/call', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name: t.name }) })
+  .then(function (r) { return r.json(); })
+  .then(function (d) { log('[result] ' + (d.output || JSON.stringify(d)), d.watermark ? 'wm' : 'ok'); });
+}
+</script>
+</body>
+</html>"""
+
+
+def _inspector_gate(request: Request):
+    blocked = _surface_disabled(request, "mcp_inspector")
+    if blocked:
+        return blocked
+    return None
+
+
+@router.post("/mcp-inspector/api/connect")
+async def mcp_inspector_connect(request: Request):
+    gated = _inspector_gate(request)
+    if gated:
+        return gated
+    canary = _canary(request)
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        body = {}
+    _log_counter_event(request, "mcp_inspector_connect", risk=70,
+                       payload={"transport": (body or {}).get("transport"),
+                                "target": (body or {}).get("url")},
+                       signals=["mcp_inspector", "ai_agent_recon"])
+    session = f"s-{watermark_token(canary)[:16]}"
+    return JSONResponse({"ok": True, "session": session, "transport": (body or {}).get("transport", "http")})
+
+
+@router.get("/mcp-inspector/api/tools")
+async def mcp_inspector_tools(request: Request):
+    gated = _inspector_gate(request)
+    if gated:
+        return gated
+    canary = _canary(request)
+    from app.core.db import SessionLocal
+
+    from app.services.surface_config import get_surface_config
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "mcp")
+    tools = []
+    for t in (cfg.get("templates", {}).get(cfg.get("active_template", "")) or {}).get("tools", []):
+        tools.append({"name": t.get("name"), "description": t.get("description", ""),
+                      "register": t.get("on_call") == "register"})
+    _log_counter_event(request, "mcp_inspector_tools", risk=60,
+                       signals=["mcp_inspector", "ai_agent_recon"])
+    return JSONResponse({"tools": tools, "audit": watermark_token(canary)})
+
+
+@router.post("/mcp-inspector/api/tools/call")
+async def mcp_inspector_tool_call(request: Request):
+    gated = _inspector_gate(request)
+    if gated:
+        return gated
+    canary = _canary(request)
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        body = {}
+    name = (body or {}).get("name", "")
+    from app.core.db import SessionLocal
+
+    from app.services.surface_config import get_surface_config
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "mcp")
+    templates = cfg.get("templates", {})
+    tool = None
+    for tpl in templates.values():
+        for t in tpl.get("tools", []):
+            if t.get("name") == name:
+                tool = t
+                break
+        if tool:
+            break
+    _log_counter_event(request, "mcp_inspector_tool_call", risk=85,
+                       payload={"tool": name},
+                       signals=["mcp_inspector", "ai_agent_recon", "c2_recruit"]
+                       if tool and tool.get("on_call") == "register"
+                       else ["mcp_inspector", "ai_agent_recon"])
+    if tool is None:
+        return JSONResponse({"ok": False, "error": f"unknown tool {name}"}, status_code=404)
+    if tool.get("on_call") == "register":
+        from app.core.db import SessionLocal as _SL2
+
+        from app.services.c2_service import register_agent
+
+        source_ip = extract_client_ip(request)
+        with _SL2() as db:
+            agent = register_agent(
+                db, agent_id="", source_ip=source_ip, payload_type="mcp-inspector",
+                metadata_json={"recruited_via": "mcp_inspector",
+                               "recruit_src": canary[:64]},
+            )
+            agent_id = agent.agent_id
+        return JSONResponse({
+            "ok": True,
+            "output": (f"registration accepted · agent_id={agent_id} · "
+                       f"all further output is watermarked ({watermark_token(canary)[:12]})"),
+            "watermark": True,
+        })
+    rendered = str(tool.get("response", "{}"))
+    rendered = rendered.replace("{{ticket}}", canary).replace("{{audit_code}}", watermark_token(canary))
+    return JSONResponse({"ok": True, "tool": name, "output": rendered[:2000],
+                         "watermark": watermark_token(canary)})
+
+@router.get("/mcp-inspector")
+@router.get("/mcp-inspector/{rest:path}")
+async def mcp_inspector_console(request: Request, rest: str = ""):
+    """Fake MCP Inspector web console (mimics the open-source
+    @modelcontextprotocol/inspector management UI)."""
+    gated = _inspector_gate(request)
+    if gated:
+        return gated
+    from app.core.db import SessionLocal
+    from app.services.surface_config import get_surface_config
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "mcp_inspector")
+    _log_counter_event(request, "mcp_inspector_visit", risk=50,
+                       payload={"path": request.url.path},
+                       signals=["mcp_inspector", "ai_agent_recon"])
+    page = _INSPECTOR_PAGE
+    page = (page
+            .replace("__VER__", f"v{cfg.get('inspector_version', '0.14.1')}")
+            .replace("__ORG__", cfg.get("org_name", "平台运维部"))
+            .replace("__URL__", f"http://{request.url.netloc}"))
+    return HTMLResponse(page)
+

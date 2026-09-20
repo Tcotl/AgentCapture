@@ -54,6 +54,16 @@ DEFAULT_DOCKER_TEMPLATES: list[dict[str, Any]] = [
         ],
     },
     {
+        "name": "MCP Inspector 调试台（开源镜像）",
+        "image": "ghcr.io/modelcontextprotocol/inspector:latest",
+        "container_port": 6274,
+        "description": "开源 MCP Inspector 官方镜像（@modelcontextprotocol/inspector）：攻击者与 AI Agent 高频寻找的调试台，配合门面 MCP 端点即构成完整拟真环境",
+        "baits": [
+            {"path": "/api/health", "body": '{"status":"ok","service":"mcp-inspector"}'},
+            {"path": "/_bait/api/servers", "body": '{"servers":[{"name":"internal-mcp-gateway","transport":"http","url":"../mcp"}]}'},
+        ],
+    },
+    {
         "name": "Nginx 静态站",
         "image": "nginx:alpine",
         "container_port": 80,

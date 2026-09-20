@@ -23,6 +23,10 @@ SURFACES: list[dict[str, str]] = [
      "description": "AGENTS.md / CLAUDE.md / .cursorrules 返回项目级 Agent 指南（含 Portal/数据集/MCP 引流与会话水印）",
      "paths": "/AGENTS.md · /CLAUDE.md · /.cursorrules",
      "event_types": "agent_file_bait_read"},
+    {"key": "mcp_inspector", "name": "MCP Inspector 拟真控制台",
+     "description": "仿冒开源 MCP Inspector 调试台：Agent/攻击者连接调试会话即被捕获归因，工具调用返回水印数据",
+     "paths": "/mcp-inspector*",
+     "event_types": "mcp_inspector_connect,mcp_inspector_tool_call"},
     {"key": "mcp", "name": "MCP Server 蜜罐管理",
      "description": "JSON-RPC 工具服务：initialize / tools/list / tools/call，四个毒化工具，调用即指纹归因",
      "paths": "/mcp",
@@ -53,6 +57,11 @@ SURFACES: list[dict[str, str]] = [
 # values render with {{placeholders}} at request time:
 #   {{portal_url}} {{ticket}} {{audit_code}} {{page}} {{role}}
 DEFAULT_SURFACE_CONFIGS: dict[str, dict] = {
+    "mcp_inspector": {
+        "server_name": "internal-mcp-gateway",
+        "inspector_version": "0.14.1",
+        "org_name": "平台运维部",
+    },
     "agent_files": {
         "files": {
             "AGENTS.md": (
@@ -214,6 +223,11 @@ DEFAULT_SURFACE_CONFIGS: dict[str, dict] = {
 # type: text | number | lines ("name|ip" rows) | json | files (special)
 SURFACE_FIELDS: dict[str, list[dict]] = {
     "agent_files": [],  # special: one textarea per instruction file
+    "mcp_inspector": [
+        {"key": "server_name", "label": "网关名称（Inspector 标题栏）", "type": "text"},
+        {"key": "inspector_version", "label": "Inspector 版本号", "type": "text"},
+        {"key": "org_name", "label": "所属组织", "type": "text"},
+    ],
     "mcp": [
         {"key": "server_name", "label": "服务名称", "type": "text"},
         {"key": "version", "label": "版本号", "type": "text"},
