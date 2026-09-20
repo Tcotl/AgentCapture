@@ -15,7 +15,7 @@ from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, desc, func, select, update as sa_update
 from sqlalchemy.orm import Session
@@ -37,6 +37,7 @@ from app.models.prompt_injection import PromptInjectionTemplate
 from app.models.service import ServiceCatalog, ServiceTemplate
 from app.models.user import User
 from app.services.api_tokens import create_api_token, list_api_tokens
+from app.services.docker_client import DockerError
 from app.services.auth import (
     authenticate_user,
     create_login_log,
@@ -4757,6 +4758,163 @@ async def config_portal_face(request: Request, db: Session = Depends(get_db)):
     return _redirect(f"/admin/templates/default-honeypot{_qs(hp_ok='功能性伪装反制配置已保存并即时生效')}")
 
 
+def _redirect_templates_docker(**params):
+    return _redirect(f"/admin/templates{_qs(**params)}")
+
+
+@router.post("/admin/templates/docker/upload")
+async def upload_docker_image(
+    request: Request,
+    image_tar: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Load a user-supplied docker image tar (docker save format)."""
+    _require_admin(request, db)
+    from app.services import docker_client
+
+    if not docker_client.available():
+        return _redirect_templates_docker(docker_err="Docker 不可用：未检测到 Docker 服务")
+    payload = await image_tar.read()
+    if not payload:
+        return _redirect_templates_docker(docker_err="镜像包为空")
+    try:
+        tags = docker_client.load_image(payload)
+    except DockerError as exc:
+        return _redirect_templates_docker(docker_err=f"镜像导入失败：{exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _redirect_templates_docker(docker_err=f"镜像导入失败：{type(exc).__name__}")
+    label = "、".join(tags[:3]) if tags else "未命名镜像"
+    return _redirect_templates_docker(docker_ok=f"镜像已导入：{label}")
+
+
+@router.post("/admin/templates/docker/deploy")
+async def deploy_docker_honeypot(
+    request: Request,
+    name: str = Form(""),
+    image: str = Form(""),
+    container_port: int = Form(80),
+    proxy_port: int = Form(0),
+    preset: str = Form(""),
+    baits_json: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    from app.services import docker_honeypot, docker_client
+    from app.services.auth import validate_password_complexity  # noqa: F401 (policy parity)
+
+    if not docker_client.available():
+        return _redirect_templates_docker(docker_err="Docker 不可用：未检测到 Docker 服务")
+    if preset:
+        preset_def = docker_honeypot.get_preset(preset)
+        if preset_def:
+            if not image:
+                image = preset_def["image"]
+            if not container_port or container_port == 80:
+                container_port = preset_def["container_port"]
+            if not baits_json:
+                import json as _json
+
+                baits_json = _json.dumps(preset_def["baits"], ensure_ascii=False)
+    if not name or not image:
+        return _redirect_templates_docker(docker_err="部署需要填写名称与镜像")
+    if not proxy_port:
+        return _redirect_templates_docker(docker_err="需要指定对外端口")
+    import json as _json
+
+    try:
+        baits = _json.loads(baits_json) if baits_json else []
+    except ValueError:
+        baits = []
+    if not isinstance(baits, list):
+        baits = []
+    try:
+        record = docker_honeypot.deploy(
+            db, name=name, image=image, container_port=container_port,
+            proxy_port=proxy_port, baits=baits, actor=user.username,
+        )
+    except DockerError as exc:
+        return _redirect_templates_docker(docker_err=str(exc))
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="deploy",
+        module="docker-honeypot",
+        target_type="container",
+        target_ref=record.name,
+        detail_json={"image": record.image, "proxy_port": record.proxy_port,
+                     "baits": len(record.baits_json or [])},
+    )
+    return _redirect_templates_docker(docker_ok=f"蜜罐容器「{record.name}」已部署，诱饵代理 :{record.proxy_port} 运行中")
+
+
+@router.post("/admin/templates/docker/{hid}/start")
+def start_docker_honeypot(hid: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services import docker_honeypot
+
+    try:
+        docker_honeypot.start(db, hid)
+    except DockerError as exc:
+        return _redirect_templates_docker(docker_err=str(exc))
+    return _redirect_templates_docker(docker_ok=f"蜜罐 #{hid} 已启动")
+
+
+@router.post("/admin/templates/docker/{hid}/stop")
+def stop_docker_honeypot(hid: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services import docker_honeypot
+
+    docker_honeypot.stop(db, hid)
+    return _redirect_templates_docker(docker_ok=f"蜜罐 #{hid} 已停止")
+
+
+@router.post("/admin/templates/docker/{hid}/remove")
+def remove_docker_honeypot(hid: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_admin(request, db)
+    from app.services import docker_honeypot
+
+    docker_honeypot.remove(db, hid)
+    log_execution(db, actor_username=user.username, action="delete",
+                  module="docker-honeypot", target_type="container", target_ref=str(hid))
+    return _redirect_templates_docker(docker_ok=f"蜜罐 #{hid} 已删除（容器一并移除）")
+
+
+@router.post("/admin/templates/docker/{hid}/baits")
+async def update_docker_baits(
+    hid: int,
+    request: Request,
+    baits_json: str = Form(""),
+    js_inject: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    from app.services import docker_honeypot
+    import json as _json
+
+    try:
+        baits = _json.loads(baits_json) if baits_json.strip() else []
+    except ValueError:
+        return _redirect_templates_docker(docker_err="诱饵路由 JSON 解析失败")
+    if not isinstance(baits, list):
+        return _redirect_templates_docker(docker_err="诱饵路由必须是数组")
+    docker_honeypot.update_baits(db, hid, baits=baits, js_inject=js_inject == "on")
+    return _redirect_templates_docker(docker_ok=f"蜜罐 #{hid} 诱饵路由已更新并热生效")
+
+
+@router.get("/admin/templates/docker/{hid}/logs", response_class=PlainTextResponse)
+def docker_honeypot_logs(hid: int, request: Request, db: Session = Depends(get_db)):
+    _require_user(request, db)
+    from app.services import docker_client, docker_honeypot
+
+    record = db.get(DockerHoneypot, hid)
+    if record is None or not record.container_id:
+        return PlainTextResponse("no container")
+    try:
+        return PlainTextResponse(docker_client.container_logs(record.container_id))
+    except docker_client.DockerError as exc:
+        return PlainTextResponse(str(exc))
+
+
 @router.get("/admin/templates/default-honeypot", response_class=HTMLResponse)
 def admin_default_honeypot_config_page(request: Request, db: Session = Depends(get_db)):
     """Dedicated config page for the default web honeypot (entered from the
@@ -4949,11 +5107,26 @@ def admin_templates(request: Request, db: Session = Depends(get_db)):
             if node.template_id:
                 deployed_urls[node.template_id] = f"http://{listen}:{port}{route}"
 
+    # user-supplied docker image honeypots
+    from app.models.docker_honeypot import DockerHoneypot
+    from app.services import docker_honeypot, docker_client
+
+    docker_ok = docker_client.available()
+    docker_honeypot.sync_status(db)
+    docker_records = db.scalars(select(DockerHoneypot).order_by(DockerHoneypot.id)).all()
+    docker_err = request.query_params.get("docker_err", "")
+    docker_ok_msg = request.query_params.get("docker_ok", "")
+
     qp = request.query_params
     ctx = {
         "title": "Web应用蜜罐管理",
         "current_user": user,
         "items": items,
+        "docker_ok": docker_ok,
+        "docker_records": docker_records,
+        "docker_presets": docker_honeypot.get_presets(),
+        "docker_err": docker_err,
+        "docker_ok_msg": docker_ok_msg,
         "nodes": nodes,
         "deployed": deployed,
         "deployed_urls": deployed_urls,

@@ -79,6 +79,7 @@ def init_db() -> None:
     from app.models.notification import AlertChannel, AlertPolicy  # noqa: F401
     from app.models.portal_config import PortalConfig  # noqa: F401
     from app.models.counter_surface import CounterSurface  # noqa: F401
+    from app.models.docker_honeypot import DockerHoneypot  # noqa: F401
     from app.models.prompt_injection import PromptInjectionTemplate  # noqa: F401
     from app.models.service import ServiceCatalog, ServiceTemplate  # noqa: F401
     from app.models.system_setting import SystemSetting  # noqa: F401

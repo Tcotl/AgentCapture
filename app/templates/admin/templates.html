@@ -654,6 +654,158 @@
     </div>
   </section>
 
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('Docker 镜像蜜罐', '上传 docker save 导出的镜像包并部署为 Web 蜜罐容器——所有流量经诱饵代理进入容器，可注入 API 欺骗路由与蜜饵信号。', '<span class="chip" style="cursor:default">' + ('Docker 就绪' if docker_ok else 'Docker 不可用') + '</span>') }}
+  {% if docker_err %}<div class="clone-msg clone-msg-err" style="margin-bottom:10px">{{ docker_err }}</div>{% endif %}
+  {% if docker_ok_msg %}<div class="clone-msg clone-msg-ok" style="margin-bottom:10px">{{ docker_ok_msg }}</div>{% endif %}
+
+  {% if not docker_ok %}
+  <div class="muted" style="font-size:12.5px;line-height:1.8;margin-bottom:10px">
+    未检测到 Docker 服务（/var/run/docker.sock 不可用）。请确认宿主机已安装 Docker 且 AgentCapture 有权访问套接字后刷新本页。
+  </div>
+  {% else %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <button type="button" class="chip primary" data-modal-open="docker-upload-modal">↑ 上传镜像包</button>
+    <button type="button" class="chip primary" data-modal-open="docker-deploy-modal">＋ 部署蜜罐容器</button>
+    <button type="button" class="chip" onclick="location.reload()" style="cursor:pointer">刷新状态</button>
+  </div>
+  <div class="table-wrap compact"><table>
+    <thead><tr><th>名称</th><th>镜像</th><th>容器端口</th><th>对外端口</th><th>诱饵路由</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for d in docker_records %}
+      <tr>
+        <td><strong style="font-size:13px">{{ d.name }}</strong></td>
+        <td><code style="font-size:11px">{{ d.image }}</code></td>
+        <td>{{ d.container_port }}</td>
+        <td><a href="http://{{ request.host.split(':')[0] }}:{{ d.proxy_port }}" target="_blank">{{ d.proxy_port }}</a></td>
+        <td>{{ (d.baits_json or [])|length }} 条{% if d.js_inject %} · JS注入{% endif %}</td>
+        <td>
+          {% if d.status == 'running' %}<span class="badge badge-success">运行中</span>
+          {% elif d.status == 'error' %}<span class="badge badge-danger">异常</span>
+          {% else %}<span class="badge badge-warning">已停止</span>{% endif %}
+        </td>
+        <td>
+          <div class="actions-inline">
+            <button type="button" class="secondary btn-sm" onclick="openDockerBaits({{ d.id }}, {{ (d.baits_json or [])|tojson }}, {{ 'true' if d.js_inject else 'false' }})" style="cursor:pointer">诱饵配置</button>
+            <button type="button" class="secondary btn-sm" onclick="openDockerLogs({{ d.id }})" style="cursor:pointer">日志</button>
+            {% if d.status == 'running' %}
+            <form method="post" action="/admin/templates/docker/{{ d.id }}/stop" style="margin:0"><button class="secondary btn-sm" type="submit">停止</button></form>
+            {% else %}
+            <form method="post" action="/admin/templates/docker/{{ d.id }}/start" style="margin:0"><button class="primary btn-sm" type="submit">启动</button></form>
+            {% endif %}
+            <form method="post" action="/admin/templates/docker/{{ d.id }}/remove" style="margin:0" data-confirm="确认删除该蜜罐容器？不可撤销。"><button class="danger btn-sm" type="submit">删除</button></form>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="muted" style="text-align:center;padding:18px">暂无 Docker 蜜罐容器——上传镜像包或从预设模板部署。</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+
+{% call modal_dialog('docker-upload-modal', '上传 Docker 镜像包', '上传 docker save 导出的镜像 tar 包，导入后将出现在部署表单的镜像列表中。') %}
+<form method="post" action="/admin/templates/docker/upload" enctype="multipart/form-data" class="stack">
+  <label class="field-label"><span>镜像 tar 包</span>
+    <input type="file" name="image_tar" accept=".tar,.tar.gz" required>
+  </label>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">导入镜像</button>
+  </div>
+</form>
+{% endcall %}
+
+{% call modal_dialog('docker-deploy-modal', '部署 Docker 蜜罐容器', '选择预设模板或直接填写镜像；容器仅经诱饵代理对外暴露，代理注入 API 欺骗路由与蜜饵信号。') %}
+<form method="post" action="/admin/templates/docker/deploy" class="stack" id="docker-deploy-form">
+  <label class="field-label"><span>预设模板</span>
+    <select id="dd-preset" onchange="ddFillPreset()">
+      <option value="">自定义镜像</option>
+      {% for p in docker_presets %}<option value="{{ p.name }}">{{ p.name }}（{{ p.image }}）</option>{% endfor %}
+    </select>
+  </label>
+  <label class="field-label"><span>容器名称</span><input name="name" placeholder="如 honeypot-wordpress" required></label>
+  <label class="field-label"><span>镜像</span><input name="image" id="dd-image" placeholder="nginx:alpine" required></label>
+  <div class="grid-2">
+    <label class="field-label"><span>容器端口（应用监听）</span><input type="number" name="container_port" id="dd-cport" value="80" required></label>
+    <label class="field-label"><span>对外端口（诱饵代理）</span><input type="number" name="proxy_port" value="8081" required></label>
+  </div>
+  <label class="field-label"><span>诱饵 API 路由（JSON 数组：path + body，可留空用预设默认）</span>
+    <textarea name="baits_json" id="dd-baits" rows="5" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px" placeholder='[{"path":"/api/user/info","body":"{...}"}]'></textarea>
+  </label>
+  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+    <input type="checkbox" name="js_inject" checked> 注入蜜饵信号（beacon 回传 + 隐藏诱饵链接）
+  </label>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">部署容器</button>
+  </div>
+</form>
+{% endcall %}
+
+{% call modal_dialog('docker-baits-modal', '诱饵路由配置', '每条路由在代理上返回预设响应（自动附加容器水印与 canary）；所有 HTML 响应可注入蜜饵信号。') %}
+<form method="post" action="#" class="stack" id="docker-baits-form">
+  <label class="field-label"><span>诱饵路由 JSON</span>
+    <textarea name="baits_json" id="db-baits" rows="8" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px"></textarea>
+  </label>
+  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+    <input type="checkbox" name="js_inject" id="db-js"> 注入蜜饵信号
+  </label>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">保存诱饵配置</button>
+  </div>
+</form>
+{% endcall %}
+
+{% call modal_dialog('docker-logs-modal', '容器日志', '最近 200 行（stdout + stderr）') %}
+<pre id="docker-logs-pre" style="max-height:420px;overflow:auto;font-size:11.5px;background:rgba(3,10,26,.85);color:#bbf7d0;padding:14px;border-radius:10px;white-space:pre-wrap"></pre>
+{% endcall %}
+
+<script>
+function openDockerBaits(id, baits, jsInject) {
+  var form = document.getElementById('docker-baits-form');
+  form.action = '/admin/templates/docker/' + id + '/baits';
+  document.getElementById('db-baits').value = JSON.stringify(baits || [], null, 2);
+  document.getElementById('db-js').checked = !!jsInject;
+  document.querySelector('[data-modal-open="docker-baits-modal"]')?.click();
+  var backdrop = document.getElementById('docker-baits-modal');
+  if (backdrop) backdrop.hidden = false;
+}
+function openDockerLogs(id) {
+  fetch('/agentcapture/admin/templates/docker/' + id + '/logs')
+    .then(function (r) { return r.text(); })
+    .then(function (t) {
+      var pre = document.getElementById('docker-logs-pre') || document.createElement('pre');
+      // 展示在诱饵配置弹窗之外：复用 logs 内容弹窗
+      var bd = document.getElementById('docker-logs-modal-bd');
+      if (!bd) {
+        bd = document.createElement('div');
+        bd.id = 'docker-logs-modal-bd';
+        bd.className = 'modal-backdrop';
+        bd.innerHTML = '<div class="modal" style="width:min(860px,92vw)"><div class="modal-header"><h3 class="modal-title">容器日志</h3><button class="modal-close" onclick="document.getElementById(\'docker-logs-modal-bd\').remove()">×</button></div><div class="modal-body"><pre style="max-height:60vh;overflow:auto;font-size:11.5px;color:#bbf7d0;white-space:pre-wrap" id="docker-logs-pre2"></pre></div></div>';
+        document.body.appendChild(bd);
+        bd.addEventListener('click', function (e) { if (e.target === bd) bd.remove(); });
+      }
+      bd.querySelector('#docker-logs-pre2').textContent = t || '(空)';
+      bd.hidden = false;
+    });
+}
+function ddFillPreset() {
+  var sel = document.getElementById('dd-preset');
+  var presets = {{ docker_presets | tojson }};
+  var p = presets.find(function (x) { return x.name === sel.value; });
+  if (!p) return;
+  document.getElementById('dd-image').value = p.image;
+  document.getElementById('dd-cport').value = p.container_port;
+  document.getElementById('dd-baits').value = JSON.stringify(p.baits, null, 2);
+}
+document.addEventListener('DOMContentLoaded', function () {
+  ddFillPreset();
+});
+</script>
+
 <script>
 // Toggle redirect URL field visibility
 (function(){
