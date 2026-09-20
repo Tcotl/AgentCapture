@@ -107,9 +107,14 @@ app.add_middleware(AdminAccessPathMiddleware)
 app.mount("/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static")), name="static")
 
 # Serve cloned/uploaded web template assets so preview can resolve relative paths.
+# On read-only filesystems (serverless) the directory cannot be created and the
+# preview mount is skipped instead of failing boot.
 _cloned_root = Path(__file__).resolve().parents[1] / "data" / "web_app_templates" / "cloned"
-_cloned_root.mkdir(parents=True, exist_ok=True)
-app.mount("/_preview/cloned", StaticFiles(directory=str(_cloned_root)), name="preview-cloned")
+try:
+    _cloned_root.mkdir(parents=True, exist_ok=True)
+    app.mount("/_preview/cloned", StaticFiles(directory=str(_cloned_root)), name="preview-cloned")
+except OSError:
+    pass
 
 app.include_router(health_router)
 app.include_router(agent_control_router)

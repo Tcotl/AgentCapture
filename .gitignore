@@ -19,3 +19,5 @@ data/
 /DEVELOPMENT.md
 /CHANGELOG.md
 /design-system/
+.vercel
+.env*
