@@ -4547,7 +4547,7 @@ def start_default_web_honeypot(
     user = _require_admin(request, db)
     from app.services.honeypot_services import start_service
 
-    back = next if next.startswith("/admin") else "/admin/templates"
+    back = next if next.startswith("/admin") else "/admin/templates/default-honeypot"
     item = _default_honeypot_row(db)
     port = item.default_port if item else 48777
     try:
@@ -4582,7 +4582,7 @@ def stop_default_web_honeypot(
     user = _require_admin(request, db)
     from app.services.honeypot_services import stop_service
 
-    back = next if next.startswith("/admin") else "/admin/templates"
+    back = next if next.startswith("/admin") else "/admin/templates/default-honeypot"
     stop_service("thinkphp")
     item = _default_honeypot_row(db)
     if item:
@@ -4635,7 +4635,7 @@ async def config_default_web_honeypot(
         target_ref="thinkphp",
         detail_json={"enabled": form.get("enabled") == "on", "config_keys": sorted(config)},
     )
-    return _redirect(f"/admin/templates{_qs(hp_ok='默认 Web 蜜罐配置已保存并即时生效')}")
+    return _redirect(f"/admin/templates/default-honeypot{_qs(hp_ok='默认 Web 蜜罐配置已保存并即时生效')}")
 
 
 @router.post("/admin/templates/metadata")
@@ -4669,7 +4669,7 @@ async def config_metadata_face(
         target_ref="metadata",
         detail_json={"enabled": form.get("enabled") == "on", "config_keys": sorted(config)},
     )
-    return _redirect(f"/admin/templates{_qs(hp_ok='云元数据蜜罐配置已保存并即时生效')}")
+    return _redirect(f"/admin/templates/default-honeypot{_qs(hp_ok='云元数据蜜罐配置已保存并即时生效')}")
 
 
 @router.post("/admin/templates/dataset")
@@ -4692,7 +4692,7 @@ async def config_dataset_face(request: Request, db: Session = Depends(get_db)):
                   target_ref="dataset",
                   detail_json={"enabled": form.get("enabled") == "on",
                                "config_keys": sorted(config)})
-    return _redirect(f"/admin/templates{_qs(hp_ok='无限资源消耗数据集配置已保存并即时生效')}")
+    return _redirect(f"/admin/templates/default-honeypot{_qs(hp_ok='无限资源消耗数据集配置已保存并即时生效')}")
 
 
 @router.post("/admin/templates/intranet")
@@ -4722,7 +4722,7 @@ async def config_intranet_face(request: Request, db: Session = Depends(get_db)):
                   target_ref="intranet",
                   detail_json={"enabled": form.get("enabled") == "on",
                                "config_keys": sorted(config)})
-    return _redirect(f"/admin/templates{_qs(hp_ok='内网横向 Wiki 配置已保存并即时生效')}")
+    return _redirect(f"/admin/templates/default-honeypot{_qs(hp_ok='内网横向 Wiki 配置已保存并即时生效')}")
 
 
 @router.post("/admin/templates/portal")
@@ -4754,7 +4754,93 @@ async def config_portal_face(request: Request, db: Session = Depends(get_db)):
                   module="templates", target_type="web-honeypot-config",
                   target_ref="portal",
                   detail_json={"enabled": form.get("enabled") == "on"})
-    return _redirect(f"/admin/templates{_qs(hp_ok='功能性伪装反制配置已保存并即时生效')}")
+    return _redirect(f"/admin/templates/default-honeypot{_qs(hp_ok='功能性伪装反制配置已保存并即时生效')}")
+
+
+@router.get("/admin/templates/default-honeypot", response_class=HTMLResponse)
+def admin_default_honeypot_config_page(request: Request, db: Session = Depends(get_db)):
+    """Dedicated config page for the default web honeypot (entered from the
+    已部署模板管理 row)."""
+    user = _require_user(request, db)
+    ctx = _default_honeypot_ctx(db)
+    ctx.update({
+        "title": "默认 Web 蜜罐 · 配置",
+        "current_user": user,
+        "hp_ok": request.query_params.get("hp_ok", ""),
+        "hp_err": request.query_params.get("hp_err", ""),
+    })
+    return _render(request, "admin/default_honeypot_config.html", ctx)
+
+
+def _default_honeypot_ctx(db: Session) -> dict:
+    from app.services.surface_config import (
+        SURFACES,
+        get_enabled_map,
+        get_runtime_map,
+        surface_stats,
+    )
+
+    from app.services.honeypot_services import port_listening, running_services
+
+    runtime_map = get_runtime_map(db)
+    tp_runtime = runtime_map.get("thinkphp", {})
+    stats = surface_stats(db)
+    default_honeypot = {
+        "name": "ThinkPHP Web 蜜罐",
+        "port": 48777,
+        "running": bool(running_services().get("thinkphp")) or port_listening(48777),
+        "enabled": tp_runtime.get("enabled", True),
+        "config": tp_runtime.get("config", {}),
+        "stats": stats.get("thinkphp", {}),
+        "faces": [
+            {
+                "key": meta["key"],
+                "name": meta["name"],
+                "enabled": get_enabled_map(db).get(meta["key"], True),
+            }
+            for meta in SURFACES
+            if meta["key"] != "thinkphp"
+        ],
+    }
+
+    # 云元数据蜜罐（SSRF）is configured on this page too — no standalone page.
+    md_runtime = runtime_map.get("metadata", {})
+    metadata_face = {
+        "enabled": md_runtime.get("enabled", True),
+        "config": md_runtime.get("config", {}),
+        "hits_24h": stats.get("metadata", {}).get("hits_24h", 0),
+    }
+
+    def _face_ctx(key: str) -> dict:
+        rt = runtime_map.get(key, {})
+        return {
+            "enabled": rt.get("enabled", True),
+            "config": rt.get("config", {}),
+            "hits_24h": stats.get(key, {}).get("hits_24h", 0),
+        }
+
+    dataset_face = _face_ctx("dataset")
+    intranet_face = _face_ctx("intranet")
+    from app.services.portal_config import get_config_row as _pcr
+
+    _portal_row = _pcr(db)
+    portal_face = {
+        "enabled": bool(_portal_row.enabled),
+        "config": {
+            "footer_enabled": _portal_row.footer_enabled,
+            "footer_title": _portal_row.footer_title,
+            "heartbeat_interval": _portal_row.heartbeat_interval,
+            "register_max_per_ip_hour": _portal_row.register_max_per_ip_hour,
+        },
+        "hits_24h": "—",
+    }
+    return {
+        "default_honeypot": default_honeypot,
+        "metadata_face": metadata_face,
+        "dataset_face": dataset_face,
+        "intranet_face": intranet_face,
+        "portal_face": portal_face,
+    }
 
 
 @router.get("/admin/templates", response_class=HTMLResponse)

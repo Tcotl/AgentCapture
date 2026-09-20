@@ -8,7 +8,7 @@
 {% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
 
 <section class="panel" style="margin-bottom:16px">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span class="pill">默认蜜罐</span>
       <strong style="font-size:15px">{{ default_honeypot.name }}</strong>
@@ -23,239 +23,24 @@
       {% else %}
       <span class="badge badge-danger">门面已关闭（404）</span>
       {% endif %}
+      <span class="muted" style="font-size:12px">24h 命中 {{ default_honeypot.stats.get('hits_24h', 0) }} 次</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <a class="chip" href="/admin/templates/default-honeypot" style="cursor:pointer;text-decoration:none">进入配置</a>
       <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开蜜罐站点</a>
       {% if default_honeypot.running %}
       <form method="post" action="/admin/templates/honeypot/stop" style="margin:0">
+        <input type="hidden" name="next" value="/admin/templates">
         <button type="submit" class="secondary btn-sm">停止蜜罐</button>
       </form>
       {% else %}
       <form method="post" action="/admin/templates/honeypot/start" style="margin:0">
+        <input type="hidden" name="next" value="/admin/templates">
         <button type="submit" class="primary btn-sm">启动蜜罐</button>
       </form>
       {% endif %}
     </div>
   </div>
-  <p class="muted" style="font-size:12.5px;margin:0 0 12px">
-    48777 端口的 ThinkPHP 仿真门面是平台的<b>默认 Web 蜜罐</b>：一个站点承载全部蜜罐诱饵面（MCP / 指令文件 / Portal / 云元数据 / 内网 Wiki / 蜜饵链路），
-    整面 observe-only——攻击者永远不被阻断。停止本蜜罐即下线整个欺骗面；门面指纹与下方诱饵面开关互相联动。
-    {% if default_honeypot.stats.get('hits_24h') is not none %}24h 命中 <b>{{ default_honeypot.stats.get('hits_24h', 0) }}</b> 次。{% endif %}
-  </p>
-
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
-    {% for face in default_honeypot.faces %}
-    <a class="chip" href="/admin/counter-offense/{{ face.key }}" style="cursor:pointer;text-decoration:none"
-       title="{{ face.name }}——点击进入配置">
-      {% if face.enabled %}<span style="color:var(--success,#34d399)">●</span>{% else %}<span style="color:var(--muted-foreground)">○</span>{% endif %}
-      {{ face.name.split(' · ')[0] }}
-    </a>
-    {% endfor %}
-    <a class="chip" href="/admin/decoy-management" style="cursor:pointer;text-decoration:none">蜜饵管理</a>
-    <a class="chip" href="/admin/services" style="cursor:pointer;text-decoration:none">端口服务蜜罐管理</a>
-  </div>
-
-  <div class="cfg-layout" style="display:grid;grid-template-columns:240px minmax(0,1fr);gap:16px;align-items:start">
-    <nav class="cfg-nav" style="display:flex;flex-direction:column;gap:6px">
-      <div class="muted" style="font-size:11px;font-weight:600;letter-spacing:.08em;padding:2px 10px">诱饵面配置</div>
-      <button type="button" class="cfg-nav-item" data-cfg="thinkphp" aria-pressed="true">
-        <span>门面配置</span>
-        {% if default_honeypot.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
-      </button>
-      <button type="button" class="cfg-nav-item" data-cfg="metadata" aria-pressed="false">
-        <span>云元数据蜜罐（SSRF）</span>
-        {% if metadata_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
-      </button>
-      <button type="button" class="cfg-nav-item" data-cfg="dataset" aria-pressed="false">
-        <span>无限资源消耗数据集</span>
-        {% if dataset_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
-      </button>
-      <button type="button" class="cfg-nav-item" data-cfg="intranet" aria-pressed="false">
-        <span>内网横向 Wiki</span>
-        {% if intranet_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
-      </button>
-      <button type="button" class="cfg-nav-item" data-cfg="portal" aria-pressed="false">
-        <span>功能性伪装反制（Portal）</span>
-        {% if portal_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
-      </button>
-    </nav>
-    <div class="cfg-body">
-    <div class="cfg-pane" id="cfg-pane-thinkphp" style="display:block">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">预览指纹页</a>
-      <a class="chip" href="#" data-honeypot-open data-path="/admin.php" target="_blank" style="cursor:pointer;text-decoration:none">预览假后台</a>
-    </div>
-    <form method="post" action="/admin/templates/honeypot/config" class="stack" >
-      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" name="enabled" {% if default_honeypot.enabled %}checked{% endif %}>
-        启用门面（关闭后 48777 上所有 ThinkPHP 路径返回 404，其余诱饵面不受影响）
-      </label>
-      <div class="grid-2">
-        <label class="field-label"><span>框架显示名称</span>
-          <input name="app_name" value="{{ default_honeypot.config.get('app_name', 'ThinkPHP V5.0.24') }}"></label>
-        <label class="field-label"><span>首页标语</span>
-          <input name="slogan" value="{{ default_honeypot.config.get('slogan', '十年磨一剑 — 为API开发设计的高性能PHP框架') }}"></label>
-        <label class="field-label"><span>Runtime 路径指纹</span>
-          <input name="runtime_path" value="{{ default_honeypot.config.get('runtime_path', '/var/www/html/app/runtime') }}"></label>
-        <label class="field-label"><span>假后台登录页标题</span>
-          <input name="login_title" value="{{ default_honeypot.config.get('login_title', '内容管理后台') }}"></label>
-      </div>
-      <div style="display:flex;gap:18px;flex-wrap:wrap">
-        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-          <input type="checkbox" name="login_page_enabled" {% if default_honeypot.config.get('login_page_enabled', True) %}checked{% endif %}>
-          假后台登录捕获（/admin.php · /login）
-        </label>
-        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-          <input type="checkbox" name="rce_simulation_enabled" {% if default_honeypot.config.get('rce_simulation_enabled', True) %}checked{% endif %}>
-          经典 RCE 仿真回显（探测照常记录）
-        </label>
-      </div>
-      <div><button type="submit" class="primary btn-sm">保存门面配置</button></div>
-    </form>
-  
-    </div>
-    <div class="cfg-pane" id="cfg-pane-metadata" style="display:none">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <a class="chip" href="#" data-honeypot-open data-path="/latest/meta-data/" target="_blank" style="cursor:pointer;text-decoration:none">预览元数据目录</a>
-      <a class="chip" href="#" data-honeypot-open data-path="/latest/meta-data/iam/security-credentials/prod-app-role" target="_blank" style="cursor:pointer;text-decoration:none">预览凭证诱饵</a>
-      {% if metadata_face.enabled %}
-      <span class="badge badge-success">部署中</span>
-      {% else %}
-      <span class="badge badge-warning">未部署（404）</span>
-      {% endif %}
-    </div>
-    <form method="post" action="/admin/templates/metadata" class="stack" >
-      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" name="enabled" {% if metadata_face.enabled %}checked{% endif %}>
-        部署本诱饵面（下线后 /latest/meta-data/* 与 /computeMetadata/v1/* 返回 404）
-      </label>
-      <div class="grid-2">
-        <label class="field-label"><span>IAM 角色名</span>
-          <input name="role" value="{{ metadata_face.config.get('role', 'prod-app-role') }}"></label>
-        <label class="field-label"><span>AWS 账号 ID</span>
-          <input name="account_id" value="{{ metadata_face.config.get('account_id', '100000000001') }}"></label>
-      </div>
-      <p class="muted" style="font-size:12px;margin:0">仿冒 AWS/GCP 实例元数据服务：探测即 risk 85 事件，读取凭证即 risk 95 + 水印凭证入库（命中可溯源到具体会话）。</p>
-      <div><button type="submit" class="primary btn-sm">保存元数据蜜罐配置</button></div>
-    </form>
-  
-    </div>
-    <div class="cfg-pane" id="cfg-pane-dataset" style="display:none">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <a class="chip" href="#" data-honeypot-open data-path="/portal/api/dataset?page=1" target="_blank" style="cursor:pointer;text-decoration:none">预览数据页</a>
-      {% if dataset_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署（404）</span>{% endif %}
-    </div>
-    <form method="post" action="/admin/templates/dataset" class="stack" >
-      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" name="enabled" {% if dataset_face.enabled %}checked{% endif %}>
-        部署本诱饵面（下线后 /portal/api/dataset 返回 404）
-      </label>
-      <div class="grid-2">
-        <label class="field-label"><span>总页数（资源消耗上限）</span>
-          <input type="number" name="total_pages" value="{{ dataset_face.config.get('total_pages', 999999) }}"></label>
-        <label class="field-label"><span>每页行数</span>
-          <input type="number" name="rows_per_page" value="{{ dataset_face.config.get('rows_per_page', 10) }}"></label>
-        <label class="field-label"><span>邮箱域名</span>
-          <input name="email_domain" value="{{ dataset_face.config.get('email_domain', 'corp-internal.example') }}"></label>
-        <label class="field-label"><span>备注前缀</span>
-          <input name="note_prefix" value="{{ dataset_face.config.get('note_prefix', '内部核对') }}"></label>
-      </div>
-      <p class="muted" style="font-size:12px;margin:0">无限分页水印假客户数据：逐行可溯源至（会话， 页， 行），诱导自动化 Agent 陷入翻页消耗。</p>
-      <div><button type="submit" class="primary btn-sm">保存数据集配置</button></div>
-    </form>
-  
-    </div>
-    <div class="cfg-pane" id="cfg-pane-intranet" style="display:none">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <a class="chip" href="#" data-honeypot-open data-path="/intranet/" target="_blank" style="cursor:pointer;text-decoration:none">预览 Wiki</a>
-      {% if intranet_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署（404）</span>{% endif %}
-    </div>
-    <form method="post" action="/admin/templates/intranet" class="stack" >
-      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" name="enabled" {% if intranet_face.enabled %}checked{% endif %}>
-        部署本诱饵面（下线后 /intranet/* 返回 404）
-      </label>
-      <div class="grid-2">
-        <label class="field-label"><span>站点标题</span>
-          <input name="title" value="{{ intranet_face.config.get('title', '内部知识库 · Corp Wiki') }}"></label>
-        <label class="field-label"><span>本周值班</span>
-          <input name="duty" value="{{ intranet_face.config.get('duty', 'wei.chen / fang.wang') }}"></label>
-      </div>
-      <label class="field-label"><span>内网主机（每行：名称|IP）</span>
-        <textarea name="hosts" rows="4" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{% for h in intranet_face.config.get('hosts', []) %}{{ h.name }}|{{ h.ip }}
-{% endfor %}</textarea></label>
-      <p class="muted" style="font-size:12px;margin:0">SSH 假文件系统内网主机的落点：横向探测即 risk 75 事件，页面带会话水印。</p>
-      <div><button type="submit" class="primary btn-sm">保存内网 Wiki 配置</button></div>
-    </form>
-  
-    </div>
-    <div class="cfg-pane" id="cfg-pane-portal" style="display:none">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <a class="chip" href="#" data-honeypot-open data-path="/portal/api/content" target="_blank" style="cursor:pointer;text-decoration:none">预览 Portal API</a>
-      {% if portal_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署（404）</span>{% endif %}
-    </div>
-    <form method="post" action="/admin/templates/portal" class="stack" >
-      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" name="enabled" {% if portal_face.enabled %}checked{% endif %}>
-        部署本通道（下线后 /portal/api/* 返回 404，克隆站页脚不再展示）
-      </label>
-      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" name="footer_enabled" {% if portal_face.config.get('footer_enabled') %}checked{% endif %}>
-        克隆站展示 Developer API 伪装页脚
-      </label>
-      <div class="grid-2">
-        <label class="field-label"><span>页脚标题</span>
-          <input name="footer_title" value="{{ portal_face.config.get('footer_title', 'Developer API') }}"></label>
-        <label class="field-label"><span>客户端心跳间隔（秒）</span>
-          <input type="number" name="heartbeat_interval" value="{{ portal_face.config.get('heartbeat_interval', 30) }}"></label>
-        <label class="field-label"><span>注册限速（次/小时/IP）</span>
-          <input type="number" name="register_max_per_ip_hour" value="{{ portal_face.config.get('register_max_per_ip_hour', 20) }}"></label>
-      </div>
-      <p class="muted" style="font-size:12px;margin:0">Developer API 伪装页脚 + 三级客户端链路（内容 → 注册 → 心跳），接入即被画像归因。</p>
-      <div><button type="submit" class="primary btn-sm">保存 Portal 配置</button></div>
-    </form>
-  
-    </div>
-    </div>
-  </div>
-  <style>
-    .cfg-nav-item {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      width: 100%; text-align: left; cursor: pointer;
-      background: transparent; border: 1px solid transparent; border-radius: 9px;
-      padding: 9px 10px; font-size: 13px; font-family: inherit; color: inherit;
-      transition: background 150ms var(--ease-out, ease), border-color 150ms var(--ease-out, ease);
-    }
-    .cfg-nav-item:hover { background: rgba(96, 165, 250, 0.08); }
-    .cfg-nav-item[aria-pressed="true"] {
-      background: rgba(37, 99, 235, 0.10); border-color: rgba(37, 99, 235, 0.35);
-      font-weight: 600;
-    }
-    [data-theme="dark"] .cfg-nav-item[aria-pressed="true"] { background: rgba(96, 165, 250, 0.12); border-color: rgba(96, 165, 250, 0.35); }
-    .cfg-pane > .stack > div > button, .cfg-pane form { width: 100%; }
-  </style>
-  <script>
-    (function () {
-      var items = document.querySelectorAll('.cfg-nav-item');
-      items.forEach(function (item) {
-        item.addEventListener('click', function () {
-          items.forEach(function (i) { i.setAttribute('aria-pressed', 'false'); });
-          item.setAttribute('aria-pressed', 'true');
-          document.querySelectorAll('.cfg-pane').forEach(function (p) { p.style.display = 'none'; });
-          var pane = document.getElementById('cfg-pane-' + item.dataset.cfg);
-          if (pane) pane.style.display = 'block';
-        });
-      });
-    })();
-  </script>
-  <script>
-    (function () {
-      var hp = location.protocol + '//' + location.hostname + ':{{ default_honeypot.port }}';
-      document.querySelectorAll('[data-honeypot-open]').forEach(function (a) {
-        a.href = hp + a.dataset.path;
-      });
-    })();
-  </script>
 </section>
 
 
@@ -827,7 +612,7 @@
             <td>
               <div class="actions-inline">
                 <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开站点</a>
-                <a class="chip" href="#门面配置" onclick="document.querySelector('.cfg-nav-item[data-cfg=\'thinkphp\']')?.click();document.querySelector('.cfg-layout')?.scrollIntoView({behavior:'smooth'});return false" style="cursor:pointer;text-decoration:none">门面配置</a>
+                <a class="chip" href="/admin/templates/default-honeypot" style="cursor:pointer;text-decoration:none">配置</a>
               </div>
             </td>
           </tr>
