@@ -234,6 +234,17 @@ AgentCapture/
 
 ---
 
+## Online Demo
+
+| Item | Info |
+|---|---|
+| Demo URL | https://agentcapture-demo.vercel.app/ |
+| Username | `admin` |
+| Password | `Admin@123` (first login walks through forced password change) |
+| Update policy | auto-deploys on every code push (GitHub Actions → Vercel) |
+
+> The demo runs on Vercel Serverless: web honeypot plane, console and open API are fully functional; SQLite does not persist across cold starts — protocol honeypots belong on a self-hosted node.
+
 ## One-line Deployment
 
 ```bash

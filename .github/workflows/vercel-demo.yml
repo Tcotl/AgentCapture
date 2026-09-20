@@ -1,0 +1,49 @@
+name: Deploy demo to Vercel
+
+# 每次代码更新自动部署 vercel.com 演示环境。
+# 需要在仓库 Secrets 中配置：VERCEL_TOKEN（Vercel 账户令牌，Account Settings → Tokens）。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-demo
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      - name: Link project (creates agentcapture-demo on first run)
+        run: vercel link --yes --project agentcapture-demo --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Ensure runtime env (demo admin password / secret key)
+        run: |
+          echo "Admin@123" | vercel env add BOOTSTRAP_ADMIN_PASSWORD production --token "$VERCEL_TOKEN" 2>/dev/null || true
+          echo "Admin@123" | vercel env add BOOTSTRAP_ADMIN_PASSWORD preview --token "$VERCEL_TOKEN" 2>/dev/null || true
+          echo "agentcapture-demo-secret-key-050" | vercel env add SECRET_KEY production --token "$VERCEL_TOKEN" 2>/dev/null || true
+          echo "agentcapture-demo-secret-key-050" | vercel env add SECRET_KEY preview --token "$VERCEL_TOKEN" 2>/dev/null || true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy (production)
+        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

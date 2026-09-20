@@ -18,6 +18,9 @@ os.environ.setdefault(
     "DATABASE_URL",
     "sqlite:////tmp/agent_capture.db",
 )
+# Demo environment default (vercel.com deployment): bootstrap admin uses
+# Admin@123 unless the operator overrides it in project env vars.
+os.environ.setdefault("BOOTSTRAP_ADMIN_PASSWORD", "Admin@123")
 os.environ.setdefault("KNOWLEDGE_BASE_ROOT", "/tmp/knowledge_base")
 
 import sys  # noqa: E402

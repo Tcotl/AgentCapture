@@ -234,6 +234,17 @@ AgentCapture/
 
 ---
 
+## 在线演示
+
+| 项目 | 信息 |
+|---|---|
+| 演示地址 | https://agentcapture-demo.vercel.app/ |
+| 登录账号 | `admin` |
+| 登录口令 | `Admin@123`（首次登录需按提示完成强制改密，演示环境可沿用） |
+| 更新策略 | 每次代码推送自动部署（GitHub Actions → Vercel） |
+
+> 演示环境运行于 Vercel Serverless：Web 蜜罐面、控制台与开放 API 全功能可用；SQLite 数据库不持久化（冷启动重置），端口服务蜜罐等长驻组件请自建节点部署。
+
 ## 一键部署
 
 ```bash
