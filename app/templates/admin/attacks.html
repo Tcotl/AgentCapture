@@ -240,6 +240,9 @@
               <tr>
                 <td>
                   <a class="at-ip" href="/admin/attack-sources/{{ item.source_ip }}">{{ item.source_ip or '-' }}</a>
+                  {% set info = ip_info.get(item.source_ip) %}{% if info %}
+                  <div style="margin-top:3px"><span class="badge {% if info.internal %}badge-warning{% else %}badge-info{% endif %}" style="font-size:10px">{{ info.region }}</span></div>
+                  {% endif %}
                   <span class="at-site">{{ item.site_id or '-' }}</span>
                 </td>
                 <td><code class="sid" title="{{ item.session_id }}">{{ item.session_display }}</code></td>

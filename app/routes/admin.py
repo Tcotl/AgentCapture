@@ -3412,6 +3412,9 @@ def admin_attacks(
         source_ip=source_ip or None,
         site_id=site_id or None,
     )
+    from app.services.ip_geo import ip_info_map
+
+    ip_info = ip_info_map([item["source_ip"] for item in items])
     from app.models.isolation import IsolationEntry
 
     active_isolations = int(
@@ -3424,6 +3427,7 @@ def admin_attacks(
             "title": "攻击流量",
             "current_user": user,
             "items": items,
+            "ip_info": ip_info,
             "active_isolations": active_isolations,
             "filters": {
                 "date_from": date_from,
@@ -3680,6 +3684,9 @@ def admin_attack_sources(
         source_ip=source_ip or None,
         site_id=site_id or None,
     )
+    from app.services.ip_geo import ip_info_map
+
+    ip_info = ip_info_map([item["source_ip"] for item in items])
     return _render(
         request,
         "admin/attack_sources.html",
@@ -3687,6 +3694,7 @@ def admin_attack_sources(
             "title": "攻击来源",
             "current_user": user,
             "items": items,
+            "ip_info": ip_info,
             "filters": {
                 "date_from": date_from,
                 "date_to": date_to,
