@@ -41,6 +41,7 @@ from app.services.auth import (
     authenticate_user,
     create_login_log,
     filter_login_logs,
+    get_user_by_id,
     hash_password,
     require_admin,
     require_user,
@@ -3038,6 +3039,11 @@ def admin_login(
     )
     request.session.clear()
     request.session["user_id"] = user.id
+    from app.services.auth import default_password_flag
+
+    if default_password_flag(db):
+        request.session["must_change_password"] = True
+        return _redirect("/admin/force-change-password")
     return _redirect("/admin")
 
 
@@ -3045,6 +3051,69 @@ def admin_login(
 def admin_logout(request: Request):
     request.session.clear()
     return _redirect("/admin/login")
+
+
+@router.get("/admin/force-change-password", response_class=HTMLResponse)
+def admin_force_change_password_page(request: Request, db: Session = Depends(get_db)):
+    """First-deployment gate: reachable only with the must-change session
+    flag set (set at login while the shipped default password is active)."""
+    if not request.session.get("must_change_password"):
+        return _redirect("/admin/login")
+    user = get_user_by_id(db, int(request.session["user_id"]))
+    if not user:
+        return _redirect("/admin/login")
+    from app.services.auth import validate_password_complexity
+
+    return _render(
+        request,
+        "admin/force_change_password.html",
+        {
+            "title": "修改默认口令",
+            "current_user": user,
+            "username": user.username,
+            "policy": validate_password_complexity("Aa1!aaaa") and "至少 8 位，含大小写字母、数字与符号",
+            "error": request.query_params.get("error", ""),
+        },
+    )
+
+
+@router.post("/admin/force-change-password")
+async def admin_force_change_password(
+    request: Request,
+    password: str = Form(""),
+    confirm: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    if not request.session.get("must_change_password") or not request.session.get("user_id"):
+        return _redirect("/admin/login")
+    user = get_user_by_id(db, int(request.session["user_id"]))
+    if not user:
+        return _redirect("/admin/login")
+    from app.services.auth import (
+        clear_default_password_flag,
+        hash_password,
+        validate_password_complexity,
+    )
+
+    if password != confirm:
+        return _redirect(f"/admin/force-change-password{_qs(error='两次输入的密码不一致')}")
+    error = validate_password_complexity(password)
+    if error:
+        return _redirect(f"/admin/force-change-password{_qs(error=error)}")
+    user.password_hash = hash_password(password)
+    db.add(user)
+    clear_default_password_flag(db)
+    request.session.pop("must_change_password", None)
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="update",
+        module="security",
+        target_type="password",
+        target_ref=user.username,
+        detail_json={"reason": "forced default-password change"},
+    )
+    return _redirect(f"/admin{_qs(saved='默认口令已修改，欢迎使用 AgentCapture')}")
 
 
 @router.get("/admin", response_class=HTMLResponse)
@@ -7104,9 +7173,20 @@ def change_profile_password(
     user = _require_user(request, db)
     if not verify_password(current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="current password invalid")
+    from app.services.auth import (
+        clear_default_password_flag,
+        validate_password_complexity,
+    )
+
+    error = validate_password_complexity(new_password)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
     user.password_hash = hash_password(new_password)
     db.add(user)
     db.commit()
+    # a successful change lifts the first-deployment forced gate
+    clear_default_password_flag(db)
+    request.session.pop("must_change_password", None)
     log_execution(
         db,
         actor_username=user.username,
