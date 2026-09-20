@@ -1,0 +1,340 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('AI', title or '提示词注入管理', '以表格方式管理提示词注入模板；选择具体模板后在弹窗中编辑正文、触发条件、优先级和启用状态。', ['表格管理', '弹窗编辑', '内容维护'],
+      actions='<button type="button" class="chip primary" data-modal-open="prompt-create-modal">＋ 新增模板</button>') }}
+
+<style>
+  .prompt-kpi-grid { margin-bottom: 18px; }
+  .prompt-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .prompt-table-toolbar .prompt-help-inline {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .prompt-table-toolbar button { width: auto; min-width: 128px; }
+  .prompt-template-name strong {
+    display: block;
+    color: #f8fbff;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .prompt-template-name span {
+    display: block;
+    color: var(--muted-foreground);
+    font-family: "Fira Code", monospace;
+    font-size: 12px;
+  }
+  .prompt-description-cell {
+    max-width: 420px;
+    color: var(--muted-foreground);
+    line-height: 1.55;
+  }
+  .prompt-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .prompt-actions-row button,
+  .prompt-actions-row form { width: auto; }
+  .prompt-actions-row form button { min-width: 72px; }
+  .prompt-modal-backdrop[hidden] { display: none !important; }
+  .prompt-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(14px);
+    cursor: pointer;
+  }
+  .prompt-modal {
+    width: min(980px, 100%);
+    max-height: min(88vh, 860px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: default;
+    border-radius: 24px;
+    border: 1px solid rgba(96, 165, 250, 0.24);
+    background:
+      radial-gradient(circle at 88% 0%, rgba(59, 130, 246, 0.18), transparent 32%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(8, 13, 25, 0.98));
+    box-shadow: 0 34px 120px rgba(0, 0, 0, 0.58), var(--glow-blue);
+  }
+  .prompt-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 22px 24px 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+  .prompt-modal-title { margin: 0; color: #f8fbff; font-size: 20px; font-weight: 900; letter-spacing: -0.03em; }
+  .prompt-modal-subtitle { margin-top: 6px; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
+  .prompt-modal-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: #dbeafe !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    box-shadow: none !important;
+    padding: 0;
+  }
+  .prompt-modal-close:hover {
+    background: rgba(34, 211, 238, 0.14) !important;
+    border-color: rgba(34, 211, 238, 0.45) !important;
+    color: #a5f3fc !important;
+  }
+  .prompt-modal-body {
+    overflow: auto;
+    padding: 20px 24px 24px;
+  }
+  .prompt-editor {
+    min-height: 260px;
+    font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .prompt-help {
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(96, 165, 250, 0.15);
+    background: rgba(59, 130, 246, 0.06);
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .prompt-help code { margin: 2px; }
+  .prompt-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .prompt-modal-footer button { width: auto; min-width: 112px; }
+  @media (max-width: 980px) {
+    .prompt-table-toolbar { align-items: stretch; }
+    .prompt-table-toolbar button { width: 100%; }
+    .prompt-actions-row { flex-direction: column; align-items: stretch; }
+    .prompt-actions-row button,
+    .prompt-actions-row form,
+    .prompt-actions-row form button { width: 100%; }
+    .prompt-modal-backdrop { padding: 12px; }
+    .prompt-modal { max-height: 94vh; border-radius: 18px; }
+    .prompt-modal-header, .prompt-modal-body { padding-left: 16px; padding-right: 16px; }
+    .prompt-modal-footer, .prompt-modal-footer button { width: 100%; }
+  }
+</style>
+
+<div class="cards tight prompt-kpi-grid">
+  {{ metric_card('模板总数', summary.total) }}
+  {{ metric_card('启用模板', summary.active, 'success') }}
+  {{ metric_card('HTML 注入', summary.html, 'info') }}
+  {{ metric_card('API 注入', summary.api, 'warning') }}
+</div>
+
+<section class="panel">
+  {{ section_header('提示词注入模板表格', '通过表格选择模板，点击“编辑”后在弹窗中修改模板内容。') }}
+  <div class="prompt-table-toolbar">
+    <div class="prompt-help-inline">正文内容不会在列表中展开，避免页面信息过密；需要修改时进入对应模板弹窗。</div>
+    <form method="post" action="/admin/prompt-injection/bulk-delete" data-confirm="确认删除选中的 {n} 个模板？不可撤销。" class="bulk-del-form">
+      <input type="hidden" name="ids" value="">
+      <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th>
+          <th>模板</th>
+          <th>范围</th>
+          <th>触发条件</th>
+          <th>变量</th>
+          <th>优先级</th>
+          <th>状态</th>
+          <th class="cell-prose">说明</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
+          <td class="prompt-template-name"><strong>{{ item.name }}</strong><span>{{ item.template_key }}</span></td>
+          <td>{{ badge({'html_response': 'HTML 页面', 'api_response': 'API 响应', 'all': '全部范围'}.get(item.target_scope, item.target_scope), 'info') }}</td>
+          <td>{{ badge({'always': '始终启用', 'agent_only': '命中 Agent 时', 'high_risk': '高风险会话', 'agent_or_high_risk': 'Agent 或高风险'}.get(item.trigger_type, item.trigger_type), 'warning') }}</td>
+          <td>{% if item.variables_json %}{% for variable in item.variables_json %}<span class="pill" style="margin:1px">{{ variable }}</span>{% endfor %}{% else %}<span class="muted">-</span>{% endif %}</td>
+          <td><span class="pill">P{{ item.priority }}</span></td>
+          <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
+          <td class="prompt-description-cell cell-prose">{{ item.description or '暂无说明' }}</td>
+          <td>
+            <div class="prompt-actions-row">
+              <button type="button" onclick="openPromptModal('prompt-edit-{{ item.id }}')">编辑</button>
+              <form method="post" action="/admin/prompt-injection/{{ item.id }}/toggle">
+                <button type="submit" class="secondary">{% if item.is_active %}停用{% else %}启用{% endif %}</button>
+              </form>
+              <form method="post" action="/admin/prompt-injection/{{ item.id }}/delete">
+                <button type="submit" class="danger">删除</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无提示词注入模板', '点击新增模板后会显示在这里。', 9, 'AI') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% call modal_dialog('prompt-create-modal', '新增提示词注入模板', '创建新的提示词注入内容，保存后进入表格统一管理。') %}
+<form method="post" action="/admin/prompt-injection" class="stack">
+  <div class="grid-2">
+    <label class="field-label"><span>模板标识</span><input name="template_key" placeholder="如 system_override"></label>
+    <label class="field-label"><span>模板名称 *</span><input name="name" placeholder="模板名称" required></label>
+  </div>
+  <div class="grid-3">
+    <label class="field-label"><span>注入范围</span>
+      <select name="target_scope">
+        <option value="html_response">HTML 页面注入</option>
+        <option value="api_response">API 响应注入</option>
+        <option value="all">全部范围</option>
+      </select>
+    </label>
+    <label class="field-label"><span>触发条件</span>
+      <select name="trigger_type">
+        <option value="always">始终启用</option>
+        <option value="agent_only">命中 Agent 时</option>
+        <option value="high_risk">高风险会话</option>
+        <option value="agent_or_high_risk">Agent 或高风险</option>
+      </select>
+    </label>
+    <label class="field-label"><span>优先级</span><input type="number" name="priority" value="50" placeholder="优先级"></label>
+  </div>
+  <label class="field-label"><span>启用状态</span>
+    <select name="is_active">
+      <option value="1">启用</option>
+      <option value="0">停用</option>
+    </select>
+  </label>
+  <label class="field-label"><span>变量列表</span><input name="variables_csv" placeholder="如 source_ip,session_id,canary_token"></label>
+  <label class="field-label"><span>用途说明</span><textarea name="description" placeholder="用途说明、触发场景或维护备注"></textarea></label>
+  <label class="field-label"><span>注入正文 *</span><textarea class="prompt-editor" name="content_template" placeholder="提示词注入正文，支持 {source_ip} {session_id} {canary_token} 等变量" required></textarea></label>
+  <div class="prompt-help">可用变量：<code>{source_ip}</code><code>{session_id}</code><code>{canary_token}</code><code>{callback_url}</code><code>{risk_score}</code><code>{agent_type}</code></div>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">保存模板</button>
+  </div>
+</form>
+{% endcall %}
+
+{% for item in items %}
+<div class="prompt-modal-backdrop" id="prompt-edit-{{ item.id }}" hidden onclick="closePromptModalOnBackdrop(event, 'prompt-edit-{{ item.id }}')">
+  <div class="prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-edit-title-{{ item.id }}">
+    <div class="prompt-modal-header">
+      <div>
+        <h2 class="prompt-modal-title" id="prompt-edit-title-{{ item.id }}">编辑模板：{{ item.name }}</h2>
+        <div class="prompt-modal-subtitle"><code>{{ item.template_key }}</code> · 在弹窗中维护正文内容与运行策略。</div>
+      </div>
+      <button type="button" class="prompt-modal-close" onclick="closePromptModal('prompt-edit-{{ item.id }}')">×</button>
+    </div>
+    <div class="prompt-modal-body">
+      <form method="post" action="/admin/prompt-injection/{{ item.id }}/update" class="stack">
+        <div class="grid-2">
+          <label class="field-label"><span>模板标识 *</span><input name="template_key" value="{{ item.template_key }}" required></label>
+          <label class="field-label"><span>模板名称 *</span><input name="name" value="{{ item.name }}" required></label>
+        </div>
+        <div class="grid-4">
+          <label class="field-label"><span>注入范围</span>
+            <select name="target_scope">
+              <option value="html_response" {% if item.target_scope == 'html_response' %}selected{% endif %}>HTML 页面注入</option>
+              <option value="api_response" {% if item.target_scope == 'api_response' %}selected{% endif %}>API 响应注入</option>
+              <option value="all" {% if item.target_scope == 'all' %}selected{% endif %}>全部范围</option>
+            </select>
+          </label>
+          <label class="field-label"><span>触发条件</span>
+            <select name="trigger_type">
+              <option value="always" {% if item.trigger_type == 'always' %}selected{% endif %}>始终启用</option>
+              <option value="agent_only" {% if item.trigger_type == 'agent_only' %}selected{% endif %}>命中 Agent 时</option>
+              <option value="high_risk" {% if item.trigger_type == 'high_risk' %}selected{% endif %}>高风险会话</option>
+              <option value="agent_or_high_risk" {% if item.trigger_type == 'agent_or_high_risk' %}selected{% endif %}>Agent 或高风险</option>
+            </select>
+          </label>
+          <label class="field-label"><span>优先级</span><input type="number" name="priority" value="{{ item.priority }}"></label>
+          <label class="field-label"><span>启用状态</span>
+            <select name="is_active">
+              <option value="1" {% if item.is_active %}selected{% endif %}>启用</option>
+              <option value="0" {% if not item.is_active %}selected{% endif %}>停用</option>
+            </select>
+          </label>
+        </div>
+        <label class="field-label"><span>变量列表</span><input name="variables_csv" value="{{ (item.variables_json or [])|join(',') }}" placeholder="如 source_ip,session_id,canary_token"></label>
+        <label class="field-label"><span>用途说明</span><textarea name="description" placeholder="用途说明">{{ item.description }}</textarea></label>
+        <label class="field-label"><span>注入正文 *</span><textarea class="prompt-editor" name="content_template" required>{{ item.content_template }}</textarea></label>
+        <div class="prompt-help">可用变量：<code>{source_ip}</code><code>{session_id}</code><code>{canary_token}</code><code>{callback_url}</code><code>{risk_score}</code><code>{agent_type}</code></div>
+        <div class="prompt-modal-footer">
+          <button type="button" class="secondary" onclick="closePromptModal('prompt-edit-{{ item.id }}')">取消</button>
+          <button type="submit">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+  function openPromptModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const firstInput = modal.querySelector('input, select, textarea, button');
+    if (firstInput) setTimeout(() => firstInput.focus(), 20);
+  }
+  function closePromptModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = true;
+    if (!document.querySelector('.prompt-modal-backdrop:not([hidden])')) {
+      document.body.style.overflow = '';
+    }
+  }
+  function closePromptModalOnBackdrop(event, id) {
+    if (event.target && event.target.id === id) closePromptModal(id);
+  }
+  document.addEventListener('keydown', function(event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.prompt-modal-backdrop:not([hidden])').forEach(function(modal) {
+      closePromptModal(modal.id);
+    });
+  });
+  // batch delete
+  var bulkAll = document.querySelector('.bulk-select-all');
+  if (bulkAll) bulkAll.addEventListener('change', function () {
+    document.querySelectorAll('.bulk-check').forEach(function (c) { c.checked = bulkAll.checked; });
+  });
+  var bulkBtn = document.querySelector('.bulk-del-btn');
+  if (bulkBtn) bulkBtn.addEventListener('click', function () {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+    if (!checked.length) { alert('请先勾选要删除的模板'); return; }
+    var form = bulkBtn.closest('form');
+    if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+    form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+    form.submit();
+  });
+</script>
+{% endblock %}

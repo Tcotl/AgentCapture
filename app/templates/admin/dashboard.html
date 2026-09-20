@@ -1,0 +1,386 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import icon, section_header %}
+{% block content %}
+{% set today_count = trend_visual[-1].count if trend_visual else 0 %}
+{% set yesterday_count = trend_visual[-2].count if trend_visual|length > 1 else 0 %}
+{% if yesterday_count > 0 %}
+  {% set day_delta = (((today_count - yesterday_count) / yesterday_count) * 100)|round(0) %}
+{% else %}
+  {% set day_delta = 100 if today_count > 0 else 0 %}
+{% endif %}
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
+  .lp-deck {
+    font-family: "Poppins", "Fira Sans", ui-sans-serif, system-ui, sans-serif;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  @keyframes lpFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ---------- Hero 头 ---------- */
+  .lp-hero {
+    position: relative;
+    text-align: center;
+    padding: 44px 24px 30px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #000000;
+    overflow: hidden;
+    animation: lpFadeIn 0.6s ease-out;
+  }
+  .lp-hero::before {
+    content: "";
+    position: absolute; left: 50%; top: -40%;
+    width: 70%; height: 120%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.09), transparent 62%);
+    pointer-events: none;
+  }
+  .lp-pill {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(6px);
+    font-size: 12px; color: #9ca3af;
+  }
+  .lp-pill b { color: #e5e7eb; font-weight: 600; }
+  .lp-pill .lp-dot { width: 7px; height: 7px; border-radius: 999px; background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.7); }
+  .lp-pill .lp-arrow { display: inline-flex; transition: transform 150ms ease; }
+  .lp-pill:hover .lp-arrow { transform: translateX(3px); }
+  .lp-title {
+    position: relative;
+    margin: 22px 0 0;
+    font-size: clamp(30px, 3.4vw, 46px);
+    font-weight: 500;
+    line-height: 1.14;
+    letter-spacing: -0.045em;
+    background: linear-gradient(to bottom, #ffffff, #ffffff, rgba(255, 255, 255, 0.55));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+  .lp-sub {
+    position: relative;
+    margin: 16px auto 0;
+    max-width: 640px;
+    font-size: 14px; line-height: 1.75;
+    color: #9ca3af;
+  }
+
+  /* ---------- 卡片通用（黑白灰阶层） ---------- */
+  .lp-card {
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #0a0a0a;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+  .lp-card:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-2px);
+    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
+  }
+
+  /* ---------- KPI 卡带 ---------- */
+  .lp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+  .lp-kpi { padding: 18px 18px 14px; }
+  .lp-kpi-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7280; font-weight: 500; }
+  .lp-kpi-value {
+    margin-top: 10px;
+    font-size: 30px; font-weight: 600; line-height: 1;
+    color: #f9fafb; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .lp-kpi-value.tone-danger { color: #fda4af; }
+  .lp-kpi-value.tone-warning { color: #fcd34d; }
+  .lp-kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+  .lp-kpi-note { font-size: 11px; color: #6b7280; }
+  .lp-delta { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+  .lp-delta.up { color: #fda4af; background: rgba(251, 113, 133, 0.12); }
+  .lp-delta.down { color: #6ee7b7; background: rgba(52, 211, 153, 0.12); }
+  .lp-delta.flat { color: #9ca3af; background: rgba(255, 255, 255, 0.06); }
+
+  /* ---------- 主区 ---------- */
+  .lp-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 16px; align-items: stretch; }
+  .lp-grid > .lp-card { min-width: 0; }
+  .lp-panel { padding: 20px; }
+  .lp-panel-title { margin: 0; font-size: 15px; font-weight: 600; color: #f3f4f6; letter-spacing: -0.01em; }
+  .lp-panel-sub { margin-top: 4px; font-size: 12px; color: #6b7280; }
+  .lp-panel-head { margin-bottom: 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+  /* 图表紧凑化 */
+  .lp-deck .snowui-chart { min-height: 0; gap: 12px; padding: 0; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+  .lp-deck .snow-chart-canvas { min-height: 190px; border-radius: 10px; border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
+  .lp-deck .snow-chart-svg { height: 240px; }
+  .lp-deck .snow-chart-tab { color: rgba(255, 255, 255, 0.42); font-family: "Poppins", sans-serif; }
+  .lp-deck .snow-chart-tab.active { color: #f9fafb; font-weight: 600; }
+  .lp-deck .snow-chart-tag.current { color: #e5e7eb; }
+  .lp-chart-meta { display: flex; gap: 16px; margin-left: auto; font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+  .lp-chart-meta b { margin-left: 5px; font-size: 13px; color: #f3f4f6; font-weight: 600; }
+
+  /* 链路分布 */
+  .lp-rows { display: flex; flex-direction: column; }
+  .lp-row {
+    display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px;
+    align-items: center; gap: 12px;
+    padding: 9px 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .lp-row:last-child { border-bottom: 0; }
+  .lp-row-name { font-size: 12px; color: #d1d5db; }
+  .lp-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+  .lp-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffffff, rgba(255, 255, 255, 0.55)); }
+  .lp-row-num { font-size: 12.5px; font-weight: 600; color: #f3f4f6; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* 健康清单 */
+  .lp-health { display: flex; flex-direction: column; }
+  .lp-health-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .lp-health-row:last-child { border-bottom: 0; }
+  .lp-hdot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
+  .lp-hdot.ok { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.55); }
+  .lp-hdot.warn { background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.55); }
+  .lp-hdot.bad { background: #fb7185; box-shadow: 0 0 8px rgba(251, 113, 133, 0.55); }
+  .lp-hname { flex: 1; font-size: 12.5px; color: #d1d5db; }
+  .lp-hval { font-size: 12px; font-weight: 600; color: #f3f4f6; font-variant-numeric: tabular-nums; }
+
+  /* 快捷操作 */
+  .lp-quick { display: flex; flex-direction: column; }
+  .lp-q {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 10px; margin: 0 -10px;
+    border-radius: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background-color 150ms ease;
+    cursor: pointer;
+  }
+  .lp-q:last-child { border-bottom: 0; }
+  .lp-q:hover { background: rgba(255, 255, 255, 0.05); }
+  .lp-q .q-icon { color: #d1d5db; display: inline-flex; flex: 0 0 auto; }
+  .lp-q .q-name { flex: 1; font-size: 12.5px; font-weight: 500; color: #e5e7eb; }
+  .lp-q .q-arrow { color: #6b7280; transition: transform 150ms ease, color 150ms ease; }
+  .lp-q:hover .q-arrow { transform: translateX(3px); color: #f9fafb; }
+
+  /* 模块卡 */
+  .lp-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .lp-module { display: flex; flex-direction: column; gap: 10px; padding: 18px; cursor: pointer; }
+  .lp-module-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .lp-module-icon { color: #e5e7eb; display: inline-flex; }
+  .lp-module-metric { font-size: 19px; font-weight: 600; color: #f9fafb; font-variant-numeric: tabular-nums; }
+  .lp-module-metric-label { display: block; text-align: right; font-size: 9.5px; letter-spacing: 0.12em; color: #6b7280; text-transform: uppercase; }
+  .lp-module-title { font-size: 13.5px; font-weight: 600; color: #f3f4f6; }
+  .lp-module-desc { font-size: 11.5px; color: #6b7280; line-height: 1.6; }
+  .lp-module-link { margin-top: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: #f3f4f6; }
+  .lp-module-link svg { transition: transform 150ms ease; }
+  .lp-module:hover .lp-module-link svg { transform: translateX(3px); }
+
+  @media (max-width: 1180px) { .lp-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="lp-deck">
+  <section class="lp-hero lp-card">
+    <span class="lp-pill">
+      <span class="lp-dot"></span>
+      <b>Deception Layer Active</b> · 诱捕网络运行中
+      <span class="lp-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+    </span>
+    <h1 class="lp-title">运营控制台</h1>
+    <p class="lp-sub">攻击态势、反制溯源、节点运营与 C2 控制的统一作战台。</p>
+  </section>
+
+  <div class="lp-kpis">
+    {% for card in summary_cards %}
+      <div class="lp-card lp-kpi">
+        <div class="lp-kpi-label">{{ card.label }}</div>
+        <div class="lp-kpi-value {% if card.tone in ['danger', 'warning'] %}tone-{{ card.tone }}{% endif %}">{{ card.value }}</div>
+        <div class="lp-kpi-foot">
+          <span class="lp-kpi-note">{{ card.note }}</span>
+          {% if card.key == 'total_events' %}
+            {% if day_delta > 0 %}<span class="lp-delta up">↑ {{ day_delta }}%</span>
+            {% elif day_delta < 0 %}<span class="lp-delta down">↓ {{ -day_delta }}%</span>
+            {% else %}<span class="lp-delta flat">±0%</span>{% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="lp-grid">
+    <section class="lp-card lp-panel">
+      <div class="lp-panel-head">
+        <div>
+          <h3 class="lp-panel-title">攻击趋势</h3>
+          <div class="lp-panel-sub">近 {{ trend_visual|length }} 天事件量（实线）与上一周期（虚线）对比</div>
+        </div>
+      </div>
+      <div class="trend-chart dashboard-ui-kit-chart snowui-chart" role="img" aria-label="最近攻击趋势折线图">
+        {% set trend_count = trend_visual|length %}
+        {% set chart_left = 70 %}
+        {% set chart_right = 820 %}
+        {% set trend_step = (chart_right - chart_left) / (trend_count - 1 if trend_count > 1 else 1) %}
+        {% set chart_base = 182 %}
+        {% set chart_top = 34 %}
+        {% set chart_scale = 1.35 %}
+        {% set trend_ns = namespace(total=0, peak=0) %}
+        {% for item in trend_visual %}
+          {% set trend_ns.total = trend_ns.total + item.count %}
+          {% if item.count > trend_ns.peak %}{% set trend_ns.peak = item.count %}{% endif %}
+        {% endfor %}
+
+        <div class="snow-chart-tabs">
+          <span class="snow-chart-tab active">攻击流量</span>
+          <span class="snow-chart-tab">文件蜜饵下载</span>
+          <span class="snow-chart-tab">凭证登录</span>
+          <span class="snow-chart-divider">|</span>
+          <span class="snow-chart-tag current"><i></i>本周期</span>
+          <span class="snow-chart-tag compare"><i></i>对比周期</span>
+          <span class="lp-chart-meta">
+            <span>本周期<b>{{ trend_ns.total }}</b></span>
+            <span>峰值日<b>{{ trend_ns.peak }}</b></span>
+            <span>日均<b>{{ (trend_ns.total / trend_count)|round|int }}</b></span>
+          </span>
+        </div>
+
+        <div class="snow-chart-canvas">
+          <svg class="snow-chart-svg" viewBox="0 0 880 210" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+             <linearGradient id="snowTrendArea" x1="0" x2="0" y1="0" y2="1">
+               <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16"/>
+               <stop offset="60%" stop-color="#ffffff" stop-opacity="0.04"/>
+               <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+             </linearGradient>
+           </defs>
+            <g class="snow-chart-grid">
+              <line x1="{{ chart_left }}" y1="{{ chart_top }}" x2="{{ chart_right }}" y2="{{ chart_top }}"/>
+              <line x1="{{ chart_left }}" y1="71" x2="{{ chart_right }}" y2="71"/>
+              <line x1="{{ chart_left }}" y1="108" x2="{{ chart_right }}" y2="108"/>
+              <line x1="{{ chart_left }}" y1="145" x2="{{ chart_right }}" y2="145"/>
+              <line x1="{{ chart_left }}" y1="{{ chart_base }}" x2="{{ chart_right }}" y2="{{ chart_base }}"/>
+            </g>
+            <g class="snow-chart-y-labels">
+              <text x="22" y="39">{{ trend_ns.peak }}</text>
+              <text x="22" y="76">{{ ((trend_ns.peak * 2) / 3)|round|int }}</text>
+              <text x="22" y="113">{{ (trend_ns.peak / 3)|round|int }}</text>
+              <text x="38" y="186">0</text>
+            </g>
+            <polygon
+              class="snow-line-area"
+              points="{{ chart_left }},{{ chart_base }} {% for item in trend_visual %}{% set x = chart_left + loop.index0 * trend_step %}{% set y = chart_base - item.height * chart_scale %}{{ x }},{{ y }} {% endfor %}{{ chart_right }},{{ chart_base }}"
+            />
+            <polyline
+              class="snow-line-compare"
+              points="{% for item in trend_compare_visual %}{% set x = chart_left + loop.index0 * trend_step %}{% set y = chart_base - (item.height * chart_scale) %}{{ x }},{{ y }} {% endfor %}"
+            />
+            <polyline
+              class="snow-line-current"
+              style="stroke:#f9fafb;filter:drop-shadow(0 0 8px rgba(255,255,255,0.25))"
+              points="{% for item in trend_visual %}{% set x = chart_left + loop.index0 * trend_step %}{% set y = chart_base - item.height * chart_scale %}{{ x }},{{ y }} {% endfor %}"
+            />
+            <g class="snow-chart-x-labels">
+              {% for item in trend_visual %}
+                {% set x = chart_left + loop.index0 * trend_step %}
+                <text x="{{ x }}" y="202" text-anchor="middle">{{ item.short_day }}</text>
+              {% endfor %}
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="lp-card lp-panel">
+        <div class="lp-panel-head">
+          <div>
+            <h3 class="lp-panel-title">系统健康</h3>
+            <div class="lp-panel-sub">宿主实时状态</div>
+          </div>
+        </div>
+        <div class="lp-health">
+          {% for item in system_dashboard_cards %}
+            {% set ratio = 0 if item.key == 'uptime_seconds' else item.percent %}
+            <div class="lp-health-row">
+              <span class="lp-hdot {{ 'bad' if ratio >= 85 else ('warn' if ratio >= 60 else 'ok') }}"></span>
+              <span class="lp-hname">{{ item.label }}</span>
+              <span class="lp-hval">{{ item.display }}</span>
+            </div>
+          {% endfor %}
+          <div class="lp-health-row">
+            <span class="lp-hdot ok"></span>
+            <span class="lp-hname">在线节点</span>
+            <span class="lp-hval">{{ stats.summary.online_nodes }}</span>
+          </div>
+          <div class="lp-health-row">
+            <span class="lp-hdot {{ 'warn' if c2_summary.active == 0 else 'ok' }}"></span>
+            <span class="lp-hname">活跃 C2 Agent</span>
+            <span class="lp-hval">{{ c2_summary.active }}</span>
+          </div>
+        </div>
+      </section>
+
+  
+    <section class="lp-card lp-panel">
+      <div class="lp-panel-head">
+        <div>
+          <h3 class="lp-panel-title">威胁链路分布</h3>
+          <div class="lp-panel-sub">扫描枚举 → 失陷线索</div>
+        </div>
+      </div>
+      <div class="lp-rows">
+        {% for item in chain_visual %}
+          <div class="lp-row">
+            <span class="lp-row-name">{{ item.label }}</span>
+            <div class="lp-bar"><span style="width: {{ item.percent if item.percent > 0 else 2 }}%"></span></div>
+            <span class="lp-row-num">{{ item.value }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+
+    <section class="lp-card lp-panel">
+      <div class="lp-panel-head">
+        <div>
+          <h3 class="lp-panel-title">快捷操作</h3>
+            <div class="lp-panel-sub">值守常用入口</div>
+          </div>
+        </div>
+        <div class="lp-quick">
+          <a class="lp-q" href="/admin/attacks"><span class="q-icon">{{ icon(name='activity', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">攻击流量分析</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/big-screen"><span class="q-icon">{{ icon(name='monitor', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">态势大屏</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/c2/console"><span class="q-icon">{{ icon(name='terminal', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">C2 控制台</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/decoy-management"><span class="q-icon">{{ icon(name='flag', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">蜜饵部署</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/alerts"><span class="q-icon">{{ icon(name='bell', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">告警配置</span><span class="q-arrow">→</span></a>
+        </div>
+      </section>
+  </div>
+
+
+  <section class="lp-card lp-panel">
+    <div class="lp-panel-head">
+      <div>
+        <h3 class="lp-panel-title">功能模块</h3>
+        <div class="lp-panel-sub">全部产品域直达</div>
+      </div>
+    </div>
+    <div class="lp-modules">
+      {% for module in feature_modules %}
+        <a class="lp-card lp-module" href="{{ module.href }}">
+          <div class="lp-module-head">
+            <span class="lp-module-icon">{{ icon(name=module.icon, class_name='ui-icon ui-icon-lg') }}</span>
+            <span>
+              <span class="lp-module-metric {% if module.tone in ['warning', 'danger', 'success', 'info'] %}tone-{{ module.tone }}{% endif %}">{{ module.metric }}</span>
+              <span class="lp-module-metric-label">{{ module.metric_label }}</span>
+            </span>
+          </div>
+          <div class="lp-module-title">{{ module.title }}</div>
+          <div class="lp-module-desc">{{ module.description }}</div>
+          <span class="lp-module-link">进入模块 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

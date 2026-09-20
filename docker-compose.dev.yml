@@ -1,0 +1,44 @@
+ # docker-compose.dev.yml
+ # Hot-reload dev override for AgentCapture.
+ #
+ # Use this together with docker-compose.yml to start the stack with live
+ # source reload instead of rebuilding the image on every change. Reuses the
+ # same `honeypot_data` named volume, so the SQLite DB and knowledge_base
+ # persist across reloads.
+ #
+ # Usage (mirrors the deploy.sh flag style):
+ #   docker compose --env-file .env.docker \
+ #     -f docker-compose.yml -f docker-compose.dev.yml up
+ #
+ # Follow logs:
+ #   docker compose --env-file .env.docker \
+ #     -f docker-compose.yml -f docker-compose.dev.yml logs -f honeypot
+ #
+ # Stop:
+ #   docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+ #
+ # To go back to the production container, run `./deploy.sh` as usual.
+ 
+ services:
+   honeypot:
+     container_name: agent-capture-honeypot-dev
+     # `uvicorn --reload` spawns a child watcher; PYTHONDONTWRITEBYTECODE=1
+     # (set in the image) keeps the bind-mounted source free of stray .pyc
+     # writes, but we still need root to drop the editable-install .pth into
+     # site-packages and to bind ports below 1024 if you ever configure them.
+     user: root
+     environment:
+       APP_ENV: development
+     healthcheck:
+       # Allow extra time for the one-time `pip install -e .` at first boot.
+       start_period: 45s
+     volumes:
+       # Hot reload source mount: edit on host, uvicorn picks it up.
+       - ./app:/app/app
+       # Re-evaluated by `pip install -e .` on each container start, so dep
+       # changes are picked up by restarting the container (not by --reload).
+       - ./pyproject.toml:/app/pyproject.toml:ro
+     command:
+       - sh
+       - -c
+       - "pip install -e . >/tmp/pip.log 2>&1 && exec uvicorn app.main:app --host 0.0.0.0 --port $${PORT:-4877} --reload --reload-dir /app/app"

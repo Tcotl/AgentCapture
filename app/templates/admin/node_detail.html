@@ -1,0 +1,50 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, service_tags %}
+{% block content %}
+{{ page_header('ND', node.name ~ ' / 节点详情', '查看该节点的运行摘要、最近心跳与待分发任务，作为单节点运维入口。', ['单节点视图']) }}
+<div class="grid-2">
+  <section class="panel">
+    {{ section_header('节点摘要', '当前运行状态与配置信息') }}
+    <div class="stack">
+      <div class="kv"><div class="key">名称</div><div>{{ node.name }}</div></div>
+      <div class="kv"><div class="key">类型</div><div><code>{{ node.node_type }}</code></div></div>
+      <div class="kv"><div class="key">状态</div><div><span class="status-{{ node.status }}">{{ node.status|status_zh }}</span></div></div>
+      <div class="kv"><div class="key">监听地址</div><div><code>{{ node.listen_address }}</code></div></div>
+      <div class="kv"><div class="key">回连地址</div><div><code>{{ node.callback_address }}</code></div></div>
+      <div class="kv"><div class="key">最后在线</div><div>{% if node.last_seen_at %}<code>{{ node.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') }}</code>{% else %}<span class="muted">暂无</span>{% endif %}</div></div>
+      <div class="kv"><div class="key">挂载模板</div><div>{% if node.template_id %}<code>#{{ node.template_id }}</code>{% else %}<span class="muted">未分配</span>{% endif %}</div></div>
+      <div class="kv"><div class="key">待执行任务</div><div style="font-variant-numeric:tabular-nums">{{ pending_count }}</div></div>
+    </div>
+  </section>
+  <section class="panel">
+    {{ section_header('任务分发雏形', '为该节点排入一个待执行任务') }}
+    <form method="post" action="/admin/nodes/{{ node.id }}/tasks" class="stack"><div class="grid-3"><select name="task_type"><option value="sync-template">sync-template</option><option value="restart-services">restart-services</option><option value="rotate-decoys">rotate-decoys</option><option value="collect-snapshot">collect-snapshot</option></select><input type="number" name="priority" value="50" placeholder="优先级"><input name="notes" placeholder="备注，如批量同步模板"></div><textarea name="payload_json" placeholder='{"reason": "manual-dispatch"}'>{}</textarea><button type="submit">加入任务队列</button></form>
+    <pre>curl -X POST http://127.0.0.1:8000/api/node/heartbeat -H 'Content-Type: application/json' -d '{"node_name":"{{ node.name }}","status":"online"}'
+
+curl -X POST http://127.0.0.1:8000/api/node/tasks/pull -H 'Content-Type: application/json' -d '{"node_name":"{{ node.name }}"}'</pre>
+  </section>
+</div>
+<section class="panel">
+  {{ section_header('最近心跳', '用于观察节点最近上报的运行信息') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>状态</th><th>来源 IP</th><th>版本</th><th>指标</th><th>服务</th></tr></thead>
+      <tbody>
+        {% for item in heartbeats %}
+          <tr>
+            <td><code>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+            <td><span class="status-{{ item.status }}">{{ item.status|status_zh }}</span></td>
+            <td><code>{{ item.source_ip }}</code></td>
+            <td><code>{{ item.version }}</code></td>
+            <td><pre>{{ item.metrics_json }}</pre></td>
+            <td>{{ service_tags(item.services_json, service_name_map) }}</td>
+          </tr>
+        {% else %}
+          {{ empty_state('暂无心跳记录', '节点开始上报后会在这里显示。', 6, 'HB') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="panel">{{ section_header('任务队列', '节点主动拉取的待执行任务') }}<div class="table-wrap"><table><thead><tr><th>ID</th><th>类型</th><th>状态</th><th class="numeric">优先级</th><th>创建者</th><th>分发</th><th>确认</th><th>载荷</th><th>结果</th></tr></thead><tbody>{% set task_tones = {'queued': 'tone-info', 'dispatched': 'tone-warning', 'acked': 'tone-success', 'done': 'tone-success', 'failed': 'tone-danger'} %}{% for item in tasks %}<tr><td><code>{{ item.id }}</code></td><td><code>{{ item.task_type }}</code></td><td><span class="{{ task_tones.get(item.status, 'tone-info') }}">{{ item.status|status_zh }}</span></td><td class="numeric">{{ item.priority }}</td><td>{{ item.created_by }}</td><td>{% if item.dispatched_at %}<code>{{ item.dispatched_at.strftime('%Y-%m-%d %H:%M:%S') }}</code>{% else %}<span class="muted">—</span>{% endif %}</td><td>{% if item.acked_at %}<code>{{ item.acked_at.strftime('%Y-%m-%d %H:%M:%S') }}</code>{% else %}<span class="muted">—</span>{% endif %}</td><td><pre>{{ item.task_payload_json }}</pre></td><td><pre>{{ item.result_json }}</pre></td></tr>{% else %}{{ empty_state('暂无任务', '排入任务后会在这里显示。', 9, 'TK') }}{% endfor %}</tbody></table></div></section>
+{% endblock %}

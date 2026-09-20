@@ -1,0 +1,753 @@
+{% from 'admin/_macros.html' import icon %}
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }} - AgentCapture</title>
+    <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.9.8" />
+    <script>
+      // Apply the stored theme & sidebar state before first paint to avoid a flash.
+      (function () {
+        try {
+          var theme = localStorage.getItem("ach:theme") || "light";
+          document.documentElement.dataset.theme = theme;
+          if (localStorage.getItem("ach:sidebar-collapsed") === "1") {
+            document.documentElement.classList.add("sidebar-collapsed");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="light">
+    <div class="pm-admin-scale-shell">
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <div class="brand">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 600 600"
+                class="brand-mark"
+                role="presentation"
+                aria-hidden="true"
+              >
+                <path fill="currentColor" d="M249,344 L244,343 L233,353 L231,353 L230,350 L224,353 L223,356 L227,355 L228,358 L205,379 L202,379 L201,377 L197,380 L184,378 L181,379 L195,381 L202,380 L203,386 L208,390 L212,390 L248,356 L252,351 Z" />
+                <path fill="currentColor" d="M317,174 L315,180 L312,181 L311,189 L312,206 L309,207 L310,208 L309,219 L304,225 L304,247 L302,250 L304,251 L306,255 L308,250 L311,218 L310,211 L314,207 L314,197 L317,192 L316,191 L318,175 Z" />
+                <path fill="currentColor" d="M290,118 L289,123 L297,135 L302,157 L292,228 L294,248 L306,179 L307,152 L300,129 L296,121 Z" />
+                <path fill="currentColor" d="M280,76 L279,77 L279,103 L282,103 L284,101 L287,101 L290,103 L292,102 L298,103 L301,107 L303,107 L306,110 L308,116 L312,120 L313,128 L315,130 L317,130 L316,122 L311,118 L311,113 L308,112 L305,109 L305,104 L299,99 L299,97 L296,95 L296,93 L294,93 L292,91 L292,88 L290,88 L282,80 Z" />
+                <path fill="currentColor" d="M279,49 L256,132 L253,93 L248,133 L200,90 L176,100 L207,276 L125,508 L164,560 L217,546 L325,438 L360,438 L445,518 L426,487 L445,463 L313,302 L322,423 L196,542 L139,525 L195,308 L254,251 L275,266 L274,65 L327,136 L307,269 L328,247 L508,300 L414,215 L334,185 L334,116 Z" />
+              </svg>
+              <div class="brand-text">
+                <div class="brand-title">AgentCapture</div>
+                <div class="brand-subtitle">Honeypot SaaS Console</div>
+              </div>
+            </div>
+            <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse" aria-label="收起/展开侧栏" title="收起/展开侧栏">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon-left"><path d="m15 18-6-6 6-6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon-right"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+        <div class="nav-scroll">
+          <div class="nav-home">
+            <a href="/admin" class="nav-link">
+              <span class="dot">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}</span>
+              <span>控制台首页</span>
+            </a>
+          </div>
+          {% for group in nav_groups %}
+            <div class="nav-group" data-nav-group="{{ loop.index }}">
+              <button type="button" class="nav-group-title" data-nav-toggle aria-expanded="true">
+                <span>{{ group.title }}</span>
+                <svg class="nav-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="nav-group-items">
+                <div class="nav-group-inner">
+                {% for item in group.links %}
+                  {% if item.header %}
+                  <div class="nav-section">{{ item.label }}</div>
+                  {% else %}
+                  <a href="{{ item.href }}" class="nav-link {% if item.active %}active{% endif %}"{% if item.description %} title="{{ item.description }}"{% endif %}>
+                    <span class="dot">{{ icon(name=item.icon, class_name='ui-icon ui-icon-sm') }}</span>
+                    <span class="nav-label">{{ item.label }}</span>
+                  </a>
+                  {% endif %}
+                {% endfor %}
+                </div>
+              </div>
+              </div>
+            {% endfor %}
+        </div>
+          <div class="sidebar-footer">
+            {% if current_user %}
+              <div class="profile-card">
+                <div class="avatar">{{ current_user.username[:2]|upper }}</div>
+                <div class="profile-meta">
+                  <div class="profile-name-row">
+                    <div class="profile-name">{{ current_user.username }}</div>
+                  </div>
+                </div>
+                <a class="profile-settings" href="/admin/profile" aria-label="个人设置" title="个人设置">{{ icon(name='settings', class_name='ui-icon ui-icon-sm') }}</a>
+                <a class="profile-settings logout" href="/admin/logout" aria-label="退出登录" title="退出登录">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ui-icon ui-icon-sm"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                </a>
+              </div>
+            {% endif %}
+          </div>
+        </aside>
+
+        <main class="main-shell">
+          <div class="workspace">
+            <div class="utility-strip">
+              <span class="utility-path">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}<span>/admin{% if active_path and active_path != '/admin' %} · {{ active_path }}{% endif %}</span></span>
+              <div class="utility-right">
+                {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
+                {% if site_id %}<span class="chip">{{ site_id }}</span>{% endif %}
+                <span class="chip chip-live">Live</span>
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="切换明暗主题" title="切换明暗主题">
+                  <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                  <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="content">
+              {% if admin_path_is_default and not admin_path_banner_dismissed and active_path != '/admin/profile' %}
+              <div class="panel page-banner" id="admin-path-banner" style="border-left:3px solid var(--warning,#fbbf24);display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+                <div style="flex:1;min-width:260px">
+                  <div class="panel-title" style="color:var(--warning,#fbbf24);font-size:13px;margin-bottom:4px">安全建议：自定义控制台访问路径</div>
+                  <p style="margin:0;font-size:12.5px;color:var(--muted-foreground)">
+                    当前仍使用默认访问路径 <code>/{{ admin_access_path }}/</code>。部署完成后请尽快在
+                    <a href="/admin/profile" style="color:var(--info,#60a5fa)">系统设置 → 控制台安全路径</a>
+                    中修改，避免控制台被扫描发现。
+                  </p>
+                </div>
+                <a class="chip" href="/admin/profile" style="cursor:pointer">前往设置</a>
+                <button type="button" class="secondary btn-sm" id="dismiss-path-banner" style="cursor:pointer">本次登录不再提示</button>
+              </div>
+              <script>
+                (function () {
+                  var btn = document.getElementById('dismiss-path-banner');
+                  if (!btn) return;
+                  btn.addEventListener('click', function () {
+                    document.getElementById('admin-path-banner').style.display = 'none';
+                    fetch('/api/admin/dismiss-path-banner', { method: 'POST' }).catch(function () {});
+                  });
+                })();
+              </script>
+              {% endif %}
+              {% block content %}{% endblock %}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script>
+      const RECENT_FILTER_VERSION = 2;
+      const RECENT_FILTER_MAX_HISTORY = 8;
+
+      function initRecentFilterForms() {
+        const forms = document.querySelectorAll("form[data-recent-filter-key]");
+        forms.forEach((form) => {
+          const storageKey = "ach:recent-filter:" + form.dataset.recentFilterKey;
+          const skipAutoRestoreKey = storageKey + ":skip-autorestore";
+          const noticeKey = storageKey + ":notice";
+          const fields = Array.from(form.querySelectorAll("input[name], select[name], textarea[name]")).filter((field) => {
+            return field.name && !field.disabled && field.type !== "password" && field.dataset.recentIgnore !== "1";
+          });
+          if (!fields.length) return;
+
+          const url = new URL(window.location.href);
+          const relevantParamNames = new Set(fields.map((field) => field.name));
+          const hasRelevantUrlParams = Array.from(relevantParamNames).some((name) => url.searchParams.has(name));
+          const restoreButtons = form.querySelectorAll('[data-filter-action="restore"]');
+          const clearButtons = form.querySelectorAll('[data-filter-action="clear"]');
+          const statusNodes = form.querySelectorAll("[data-recent-status]");
+
+          function emptyStore() {
+            return {
+              version: RECENT_FILTER_VERSION,
+              lastUsed: {},
+              defaultValues: {},
+              history: [],
+            };
+          }
+
+          function cloneValues(values) {
+            return JSON.parse(JSON.stringify(values || {}));
+          }
+
+          function readStoredValues() {
+            try {
+              return JSON.parse(localStorage.getItem(storageKey) || "{}");
+            } catch (error) {
+              return {};
+            }
+          }
+
+          function valuesSignature(values) {
+            const compact = Object.fromEntries(
+              Object.entries(values || {})
+                .filter(([, value]) => String(value || "").trim() !== "")
+                .sort(([left], [right]) => left.localeCompare(right))
+            );
+            return JSON.stringify(compact);
+          }
+
+          function normalizeStore(rawStore) {
+            if (!rawStore || typeof rawStore !== "object") {
+              return emptyStore();
+            }
+            if (rawStore.version === RECENT_FILTER_VERSION) {
+              return {
+                version: RECENT_FILTER_VERSION,
+                lastUsed: cloneValues(rawStore.lastUsed || {}),
+                defaultValues: cloneValues(rawStore.defaultValues || {}),
+                history: Array.isArray(rawStore.history) ? rawStore.history.map((entry) => ({
+                  id: entry.id || String(Date.now()),
+                  label: entry.label || "",
+                  updatedAt: entry.updatedAt || new Date().toISOString(),
+                  values: cloneValues(entry.values || {}),
+                })) : [],
+              };
+            }
+            const legacyValues = cloneValues(rawStore);
+            const migrated = emptyStore();
+            migrated.lastUsed = legacyValues;
+            if (Object.values(legacyValues).some((value) => String(value || "").trim() !== "")) {
+              migrated.history = [{
+                id: "legacy-" + Date.now(),
+                label: "迁移的最近使用条件",
+                updatedAt: new Date().toISOString(),
+                values: legacyValues,
+              }];
+            }
+            return migrated;
+          }
+
+          function saveStore(store) {
+            localStorage.setItem(storageKey, JSON.stringify(store));
+          }
+
+          function hasStoredValues(values) {
+            return Object.values(values || {}).some((value) => String(value || "").trim() !== "");
+          }
+
+          function sameValues(left, right) {
+            return valuesSignature(left) === valuesSignature(right);
+          }
+
+          function writeStatus(text) {
+            statusNodes.forEach((node) => {
+              node.textContent = text;
+            });
+          }
+
+          function currentValues() {
+            return fields.reduce((acc, field) => {
+              acc[field.name] = field.value || "";
+              return acc;
+            }, {});
+          }
+
+          function summarizeValues(values) {
+            const parts = Object.entries(values || {})
+              .filter(([, value]) => String(value || "").trim() !== "")
+              .map(([name, value]) => `${name}=${value}`);
+            if (!parts.length) return "空条件";
+            return parts.slice(0, 4).join(" · ");
+          }
+
+          function createHistoryEntry(values) {
+            return {
+              id: "entry-" + Date.now() + "-" + Math.random().toString(16).slice(2, 8),
+              label: summarizeValues(values),
+              updatedAt: new Date().toISOString(),
+              values: cloneValues(values),
+            };
+          }
+
+          function upsertHistory(store, values) {
+            const signature = valuesSignature(values);
+            if (!signature || signature === "{}") {
+              return store;
+            }
+            const nextHistory = (store.history || []).filter((entry) => valuesSignature(entry.values) !== signature);
+            nextHistory.unshift(createHistoryEntry(values));
+            store.history = nextHistory.slice(0, RECENT_FILTER_MAX_HISTORY);
+            return store;
+          }
+
+          function persistLastUsed(values, { toHistory = false } = {}) {
+            const store = normalizeStore(readStoredValues());
+            store.lastUsed = cloneValues(values);
+            if (toHistory && hasStoredValues(values)) {
+              upsertHistory(store, values);
+            }
+            saveStore(store);
+            return store;
+          }
+
+          function clearStoredHistory() {
+            const store = normalizeStore(readStoredValues());
+            store.history = [];
+            saveStore(store);
+            return store;
+          }
+
+          function buildRestoreUrl(values) {
+            const nextUrl = new URL(window.location.href);
+            fields.forEach((field) => nextUrl.searchParams.delete(field.name));
+            Object.entries(values).forEach(([name, value]) => {
+              if (String(value || "").trim() !== "") {
+                nextUrl.searchParams.set(name, value);
+              }
+            });
+            return nextUrl.toString();
+          }
+
+          function formatTimestamp(isoString) {
+            if (!isoString) return "未记录时间";
+            const date = new Date(isoString);
+            if (Number.isNaN(date.getTime())) return "未记录时间";
+            return date.toLocaleString("zh-CN", {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+
+          const manager = document.createElement("div");
+          manager.className = "recent-filter-manager";
+          manager.innerHTML = `
+            <div class="recent-filter-title">最近使用条件管理</div>
+            <div class="recent-filter-summary" data-recent-history-summary>当前尚未保存历史条件</div>
+            <div class="recent-filter-controls">
+              <select data-recent-history-select>
+                <option value="">选择历史条件</option>
+              </select>
+              <button type="button" class="secondary" data-recent-history-apply>应用历史</button>
+              <button type="button" class="secondary" data-recent-default-set>设为默认</button>
+              <button type="button" class="secondary" data-recent-default-apply>使用默认</button>
+              <button type="button" class="secondary" data-recent-history-clear>清空历史</button>
+            </div>
+          `;
+          form.appendChild(manager);
+
+          const historySummary = manager.querySelector("[data-recent-history-summary]");
+          const historySelect = manager.querySelector("[data-recent-history-select]");
+          const historyApplyButton = manager.querySelector("[data-recent-history-apply]");
+          const defaultSetButton = manager.querySelector("[data-recent-default-set]");
+          const defaultApplyButton = manager.querySelector("[data-recent-default-apply]");
+          const historyClearButton = manager.querySelector("[data-recent-history-clear]");
+
+          function selectedHistoryValues(store) {
+            const selectedId = historySelect.value;
+            const selectedItem = (store.history || []).find((entry) => entry.id === selectedId);
+            return selectedItem ? cloneValues(selectedItem.values) : null;
+          }
+
+          function renderManager(store) {
+            const previousSelection = historySelect.value;
+            historySelect.innerHTML = '<option value="">选择历史条件</option>';
+            (store.history || []).forEach((entry, index) => {
+              const option = document.createElement("option");
+              option.value = entry.id;
+              const isDefault = hasStoredValues(store.defaultValues) && sameValues(store.defaultValues, entry.values);
+              option.textContent = `${isDefault ? "默认 · " : ""}${index + 1}. ${formatTimestamp(entry.updatedAt)} · ${entry.label || "未命名条件"}`;
+              historySelect.appendChild(option);
+            });
+            if ((store.history || []).some((entry) => entry.id === previousSelection)) {
+              historySelect.value = previousSelection;
+            }
+            const defaultSummary = hasStoredValues(store.defaultValues) ? summarizeValues(store.defaultValues) : "未设置";
+            historySummary.textContent = `默认条件：${defaultSummary} ｜ 历史条数：${(store.history || []).length}`;
+            const hasHistory = (store.history || []).length > 0;
+            historyApplyButton.disabled = !hasHistory;
+            historyClearButton.disabled = !hasHistory;
+            defaultApplyButton.disabled = !hasStoredValues(store.defaultValues);
+          }
+
+          function navigateWithValues(values, noticeType) {
+            if (!hasStoredValues(values)) {
+              writeStatus("暂无可应用的筛选条件");
+              return;
+            }
+            sessionStorage.setItem(noticeKey, noticeType);
+            window.location.assign(buildRestoreUrl(values));
+          }
+
+          const storeBeforeRestore = normalizeStore(readStoredValues());
+          const autoRestoreValues = hasStoredValues(storeBeforeRestore.defaultValues)
+            ? storeBeforeRestore.defaultValues
+            : storeBeforeRestore.lastUsed;
+          const shouldSkipAutoRestore = sessionStorage.getItem(skipAutoRestoreKey) === "1";
+          if (shouldSkipAutoRestore) {
+            sessionStorage.removeItem(skipAutoRestoreKey);
+          } else if (!hasRelevantUrlParams && hasStoredValues(autoRestoreValues)) {
+            sessionStorage.setItem(
+              noticeKey,
+              hasStoredValues(storeBeforeRestore.defaultValues) ? "default-auto" : "recent-auto"
+            );
+            window.location.replace(buildRestoreUrl(autoRestoreValues));
+            return;
+          }
+
+          const notice = sessionStorage.getItem(noticeKey);
+          if (notice === "recent-auto") {
+            writeStatus("已自动恢复最近使用条件");
+            sessionStorage.removeItem(noticeKey);
+          } else if (notice === "default-auto") {
+            writeStatus("已自动恢复默认条件");
+            sessionStorage.removeItem(noticeKey);
+          } else if (hasStoredValues(storeBeforeRestore.defaultValues) || hasStoredValues(storeBeforeRestore.lastUsed)) {
+            writeStatus("当前页已启用最近使用条件记忆");
+          }
+
+          const initialStore = persistLastUsed(currentValues(), { toHistory: false });
+          renderManager(initialStore);
+
+          form.addEventListener("submit", () => {
+            persistLastUsed(currentValues(), { toHistory: true });
+          });
+
+          restoreButtons.forEach((button) => {
+            button.addEventListener("click", (event) => {
+              event.preventDefault();
+              const store = normalizeStore(readStoredValues());
+              const fallbackValues = hasStoredValues(store.defaultValues) ? store.defaultValues : store.lastUsed;
+              if (!hasStoredValues(fallbackValues)) {
+                writeStatus("暂无默认或最近使用条件");
+                return;
+              }
+              navigateWithValues(
+                fallbackValues,
+                hasStoredValues(store.defaultValues) ? "default-auto" : "recent-auto"
+              );
+            });
+          });
+
+          clearButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              sessionStorage.setItem(skipAutoRestoreKey, "1");
+              writeStatus("本次已跳过自动恢复");
+            });
+          });
+
+          historyApplyButton.addEventListener("click", () => {
+            const store = normalizeStore(readStoredValues());
+            const values = selectedHistoryValues(store);
+            if (!values) {
+              writeStatus("请先从下拉框选择一条历史条件");
+              return;
+            }
+            navigateWithValues(values, "recent-auto");
+          });
+
+          defaultSetButton.addEventListener("click", () => {
+            const store = normalizeStore(readStoredValues());
+            const values = selectedHistoryValues(store) || currentValues();
+            if (!hasStoredValues(values)) {
+              writeStatus("当前条件为空，无法设为默认");
+              return;
+            }
+            store.defaultValues = cloneValues(values);
+            saveStore(store);
+            renderManager(store);
+            writeStatus("已设为默认条件");
+          });
+
+          defaultApplyButton.addEventListener("click", () => {
+            const store = normalizeStore(readStoredValues());
+            if (!hasStoredValues(store.defaultValues)) {
+              writeStatus("尚未设置默认条件");
+              return;
+            }
+            navigateWithValues(store.defaultValues, "default-auto");
+          });
+
+          historyClearButton.addEventListener("click", () => {
+            const store = clearStoredHistory();
+            renderManager(store);
+            writeStatus("历史条件已清空，默认条件保留");
+          });
+        });
+      }
+
+      function initNavGroups() {
+        const KEY = "ach:nav-collapsed";
+        let collapsed = [];
+        try { collapsed = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (error) { collapsed = []; }
+        document.querySelectorAll(".nav-group[data-nav-group]").forEach((group) => {
+          const id = group.dataset.navGroup;
+          const hasActive = !!group.querySelector(".nav-link.active");
+          // The group containing the current page always opens; others honor
+          // the persisted collapsed state.
+          group.classList.toggle("is-collapsed", !hasActive && collapsed.includes(id));
+          const toggle = group.querySelector("[data-nav-toggle]");
+          if (!toggle) return;
+          toggle.setAttribute("aria-expanded", String(!group.classList.contains("is-collapsed")));
+          toggle.addEventListener("click", () => {
+            const isCollapsed = group.classList.toggle("is-collapsed");
+            toggle.setAttribute("aria-expanded", String(!isCollapsed));
+            const idx = collapsed.indexOf(id);
+            if (isCollapsed && idx === -1) collapsed.push(id);
+            if (!isCollapsed && idx !== -1) collapsed.splice(idx, 1);
+            try { localStorage.setItem(KEY, JSON.stringify(collapsed)); } catch (error) {}
+          });
+        });
+      }
+
+      function initFormSubmitGuard() {
+        document.querySelectorAll("form").forEach((form) => {
+          form.addEventListener("submit", (event) => {
+            // Defer so JS-driven (fetch) flows can preventDefault first —
+            // those manage their own button state.
+            setTimeout(() => {
+              if (event.defaultPrevented) return;
+              const btn = form.querySelector('button[type="submit"], button:not([type])');
+              if (!btn || btn.disabled) return;
+              const original = btn.textContent;
+              btn.disabled = true;
+              btn.classList.add("is-loading");
+              btn.textContent = "提交中…";
+              // Safety net: restore if the navigation never happens.
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove("is-loading");
+                btn.textContent = original;
+              }, 8000);
+            }, 0);
+          });
+        });
+      }
+
+      function initThemeToggle() {
+      // ---- Global modal wiring: [data-modal-open] / [data-modal-close] ----
+      document.addEventListener("click", (event) => {
+        const opener = event.target.closest("[data-modal-open]");
+        if (opener) {
+          const target = document.getElementById(opener.getAttribute("data-modal-open"));
+          if (target) { target.hidden = false; document.body.style.overflow = "hidden"; }
+          return;
+        }
+        const closer = event.target.closest("[data-modal-close]");
+        if (closer) {
+          const backdrop = closer.closest("[data-modal-backdrop]");
+          if (backdrop) { backdrop.hidden = true; document.body.style.overflow = ""; }
+          return;
+        }
+        const backdropHit = event.target.closest("[data-modal-backdrop]");
+        if (backdropHit && event.target === backdropHit) {
+          backdropHit.hidden = true; document.body.style.overflow = "";
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        document.querySelectorAll("[data-modal-backdrop]:not([hidden])").forEach((b) => { b.hidden = true; });
+        document.body.style.overflow = "";
+      });
+      const btn = document.getElementById("theme-toggle");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+          const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("ach:theme", next); } catch (error) {}
+        });
+      }
+
+      function initSidebarCollapse() {
+        const btn = document.getElementById("sidebar-collapse");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+          const collapsed = document.documentElement.classList.toggle("sidebar-collapsed");
+          try { localStorage.setItem("ach:sidebar-collapsed", collapsed ? "1" : "0"); } catch (error) {}
+        });
+      }
+
+      function initTableColumnResize() {
+        const KEY = "ach:col-widths";
+        let store = {};
+        try { store = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (error) { store = {}; }
+        const pageKey = window.location.pathname;
+
+        const shell = document.querySelector(".pm-admin-scale-shell");
+        function uiScale() {
+          // The desktop shell renders at 80% CSS scale: mouse deltas are
+          // screen-px but widths are layout-px, so compensate.
+          if (!shell) return 1;
+          const rect = shell.getBoundingClientRect();
+          return rect.width && shell.offsetWidth ? rect.width / shell.offsetWidth : 1;
+        }
+
+        document.querySelectorAll(".table-wrap table").forEach((table, tableIdx) => {
+          const heads = table.querySelectorAll("thead th");
+          if (!heads.length) return;
+
+          const saved = (store[pageKey] || {})[tableIdx];
+          if (saved && saved.length === heads.length) {
+            // colgroup widths (e.g. percentage hints) would override th widths
+            // in fixed layout — clear them so restored widths take effect.
+            table.querySelectorAll("col").forEach((c) => c.style.removeProperty("width"));
+            table.style.tableLayout = "fixed";
+            heads.forEach((th, i) => { if (saved[i]) th.style.width = saved[i]; });
+          }
+
+          heads.forEach((th) => {
+            if (th.querySelector(".th-resizer")) return;
+            const handle = document.createElement("span");
+            handle.className = "th-resizer";
+            handle.setAttribute("aria-hidden", "true");
+            // The handle only *looks* like a separate widget; hit-testing on
+            // sticky positioned TH children was unreliable (a neighbouring
+            // sticky TH could paint over the strip and swallow the click), so
+            // the mousedown listener lives on the TH itself and triggers when
+            // the press lands in the 16px strip at the right edge.
+            function startResize(ev) {
+              const rect = th.getBoundingClientRect();
+              // Right-edge 40px strip resizes; the th-level handler is needed
+              // because hit-testing the tiny resizer span reliably landed on
+              // the neighbouring sticky column under the 0.8 UI scale.
+              if (ev.clientX < rect.right - 40) return;
+              ev.preventDefault();
+              ev.stopPropagation();
+              // Freeze current widths before going fixed-layout so columns
+              // don't jump when the layout mode flips.
+              table.querySelectorAll("col").forEach((c) => c.style.removeProperty("width"));
+              heads.forEach((h) => { h.style.width = h.getBoundingClientRect().width + "px"; });
+              table.style.tableLayout = "fixed";
+              const scale = uiScale() || 1;
+              const startX = ev.clientX;
+              const startW = th.getBoundingClientRect().width / scale;
+              document.body.classList.add("col-resizing");
+
+              function onMove(e) {
+                const next = Math.max(48, startW + (e.clientX - startX) / scale);
+                th.style.width = next + "px";
+              }
+              function onUp() {
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+                document.body.classList.remove("col-resizing");
+                store[pageKey] = store[pageKey] || {};
+                store[pageKey][tableIdx] = Array.from(heads).map((h) => h.style.width);
+                try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (error) {}
+              }
+              document.addEventListener("mousemove", onMove);
+              document.addEventListener("mouseup", onUp);
+            }
+            th.addEventListener("mousedown", startResize);
+            th.appendChild(handle);
+          });
+        });
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        initThemeToggle();
+        initSidebarCollapse();
+        initNavGroups();
+        initFormSubmitGuard();
+        initRecentFilterForms();
+        initTableColumnResize();
+      });
+    </script>
+    <script>
+      /* Sidebar scroll persistence: keep .nav-scroll at the user's position
+         across page navigations (session-scoped, per tab). */
+      (function () {
+        var KEY = "ach:navscroll";
+        var nav = document.querySelector(".nav-scroll");
+        if (!nav) return;
+        var saved = parseInt(sessionStorage.getItem(KEY) || "0", 10);
+        if (saved > 0) nav.scrollTop = saved;
+        var t = null;
+        nav.addEventListener("scroll", function () {
+          if (t) clearTimeout(t);
+          t = setTimeout(function () {
+            try { sessionStorage.setItem(KEY, String(Math.round(nav.scrollTop))); } catch (e) {}
+          }, 120);
+        });
+      })();
+    </script>
+    <script>
+      /* Enhanced selects: themed dropdown UI over native <select> (forms
+         keep submitting the real control). Skips multi/size selects. */
+      (function () {
+        var openMenu = null;
+        function closeMenu() {
+          if (openMenu) { openMenu.remove(); openMenu = null; }
+          document.querySelectorAll(".sel-x.open").forEach(function (w) { w.classList.remove("open"); });
+        }
+        function labelOf(sel) {
+          var opt = sel.options[sel.selectedIndex];
+          return opt ? opt.textContent : "";
+        }
+        function enhance(sel) {
+          if (sel.dataset.selx || sel.multiple || sel.size > 1 || sel.closest(".no-selx")) return;
+          sel.dataset.selx = "1";
+          var wrap = document.createElement("span");
+          wrap.className = "sel-x";
+          sel.parentNode.insertBefore(wrap, sel);
+          wrap.appendChild(sel);
+          sel.classList.add("sel-x-native");
+          sel.tabIndex = -1;
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "sel-x-btn";
+          btn.textContent = labelOf(sel);
+          wrap.appendChild(btn);
+          function sync() { btn.textContent = labelOf(sel); }
+          sel.addEventListener("change", sync);
+          var form = sel.closest("form");
+          if (form) form.addEventListener("reset", function () { setTimeout(sync, 0); });
+          btn.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            var wasOpen = wrap.classList.contains("open");
+            closeMenu();
+            if (wasOpen) return;
+            var menu = document.createElement("div");
+            menu.className = "sel-x-menu";
+            var r = btn.getBoundingClientRect();
+            var width = Math.max(r.width, 170);
+            menu.style.left = r.left + "px";
+            menu.style.top = (r.bottom + 6) + "px";
+            menu.style.width = width + "px";
+            Array.prototype.forEach.call(sel.options, function (opt) {
+              var item = document.createElement("div");
+              item.className = "sel-x-opt" + (opt.selected ? " active" : "") + (opt.disabled ? " disabled" : "");
+              item.textContent = opt.textContent;
+              if (!opt.disabled) {
+                item.addEventListener("click", function () {
+                  sel.value = opt.value;
+                  sel.dispatchEvent(new Event("change", { bubbles: true }));
+                  sync();
+                  closeMenu();
+                });
+              }
+              menu.appendChild(item);
+            });
+            document.body.appendChild(menu);
+            // flip up if clipped by the viewport bottom
+            var mh = menu.getBoundingClientRect().height;
+            if (r.bottom + 6 + mh > window.innerHeight - 8) {
+              menu.style.top = Math.max(8, r.top - mh - 6) + "px";
+            }
+            wrap.classList.add("open");
+            openMenu = menu;
+          });
+        }
+        document.addEventListener("click", function () { closeMenu(); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
+        window.addEventListener("scroll", closeMenu, true);
+        function enhanceAll() {
+          document.querySelectorAll("select").forEach(enhance);
+        }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", enhanceAll);
+        } else { enhanceAll(); }
+      })();
+    </script>
+  </body>
+</html>

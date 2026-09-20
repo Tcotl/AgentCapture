@@ -1,0 +1,261 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state %}
+{% block content %}
+<style>
+  /* 数据密集页：解除 .content 全局 1720px 上限，让聚合表格随窗口铺满 */
+  html .content:has(.at-deck) { max-width: none !important; }
+</style>
+<style>
+  .at-deck { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ---- top status band ---- */
+  .at-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 16px 20px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 3px, rgba(56, 189, 248, 0.02) 3px 4px),
+      linear-gradient(var(--tech-corner), var(--tech-corner)) left top / 14px 1px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) left top / 1px 14px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) right top / 14px 1px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) right top / 1px 14px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) left bottom / 14px 1px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) left bottom / 1px 14px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) right bottom / 14px 1px,
+      linear-gradient(var(--tech-corner), var(--tech-corner)) right bottom / 1px 14px,
+      linear-gradient(180deg, var(--tech-panel-2), var(--tech-panel));
+    background-repeat: no-repeat;
+  }
+  .at-status-id { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .at-live-dot {
+    width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto;
+    background: var(--tech-cyan);
+    box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.12), 0 0 16px rgba(34, 211, 238, 0.5);
+    animation: atPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes atPulse { 50% { box-shadow: 0 0 0 8px rgba(34, 211, 238, 0.06), 0 0 16px rgba(34, 211, 238, 0.5); } }
+  .at-status-title {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 15px; font-weight: 700; color: #f8fbff; letter-spacing: 0.02em;
+  }
+  .at-status-sub {
+    margin-top: 3px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.18em; color: rgba(103, 232, 249, 0.55);
+    text-transform: uppercase;
+  }
+  .at-readouts { display: flex; gap: 26px; flex-wrap: wrap; }
+  .at-readout { text-align: center; }
+  .at-readout b {
+    display: block;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 24px; font-weight: 700; line-height: 1;
+    color: #a5f3fc; text-shadow: 0 0 16px rgba(34, 211, 238, 0.3);
+    font-variant-numeric: tabular-nums;
+  }
+  .at-readout b.danger { color: #fda4af; text-shadow: 0 0 16px rgba(251, 113, 133, 0.3); }
+  .at-readout b.warn { color: #fcd34d; text-shadow: 0 0 16px rgba(245, 158, 11, 0.3); }
+  .at-readout span {
+    display: block; margin-top: 5px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.14em; color: rgba(148, 163, 184, 0.7);
+    text-transform: uppercase;
+  }
+
+  /* ---- main grid: filter card on top, data panel below ---- */
+  .at-grid { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ---- filter console: horizontal card ---- */
+  .at-filter {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    align-items: end;
+    gap: 12px;
+  }
+  .at-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .at-field-label {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+    color: rgba(103, 232, 249, 0.55); text-transform: uppercase;
+  }
+  .at-field-label::before { content: "▸ "; color: var(--tech-cyan); }
+  .at-field input { width: 100%; }
+  .at-filter-actions { flex-wrap: nowrap; align-items: flex-end; }
+  .at-filter-actions button { width: auto; white-space: nowrap; }
+  .at-filter .recent-filter-manager { grid-column: 1 / -1; }
+
+  /* ---- data panel: risk cell tint ---- */
+  .at-risk { font-family: "Fira Code", ui-monospace, monospace; font-weight: 700; color: #a5f3fc; }
+  .at-risk.danger { color: #fda4af; text-shadow: 0 0 10px rgba(251, 113, 133, 0.35); }
+  .at-risk.warn { color: #fcd34d; text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+
+  /* ---- aggregation table: fixed layout so key columns always fit ---- */
+  .at-table table { table-layout: fixed; }
+  .at-table .cell-prose { min-width: 0; }
+  /* 信号明细：两行内完整可读，超出折叠为悬停展开 */
+  .at-signal-wrap {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; max-width: 100%;
+    cursor: help;
+  }
+  .at-window { white-space: nowrap; }
+  .at-ip { display: block; font-weight: 600; }
+  .at-site {
+    display: block; margin-top: 2px;
+    font-size: 10.5px; color: rgba(148, 163, 184, 0.72);
+    font-family: "Fira Code", ui-monospace, monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .at-window { font-family: "Fira Code", ui-monospace, monospace; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+  .at-path { max-width: 100%; }
+  .at-table .actions-inline { flex-wrap: nowrap; gap: 6px; }
+
+  @media (max-width: 1180px) {
+    .at-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .at-readouts { gap: 18px; }
+    .at-readout { text-align: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .at-live-dot { animation: none; }
+  }
+</style>
+
+{{ page_header('AT', '攻击流量', '按来源 IP、站点与会话聚合攻击流量，并从这里进入攻击详情页与会话画像页。', ['聚合视图']) }}
+
+{% set at_ns = namespace(hits=0, peak=0, ips=[]) %}
+{% for item in items %}
+  {% set at_ns.hits = at_ns.hits + item.count %}
+  {% if item.risk_score_max > at_ns.peak %}{% set at_ns.peak = item.risk_score_max %}{% endif %}
+  {% if item.source_ip not in at_ns.ips %}{% set at_ns.ips = at_ns.ips + [item.source_ip] %}{% endif %}
+{% endfor %}
+
+<div class="at-deck">
+  <section class="panel at-status">
+    <div class="at-status-id">
+      <span class="at-live-dot"></span>
+      <div>
+        <div class="at-status-title">TRAFFIC MONITOR · 攻击流量监控</div>
+        <div class="at-status-sub">SYS.AT // Source IP × Site × Session Matrix</div>
+      </div>
+    </div>
+    <div class="at-readouts">
+      <div class="at-readout"><b>{{ items|length }}</b><span>聚合会话</span></div>
+      <div class="at-readout"><b>{{ at_ns.ips|length }}</b><span>独立来源</span></div>
+      <div class="at-readout"><b>{{ at_ns.hits }}</b><span>累计命中</span></div>
+      <div class="at-readout"><b class="{% if at_ns.peak >= 70 %}danger{% elif at_ns.peak >= 45 %}warn{% endif %}">{{ at_ns.peak }}</b><span>峰值风险</span></div>
+    </div>
+  </section>
+
+  <div class="at-grid">
+    {% if request.query_params.get('saved') %}
+    <div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
+      <p class="panel-subtitle" style="margin:0">{{ request.query_params.get('saved') }}</p>
+    </div>
+    {% endif %}
+    {% if active_isolations %}
+    <div class="panel page-banner" style="border-left:3px solid var(--warning,#f59e0b)">
+      <p class="panel-subtitle" style="margin:0">⚠ 当前有 <strong>{{ active_isolations }}</strong> 条活动隔离——被隔离来源的访问会收到伪装的「503 维护中」页面（属正常反制行为，不是平台故障）。可在 <a href="/admin/alerts">告警配置 → 主动隔离</a> 中查看/解除。</p>
+    </div>
+    {% endif %}
+    <section class="panel">
+      {{ section_header('筛选控制台', 'FILTER CONSOLE · 按时间窗 / 来源 IP / 站点收窄聚合结果') }}
+      <form method="get" action="/admin/attacks" class="at-filter" data-recent-filter-key="admin-attacks">
+        <label class="at-field">
+          <span class="at-field-label">起始日期 // DATE_FROM</span>
+          <input type="date" name="date_from" value="{{ filters.date_from }}" />
+        </label>
+        <label class="at-field">
+          <span class="at-field-label">结束日期 // DATE_TO</span>
+          <input type="date" name="date_to" value="{{ filters.date_to }}" />
+        </label>
+        <label class="at-field">
+          <span class="at-field-label">来源 IP // SOURCE_IP</span>
+          <input type="text" name="source_ip" value="{{ filters.source_ip }}" placeholder="来源 IP" />
+        </label>
+        <label class="at-field">
+          <span class="at-field-label">站点节点 // SITE_ID</span>
+          <input type="text" name="site_id" value="{{ filters.site_id }}" placeholder="站点 / 节点" />
+        </label>
+        <div class="actions-inline at-filter-actions">
+          <button type="submit" style="width:auto">应用筛选</button>
+          <button type="button" class="secondary" style="width:auto" data-filter-action="restore">恢复最近使用</button>
+          <a class="chip primary" href="/admin/attacks" data-filter-action="clear"
+             style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
+          <button type="button" class="secondary" style="width:auto" id="btn-clear-events">清除历史流量</button>
+        </div>
+        <span class="recent-filter-status" data-recent-status></span>
+      </form>
+
+      <form method="post" action="/admin/attacks/clear" id="clear-events-form" hidden>
+        <input type="hidden" name="date_from" value="{{ filters.date_from }}" />
+        <input type="hidden" name="date_to" value="{{ filters.date_to }}" />
+        <input type="hidden" name="source_ip" value="{{ filters.source_ip }}" />
+        <input type="hidden" name="site_id" value="{{ filters.site_id }}" />
+        <input type="hidden" name="scope" id="clear-scope" value="all" />
+      </form>
+      <script>
+      (function () {
+        var btn = document.getElementById('btn-clear-events');
+        var form = document.getElementById('clear-events-form');
+        if (!btn || !form) return;
+        btn.addEventListener('click', function () {
+          var hasFilter = ['date_from','date_to','source_ip','site_id'].some(function (n) {
+            return (form.elements[n] && form.elements[n].value || '').trim() !== '';
+          });
+          var scope, msg;
+          var surfaces = '流量事件 + 凭证蜜饵登陆记录 + 蜜罐会话回放';
+          if (hasFilter) {
+            scope = 'filtered';
+            var active = ['date_from','date_to','source_ip','site_id'].filter(function (n) {
+              return (form.elements[n] && form.elements[n].value || '').trim() !== '';
+            }).join(' / ');
+            msg = '将删除符合当前筛选条件（' + active + '）的历史数据：\n\n· ' + surfaces
+                + '\n\n注意：蜜饵与 Portal 路径（/_trap /d /_bait /portal）的流量证据将保留。\n\n确认删除？不可撤销。';
+          } else {
+            scope = 'all';
+            msg = '将删除【全部】历史数据（所有路径、所有来源）：\n\n· ' + surfaces
+                + '\n\n蜜饵与 Portal 路径（/_trap /d /_bait /portal）的溯源证据将保留。\n\n确认删除？不可撤销。';
+          }
+          if (!confirm(msg)) return;
+          document.getElementById('clear-scope').value = scope;
+          form.submit();
+        });
+      })();
+      </script>
+    </section>
+
+    <section class="panel">
+      {{ section_header('攻击聚合视图', '聚合维度：来源 IP + 站点 + 会话', '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+      <div class="table-wrap compact at-table">
+        <table>
+          <colgroup>
+            <col style="width: 12%"><col style="width: 15%"><col style="width: 5%"><col style="width: 14%"><col style="width: 16%"><col style="width: 6%"><col style="width: 5%"><col style="width: 17%"><col style="width: 10%">
+          </colgroup>
+          <thead><tr><th>来源</th><th>会话</th><th class="numeric">次数</th><th>时间窗</th><th>热点路径</th><th>决策</th><th class="numeric">风险</th><th class="cell-prose">信号</th><th>动作</th></tr></thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td>
+                  <a class="at-ip" href="/admin/attack-sources/{{ item.source_ip }}">{{ item.source_ip or '-' }}</a>
+                  <span class="at-site">{{ item.site_id or '-' }}</span>
+                </td>
+                <td><code class="sid" title="{{ item.session_id }}">{{ item.session_display }}</code></td>
+                <td class="numeric">{{ item.count }}</td>
+                <td class="at-window" title="{{ item.first_seen }} → {{ item.last_seen }}">{{ item.window_display }}</td>
+                <td><code class="at-path" title="{{ item.top_path }}">{{ item.top_path or '-' }}</code></td>
+                <td><span class="badge badge-{{ 'danger' if item.top_decision == '阻断' else ('warning' if item.top_decision in ['隔离', '挑战', '质询'] else 'info') }}">{{ item.top_decision }}</span></td>
+                <td class="numeric"><span class="at-risk {% if item.risk_score_max >= 70 %}danger{% elif item.risk_score_max >= 45 %}warn{% endif %}">{{ item.risk_score_max }}</span></td>
+                <td class="cell-prose"><span class="at-signal-wrap" title="{{ item.top_signals|join('，') }}">{{ item.top_signals|join('，') if item.top_signals else '-' }}</span></td>
+                <td><div class="actions-inline"><a class="chip" href="/admin/attacks/{{ item.session_id }}">详情</a><a class="chip primary" href="/admin/sessions/{{ item.session_id }}">画像</a></div></td>
+              </tr>
+            {% else %}{{ empty_state('暂无攻击聚合记录', '公开访问流量尚未触发可聚合的攻击事件。', 9, 'AT') }}{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

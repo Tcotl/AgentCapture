@@ -1,0 +1,62 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state %}
+{% block content %}
+<style>
+  /* page-local interaction & readability layer (mirrors attacks.html) */
+  .chip {
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+  .chip:hover { border-color: rgba(34, 211, 238, 0.45); background: rgba(34, 211, 238, 0.12); color: #f0fdff; }
+  .chip.primary:hover { box-shadow: 0 0 22px rgba(34, 211, 238, 0.4); }
+  .chip:active { transform: scale(0.97); }
+
+  .as-field { display: flex; flex-direction: column; gap: 6px; }
+  .as-field-label {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+    color: rgba(103, 232, 249, 0.55); text-transform: uppercase;
+  }
+  .as-field-label::before { content: "▸ "; color: var(--tech-cyan); }
+
+  .as-mono { font-family: "Fira Code", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .table-wrap .numeric { font-variant-numeric: tabular-nums; }
+</style>
+
+{{ page_header('IP', '攻击来源', '聚合所有来源地址的攻击强度、会话数量、热点站点与热点路径，用于快速定位高频来源。', ['来源画像']) }}
+<section class="panel">
+  {{ section_header('来源聚合视图', '按来源 IP 汇总事件数、站点分布、决策与高频信号', '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+  <form method="get" action="/admin/attack-sources" class="grid-4" style="margin-bottom:14px" data-recent-filter-key="admin-attack-sources">
+    <label class="as-field">
+      <span class="as-field-label">起始日期 // DATE_FROM</span>
+      <input type="date" name="date_from" value="{{ filters.date_from }}" />
+    </label>
+    <label class="as-field">
+      <span class="as-field-label">结束日期 // DATE_TO</span>
+      <input type="date" name="date_to" value="{{ filters.date_to }}" />
+    </label>
+    <label class="as-field">
+      <span class="as-field-label">来源 IP // SOURCE_IP</span>
+      <input type="text" name="source_ip" value="{{ filters.source_ip }}" placeholder="来源 IP" />
+    </label>
+    <label class="as-field">
+      <span class="as-field-label">站点节点 // SITE_ID</span>
+      <input type="text" name="site_id" value="{{ filters.site_id }}" placeholder="站点 / 节点" />
+    </label>
+    <div class="actions-inline" style="grid-column:1 / -1">
+      <button type="submit" style="width:auto">应用筛选</button>
+      <button type="button" class="secondary" style="width:auto" data-filter-action="restore">恢复最近使用</button>
+      <a class="chip primary" href="/admin/attack-sources" data-filter-action="clear"
+         style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
+      <span class="recent-filter-status" data-recent-status></span>
+    </div>
+  </form>
+  <div class="table-wrap compact">
+    <table>
+      <thead><tr><th>来源 IP</th><th class="numeric">事件数</th><th>首见</th><th>末见</th><th>热点站点</th><th>热点路径</th><th>决策</th><th class="cell-prose">信号</th><th>画像</th></tr></thead>
+      <tbody>
+        {% for item in items %}<tr><td><code>{{ item.source_ip }}</code></td><td class="numeric">{{ item.count }}</td><td class="as-mono">{{ item.first_seen[:19]|replace('T', ' ') }}</td><td class="as-mono">{{ item.last_seen[:19]|replace('T', ' ') }}</td><td>{{ item.top_site }}</td><td><code title="{{ item.top_path }}">{{ item.top_path }}</code></td><td><span class="badge {% if item.top_decision == '阻断' %}badge-danger{% elif item.top_decision == '隔离' %}badge-warning{% elif item.top_decision in ['挑战', '观察'] %}badge-info{% else %}badge-success{% endif %}">{{ item.top_decision }}</span></td><td class="cell-prose">{{ item.top_signals|join('，') }}</td><td><a class="chip primary" href="/admin/attack-sources/{{ item.source_ip }}">查看画像</a></td></tr>{% else %}{{ empty_state('暂无来源聚合记录', '当前没有可展示的来源地址。', 9, 'IP') }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

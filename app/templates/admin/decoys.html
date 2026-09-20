@@ -1,0 +1,542 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog %}
+{% block content %}
+{{ page_header('DC', title or '蜜饵管理', '按攻击链路拆分 API 路由蜜饵、文件蜜饵与凭证蜜饵；支持投放、绑定和触发审计。', ['API 路由', '文件蜜饵', '凭证蜜饵'],
+      actions='<button type="button" class="chip" data-modal-open="decoy-chain-modal">快捷部署</button><button type="button" class="chip primary" data-modal-open="decoy-create-modal">＋ 新增蜜饵</button>') }}
+
+<style>
+.dc-deck { display: flex; flex-direction: column; gap: 16px; }
+
+/* ---- top status band ---- */
+.dc-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+}
+.dc-status-id { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.dc-live-dot {
+  width: 10px; height: 10px; flex: 0 0 auto;
+  background: var(--tech-cyan);
+  box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.1), 0 0 16px rgba(34, 211, 238, 0.55);
+  animation: dcPulse 2.2s ease-in-out infinite;
+}
+@keyframes dcPulse { 50% { box-shadow: 0 0 0 8px rgba(34, 211, 238, 0.05), 0 0 16px rgba(34, 211, 238, 0.55); } }
+.dc-status-title {
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 15px; font-weight: 700; color: #f8fbff; letter-spacing: 0.02em;
+}
+.dc-status-sub {
+  margin-top: 3px;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 10.5px; letter-spacing: 0.18em; color: rgba(103, 232, 249, 0.55);
+  text-transform: uppercase;
+}
+.dc-readouts { display: flex; gap: 26px; flex-wrap: wrap; }
+.dc-readout { text-align: center; }
+.dc-readout b {
+  display: block;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 24px; font-weight: 700; line-height: 1;
+  color: #a5f3fc; text-shadow: 0 0 16px rgba(34, 211, 238, 0.3);
+  font-variant-numeric: tabular-nums;
+}
+.dc-readout span {
+  display: block; margin-top: 5px;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 10px; letter-spacing: 0.14em; color: rgba(148, 163, 184, 0.7);
+  text-transform: uppercase;
+}
+
+/* ---- decoy class modules ---- */
+.decoy-hero { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.decoy-type-card {
+  position: relative;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--tech-line);
+  background: rgba(8, 13, 26, 0.6);
+  transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+.decoy-type-card:hover {
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.05);
+  transform: translateY(-2px);
+}
+.decoy-type-card::before {
+  content: ""; position: absolute; left: 0; top: 0; width: 14px; height: 14px;
+  border-left: 1px solid var(--tech-corner); border-top: 1px solid var(--tech-corner);
+}
+.decoy-type-card::after {
+  content: ""; position: absolute; right: 0; bottom: 0; width: 14px; height: 14px;
+  border-right: 1px solid var(--tech-corner); border-bottom: 1px solid var(--tech-corner);
+}
+.decoy-type-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.decoy-type-kicker {
+  font-family: "Fira Code", ui-monospace, monospace;
+  color: rgba(103, 232, 249, 0.6); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+}
+.decoy-type-count {
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 18px; font-weight: 700; color: #a5f3fc;
+  font-variant-numeric: tabular-nums; text-shadow: 0 0 14px rgba(34, 211, 238, 0.3);
+}
+.decoy-type-card h3 { margin: 0; font-size: 15px; font-weight: 700; color: #f1f5f9; letter-spacing: 0.02em; }
+.decoy-type-card p { margin: 0; font-size: 11.5px; color: rgba(148, 163, 184, 0.8); line-height: 1.6; }
+
+/* ---- tabs / panes ---- */
+.decoy-tabs { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; }
+.decoy-tab {
+  padding: 9px 16px;
+  border: 1px solid var(--tech-line);
+  background: rgba(8, 13, 26, 0.6);
+  color: rgba(201, 216, 236, 0.85);
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.decoy-tab:hover { border-color: rgba(34, 211, 238, 0.4); color: #e2f4fd; }
+.decoy-tab.active {
+  border-color: rgba(34, 211, 238, 0.6);
+  background: rgba(34, 211, 238, 0.08);
+  color: #a5f3fc;
+  box-shadow: inset 0 -2px 0 var(--tech-cyan), 0 0 14px rgba(34, 211, 238, 0.12);
+}
+.decoy-pane { display: none; }
+.decoy-pane.active { display: block; }
+.decoy-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.decoy-form-grid .span-2 { grid-column: 1 / -1; }
+.decoy-mini-help {
+  padding: 10px 12px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-left: 2px solid var(--tech-cyan);
+  background: rgba(34, 211, 238, 0.05);
+  color: rgba(165, 243, 252, 0.85);
+  font-size: 12px; line-height: 1.6;
+}
+.decoy-mini-help code { color: #67e8f9; }
+
+/* ---- chips / paths / snippets ---- */
+.decoy-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.decoy-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--tech-cyan-faint);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  color: #a5f3fc;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-weight: 700; font-size: 11px; letter-spacing: 0.04em;
+}
+/* light theme: the hardcoded cyans are illegible on white — dark blue instead */
+[data-theme="light"] .decoy-chip {
+  color: #1E40AF;
+  background: rgba(30, 64, 175, 0.08);
+  border-color: rgba(30, 64, 175, 0.28);
+}
+[data-theme="light"] .decoy-path { color: #1E40AF; }
+.decoy-path { word-break: break-all; }
+.decoy-deploy-cell { display: flex; flex-direction: column; gap: 3px; }
+.decoy-deploy-cell .muted { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.decoy-deploy-form {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.decoy-deploy-form select, .decoy-deploy-form input, .decoy-deploy-form button { width: auto; flex: 0 0 auto; }
+.decoy-deploy-form input[name="deployed_host"] { width: 150px; }
+.decoy-desc { max-width: 320px; color: var(--muted-foreground); line-height: 1.5; font-size: 12px; }
+.decoy-snippet {
+  max-width: 520px; margin: 6px 0 0; padding: 10px 12px;
+  border: 1px solid var(--tech-line);
+  background: rgba(2, 6, 23, 0.5);
+  color: #a5f3fc;
+  white-space: pre-wrap; word-break: break-word;
+  font-size: 12px; line-height: 1.5;
+}
+.decoy-snippet-label {
+  margin-top: 6px;
+  font-family: "Fira Code", ui-monospace, monospace;
+  color: rgba(103, 232, 249, 0.6); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+
+/* ---- modal ---- */
+.decoy-modal-backdrop[hidden] { display: none !important; }
+.decoy-modal-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center; padding: 22px;
+  background: rgba(2, 6, 23, 0.78); backdrop-filter: blur(14px);
+}
+.decoy-modal {
+  position: relative;
+  width: min(920px, 100%); max-height: 90vh; overflow: hidden;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  background: linear-gradient(180deg, var(--tech-panel-2), var(--tech-panel));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 0 40px rgba(34, 211, 238, 0.08);
+}
+.decoy-modal::before {
+  content: ""; position: absolute; left: 0; top: 0; width: 16px; height: 16px;
+  border-left: 1px solid var(--tech-corner); border-top: 1px solid var(--tech-corner);
+  pointer-events: none;
+}
+.decoy-modal::after {
+  content: ""; position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
+  border-right: 1px solid var(--tech-corner); border-bottom: 1px solid var(--tech-corner);
+  pointer-events: none;
+}
+.decoy-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; border-bottom: 1px solid var(--tech-line);
+}
+.decoy-modal-title {
+  margin: 0; font-size: 16px; font-weight: 700; color: #f1f5f9;
+  font-family: "Fira Code", ui-monospace, monospace; letter-spacing: 0.02em;
+}
+.decoy-modal-body { padding: 18px 22px; overflow: auto; max-height: 70vh; }
+.decoy-modal-close {
+  width: 32px; height: 32px;
+  border: 1px solid var(--tech-line);
+  background: rgba(34, 211, 238, 0.06);
+  color: #a5f3fc; cursor: pointer;
+}
+.decoy-modal-close:hover { border-color: rgba(34, 211, 238, 0.5); }
+.decoy-modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.decoy-modal-footer button { width: auto; min-width: 108px; }
+
+@media (max-width: 1180px) {
+  .dc-readouts { gap: 18px; }
+  .dc-readout { text-align: center; }
+}
+@media (max-width: 980px) {
+  .decoy-hero, .decoy-form-grid { grid-template-columns: 1fr; }
+  .decoy-form-grid .span-2 { grid-column: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-live-dot { animation: none; }
+}
+</style>
+
+<div class="dc-deck">
+  <section class="panel dc-status">
+    <div class="dc-status-id">
+      <span class="dc-live-dot"></span>
+      <div>
+        <div class="dc-status-title">DECOY GRID · 蜜饵指挥台</div>
+        <div class="dc-status-sub">AgentCapture // Deception Assets — Deploy · Bind · Audit</div>
+      </div>
+    </div>
+    <div class="dc-readouts">
+      <div class="dc-readout"><b>{{ templates_list|length }}</b><span>蜜饵模板</span></div>
+      <div class="dc-readout"><b>{{ deployment_rows|length }}</b><span>部署记录</span></div>
+      <div class="dc-readout"><b>{{ decoy_groups.api_route|length }}</b><span>API 路由</span></div>
+      <div class="dc-readout"><b>{{ decoy_groups.file|length }}</b><span>文件蜜饵</span></div>
+      <div class="dc-readout"><b>{{ decoy_groups.credential|length }}</b><span>凭证蜜饵</span></div>
+      <div class="dc-readout"><b>{{ nodes|length }}</b><span>可投放节点</span></div>
+    </div>
+  </section>
+
+  <div class="decoy-hero">
+    <div class="decoy-type-card decoy-type-filter" data-type-filter="api_route" role="button" tabindex="0" aria-pressed="false" title="点击筛选 API 路由蜜饵模板">
+      <div class="decoy-type-head"><span class="decoy-type-kicker">CLASS-01 // Reverse Proxy</span><span class="decoy-type-count">{{ decoy_groups.api_route|length }}</span></div>
+      <h3>API 路由蜜饵</h3>
+      <p>通过反向代理发布虚拟路由，可投放到 JS、配置文件或手册。正常用户不会访问，一旦命中即触发告警。</p>
+    </div>
+    <div class="decoy-type-card decoy-type-filter" data-type-filter="file" role="button" tabindex="0" aria-pressed="false" title="点击筛选文件蜜饵模板">
+      <div class="decoy-type-head"><span class="decoy-type-kicker">CLASS-02 // Artifact</span><span class="decoy-type-count">{{ decoy_groups.file|length }}</span></div>
+      <h3>文件蜜饵</h3>
+      <p>上传或生成触发文件，并绑定 API 路由蜜饵与凭证蜜饵，帮助串联下载、回调、登录等攻击链路。</p>
+    </div>
+    <div class="decoy-type-card decoy-type-filter" data-type-filter="credential" role="button" tabindex="0" aria-pressed="false" title="点击筛选凭证蜜饵模板">
+      <div class="decoy-type-head"><span class="decoy-type-kicker">CLASS-03 // Credential</span><span class="decoy-type-count">{{ decoy_groups.credential|length }}</span></div>
+      <h3>凭证蜜饵</h3>
+      <p>为端口服务或 Web 后台生成假账号密码；凭证被用于登录时说明密钥外泄或攻击者已进入链路。</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    {{ section_header('蜜饵模板', '三类模板统一管理，可一键生成唯一投放记录') }}
+    <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
+      <form method="post" action="/admin/decoys/templates/bulk-delete" data-confirm="确认删除选中的 {n} 个蜜饵模板？不可撤销。" class="bulk-del-form">
+        <input type="hidden" name="return_to" value="/admin/decoy-management">
+        <input type="hidden" name="ids" value="">
+        <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+      </form>
+      <span class="muted" style="font-size:11px">勾选模板后批量移除</span>
+    </div>
+    <style>
+      .table-wrap.compact td, .table-wrap.compact th { padding: 8px 8px; }
+      .decoy-deploy-form { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+      .decoy-deploy-form input { flex: 1 1 96px; width: auto !important; min-width: 0; }
+      .decoy-deploy-form select { flex: 1 1 84px; width: auto !important; min-width: 0; }
+      .decoy-deploy-form button { flex: 0 0 auto; width: auto !important; }
+    </style>
+    <div class="table-wrap compact"><table>
+        <colgroup>
+          <col style="width: 4%"><col style="width: 7%"><col style="width: 26%"><col style="width: 20%"><col style="width: 16%"><col style="width: 14%"><col style="width: 13%">
+        </colgroup>
+        <thead><tr><th style="width:34px"></th><th>类型</th><th class="cell-prose">模板</th><th>投放 / 目标</th><th>绑定链路</th><th>生成部署</th><th>操作</th></tr></thead><tbody>
+      {% for item in templates_list %}
+      <tr data-decoy-type="{{ item.decoy_type }}">
+        <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
+        <td><span class="decoy-chip">{{ item.type_label }}</span></td>
+        <td class="cell-prose"><strong>{{ item.name }}</strong><div class="muted">{{ item.file_name }}</div>{% if item.meta.artifact_path %}<div class="muted">上传文件：{{ item.meta.uploaded_file_name }} · {{ item.meta.uploaded_size }} bytes</div>{% endif %}<div class="decoy-desc">{{ item.description }}</div></td>
+        <td>{% if item.decoy_type == 'api_route' %}<code class="decoy-path">{{ item.route_path }}</code><div class="muted">{{ item.exposure_channel }}</div>{% else %}<span>{{ item.target_service_key }}</span><div class="muted">{{ item.username_dictionary }}</div>{% endif %}</td>
+        <td><div class="decoy-chip-list">{% if item.bound_route_name %}<span class="decoy-chip">路由：{{ item.bound_route_name }}</span>{% endif %}{% if item.bound_credential_name %}<span class="decoy-chip">凭证：{{ item.bound_credential_name }}</span>{% endif %}{% if not item.bound_route_name and not item.bound_credential_name %}<span class="muted">未绑定</span>{% endif %}</div></td>
+        <td><form method="post" action="/admin/decoys/templates/{{ item.id }}/deploy" class="decoy-deploy-form"><input type="hidden" name="return_to" value="/admin/decoy-management"><select name="node_id"><option value="">无节点</option>{% for node in nodes %}<option value="{{ node.id }}">{{ node.name }}</option>{% endfor %}</select><input name="deployed_host" placeholder="业务主机 / 系统"><button type="submit">生成</button></form></td>
+        <td><div class="actions-inline"><button type="button" class="secondary" onclick="openDecoyModal('decoy-edit-{{ item.id }}')">编辑</button><form method="post" action="/admin/decoys/templates/{{ item.id }}/delete"><input type="hidden" name="return_to" value="/admin/decoy-management"><button class="secondary" type="submit">删除</button></form></div></td>
+      </tr>
+      {% else %}{{ empty_state('暂无蜜饵模板', '新增 API 路由、文件或凭证蜜饵后可生成部署记录。', 7, 'DC') }}{% endfor %}
+    </tbody></table></div>
+    <style>
+      .decoy-type-filter { cursor: pointer; transition: border-color 160ms var(--ease-out, ease), box-shadow 160ms var(--ease-out, ease), transform 160ms var(--ease-out, ease); }
+      .decoy-type-filter:hover { transform: translateY(-2px); }
+      .decoy-type-filter[aria-pressed="true"] { border-color: #2563EB; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18); }
+      .decoy-type-filter[aria-pressed="true"] .decoy-type-kicker { color: #2563EB; }
+      [data-theme="dark"] .decoy-type-filter[aria-pressed="true"] { border-color: #60A5FA; box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2); }
+      [data-theme="dark"] .decoy-type-filter[aria-pressed="true"] .decoy-type-kicker { color: #93C5FD; }
+    </style>
+    <div id="decoy-filter-status" style="display:none;align-items:center;gap:8px;margin:0 0 10px">
+      <span class="muted" style="font-size:12px">筛选：</span>
+      <span class="chip primary" id="decoy-filter-label"></span>
+      <button type="button" class="secondary btn-sm" id="decoy-filter-clear" style="cursor:pointer">显示全部</button>
+    </div>
+    <script>
+    (function () {
+      var cards = document.querySelectorAll('.decoy-type-filter');
+      var rows = document.querySelectorAll('tr[data-decoy-type]');
+      var status = document.getElementById('decoy-filter-status');
+      var label = document.getElementById('decoy-filter-label');
+      var names = { api_route: 'API 路由蜜饵', file: '文件蜜饵', credential: '凭证蜜饵' };
+      var active = '';
+      function apply(type) {
+        active = type;
+        var shown = 0;
+        rows.forEach(function (r) {
+          var show = !type || r.dataset.decoyType === type;
+          r.style.display = show ? '' : 'none';
+          if (show) shown += 1;
+        });
+        cards.forEach(function (c) {
+          c.setAttribute('aria-pressed', c.dataset.typeFilter === type ? 'true' : 'false');
+        });
+        status.style.display = type ? 'flex' : 'none';
+        if (type) label.textContent = names[type] + ' · ' + shown + ' 条';
+      }
+      cards.forEach(function (c) {
+        c.addEventListener('click', function () {
+          apply(active === c.dataset.typeFilter ? '' : c.dataset.typeFilter);
+        });
+      });
+      var clearBtn = document.getElementById('decoy-filter-clear');
+      if (clearBtn) clearBtn.addEventListener('click', function () { apply(''); });
+    })();
+    </script>
+    <script>
+    (function () {
+      var bulkAll = document.querySelector('.bulk-select-all');
+      if (bulkAll) bulkAll.addEventListener('change', function () {
+        document.querySelectorAll('.bulk-check').forEach(function (c) { c.checked = bulkAll.checked; });
+      });
+      var bulkBtn = document.querySelector('.bulk-del-btn');
+      if (bulkBtn) bulkBtn.addEventListener('click', function () {
+        var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+        if (!checked.length) { alert('请先勾选要删除的蜜饵模板'); return; }
+        var form = bulkBtn.closest('form');
+        if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+        form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+        form.submit();
+      });
+    })();
+    </script>
+  </section>
+
+  <section class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div style="min-width:0">
+        <h3 class="panel-title" style="margin:0;font-size:15px;font-weight:700">已部署与投放的模版</h3>
+        <div class="panel-subtitle">查看状态、分发路径、凭证登录页、生成账号密码，以及可复制到 JS、反向代理、手册或数据库的投放片段</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+        <span class="chip" id="dep-live-dot" style="cursor:default"><span id="dep-live-state" style="color:var(--success,#34d399)">●</span> 实时更新</span>
+        <button type="button" class="secondary btn-sm" id="dep-refresh-btn" style="cursor:pointer">暂停刷新</button>
+      </div>
+    </div>
+    <div class="table-wrap" id="dep-table-wrap"><table>
+      <colgroup>
+        <col style="width: 12%"><col style="width: 7%"><col style="width: 9%"><col style="width: 26%"><col style="width: 18%"><col style="width: 16%"><col style="width: 12%">
+      </colgroup>
+      <thead><tr><th>时间</th><th>类型</th><th>状态</th><th>模板 / 路径</th><th>账号 / 密码</th><th>投放片段</th><th>主机</th></tr></thead><tbody>
+      {% for row in deployment_rows %}
+        {% set item = row.item %}
+        <tr>
+          <td>{{ item.created_at.strftime('%m-%d %H:%M:%S') if item.created_at else '—' }}</td>
+          <td><span class="decoy-chip">{{ row.type_label }}</span></td>
+          <td>{{ item.status|status_zh }}</td>
+          <td>{% if row.template %}<strong>{{ row.template.name }}</strong>{% endif %}<div class="decoy-deploy-cell"><code class="decoy-path">{{ item.fetch_path }}</code><span class="muted" title="{{ item.target_endpoint }}">{{ item.target_endpoint }}</span></div><div style="margin-top:6px"><a class="chip" href="/admin/decoys/deployments/{{ item.id }}/manifest.json">下载 manifest</a></div></td>
+          <td>{{ item.generated_username }} / {{ item.generated_password }}</td>
+          <td>
+            <div class="decoy-snippet-label">{{ row.snippets.primary_label }}</div>
+            <pre class="decoy-snippet">{{ row.snippets.primary }}</pre>
+            <div class="decoy-snippet-label">{{ row.snippets.secondary_label }}</div>
+            <pre class="decoy-snippet">{{ row.snippets.secondary }}</pre>
+          </td>
+          <td>{{ item.deployed_host }}</td>
+        </tr>
+      {% else %}{{ empty_state('暂无部署记录', '部署生成后会在这里出现。', 7, 'DC') }}{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+
+{% call modal_dialog('decoy-create-modal', '新增蜜饵', '按类型创建可投放的蜜饵模板；文件蜜饵可绑定路由与凭证形成完整证据链') %}
+<div class="decoy-tabs" role="tablist">
+  <button class="decoy-tab active" type="button" data-pane="api">API 路由蜜饵</button>
+  <button class="decoy-tab" type="button" data-pane="file">文件蜜饵</button>
+  <button class="decoy-tab" type="button" data-pane="credential">凭证蜜饵</button>
+</div>
+
+<div class="decoy-pane active" id="pane-api">
+  <form method="post" action="/admin/decoys/templates" class="stack">
+    <input type="hidden" name="return_to" value="/admin/decoy-management"><input type="hidden" name="decoy_type" value="api_route">
+    <div class="decoy-mini-help">建议把路由写入前端 JS、泄露配置或内部手册；路由默认规范化为 <code>/_bait/...</code>，访问后会进入反制溯源记录。</div>
+    <div class="decoy-form-grid">
+      <input name="name" placeholder="模板名称，如 内部重建 API" required>
+      <input name="route_path" placeholder="虚拟路由，如 /api/internal/reindex" required>
+      <select name="exposure_channel"><option value="js">投放到 JS</option><option value="manual">投放到用户手册</option><option value="config">投放到配置文件</option><option value="proxy">仅反向代理发布</option></select>
+      <input name="file_name" placeholder="路由标识，可留空">
+      <textarea class="span-2" name="description" placeholder="用途说明：该路由被访问即表示有人翻看 JS / 文档 / 配置"></textarea>
+      <textarea class="span-2" name="content_template" placeholder='响应内容，可留空，默认返回 {"code":404,"message":"not found"}'></textarea>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px"><button type="button" class="secondary" data-modal-close>取消</button><button type="submit">新增 API 路由蜜饵</button></div>
+  </form>
+</div>
+
+<div class="decoy-pane" id="pane-file">
+  <form method="post" action="/admin/decoys/templates" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="return_to" value="/admin/decoy-management"><input type="hidden" name="decoy_type" value="file">
+    <div class="decoy-mini-help">上传触发文件或填写文件内容；可绑定 API 路由蜜饵与凭证蜜饵，下载后可引导攻击者继续访问假路由或尝试假凭证。</div>
+    <div class="decoy-form-grid">
+      <input name="name" placeholder="模板名称，如 生产数据库导出说明" required>
+      <input name="file_name" placeholder="文件名，如 db-backup-readme.txt">
+      <input type="file" name="uploaded_file">
+      <select name="target_service_key"><option value="file-decoy">文件下载蜜饵</option><option value="manual">手册投放</option><option value="config">配置文件投放</option></select>
+      <select name="bind_route_template_id"><option value="">绑定 API 路由蜜饵（可选）</option>{% for item in decoy_groups.api_route %}<option value="{{ item.id }}">{{ item.name }} · {{ item.route_path }}</option>{% endfor %}</select>
+      <select name="bind_credential_template_id"><option value="">绑定凭证蜜饵（可选）</option>{% for item in decoy_groups.credential %}<option value="{{ item.id }}">{{ item.name }} · {{ item.target_service_key }}</option>{% endfor %}</select>
+      <textarea class="span-2" name="description" placeholder="文件用途与投放位置说明"></textarea>
+      <textarea class="span-2" name="content_template" placeholder="未上传文件时可直接填写内容，支持 $username$ $password$ $honeypot$ $api_route$ $credential_login$ $credential_username$ $credential_password$"></textarea>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px"><button type="button" class="secondary" data-modal-close>取消</button><button type="submit">新增文件蜜饵</button></div>
+  </form>
+</div>
+
+<div class="decoy-pane" id="pane-credential">
+  <form method="post" action="/admin/decoys/templates" class="stack">
+    <input type="hidden" name="return_to" value="/admin/decoy-management"><input type="hidden" name="decoy_type" value="credential">
+    <div class="decoy-mini-help">选择端口服务或 Web 后台类型，系统生成可投放的假账号密码；后续登录记录会在“凭证蜜饵登陆记录”中聚合。</div>
+    <div class="decoy-form-grid">
+      <input name="name" placeholder="模板名称，如 VPN 运维账号" required>
+      <select name="target_service_key" required>{% for svc in service_catalog %}<option value="{{ svc.service_key }}">{{ svc.name }} · {{ svc.default_port }}/{{ svc.protocols_json|join(',') }}</option>{% endfor %}<option value="web-admin">Web 后台</option></select>
+      <input name="username_dictionary" placeholder="用户名词典，如 root,admin,payment" value="root,admin" required>
+      <input name="password_length" type="number" min="8" max="64" value="16" required>
+      <textarea class="span-2" name="description" placeholder="凭证投放位置，如数据库连接串、运维手册、Web 后台说明"></textarea>
+      <textarea class="span-2" name="content_template" placeholder="凭证提示模板，可留空。支持 $username$ $password$ $honeypot$"></textarea>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px"><button type="button" class="secondary" data-modal-close>取消</button><button type="submit">新增凭证蜜饵</button></div>
+  </form>
+</div>
+{% endcall %}
+
+{% call modal_dialog('decoy-chain-modal', '默认攻击链路快捷部署', '一键生成文件蜜饵 + API 路由蜜饵 + 凭证蜜饵的完整攻击链路，并自动生成 manifest 与投放片段；适合快速演示或首次部署。') %}
+<form method="post" action="/admin/decoys/deploy-default-chain" class="stack">
+  <input type="hidden" name="return_to" value="/admin/decoy-management">
+  <label class="fl"><span>投放节点</span>
+    <select name="node_id"><option value="">无节点</option>{% for node in nodes %}<option value="{{ node.id }}">{{ node.name }}</option>{% endfor %}</select>
+  </label>
+  <label class="fl"><span>业务系统 / 投放目标</span>
+    <input name="deployed_host" value="default-chain" placeholder="业务系统 / 投放目标">
+  </label>
+  <div class="muted" style="font-size:12px;line-height:1.6">生成后在“已生成部署与投放片段”复制 JS、Nginx、SQL 或文件投放信息。</div>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px"><button type="button" class="secondary" data-modal-close>取消</button><button type="submit">一键生成默认攻击链路</button></div>
+</form>
+{% endcall %}
+
+{% for item in templates_list %}
+<div class="decoy-modal-backdrop" id="decoy-edit-{{ item.id }}" hidden onclick="closeDecoyModalOnBackdrop(event, 'decoy-edit-{{ item.id }}')">
+  <div class="decoy-modal" role="dialog" aria-modal="true" aria-labelledby="decoy-edit-title-{{ item.id }}">
+    <div class="decoy-modal-header">
+      <div><h2 class="decoy-modal-title" id="decoy-edit-title-{{ item.id }}">编辑蜜饵模板：{{ item.name }}</h2><div class="muted">{{ item.type_label }} · 调整投放位置、绑定链路与模板内容。</div></div>
+      <button type="button" class="decoy-modal-close" onclick="closeDecoyModal('decoy-edit-{{ item.id }}')">×</button>
+    </div>
+    <div class="decoy-modal-body">
+      <form method="post" action="/admin/decoys/templates/{{ item.id }}/update" class="stack">
+        <input type="hidden" name="return_to" value="/admin/decoy-management">
+        <div class="decoy-form-grid">
+          <input name="name" value="{{ item.name }}" placeholder="模板名称" required>
+          <input name="file_name" value="{{ item.file_name }}" placeholder="文件名 / 路由标识">
+          <input name="route_path" value="{{ item.route_path }}" placeholder="API 路由，仅 API 路由蜜饵需要">
+          <input name="target_service_key" value="{{ item.target_service_key }}" placeholder="目标服务 key">
+          <input name="username_dictionary" value="{{ item.username_dictionary }}" placeholder="用户名词典">
+          <input name="password_length" type="number" min="8" max="64" value="{{ item.password_length }}">
+          <select name="exposure_channel"><option value="js" {% if item.exposure_channel == 'js' %}selected{% endif %}>投放到 JS</option><option value="manual" {% if item.exposure_channel == 'manual' %}selected{% endif %}>投放到用户手册</option><option value="config" {% if item.exposure_channel == 'config' %}selected{% endif %}>投放到配置文件</option><option value="proxy" {% if item.exposure_channel == 'proxy' %}selected{% endif %}>仅反向代理发布</option></select>
+          <select name="bind_route_template_id"><option value="">绑定 API 路由蜜饵（可选）</option>{% for route in decoy_groups.api_route %}{% if route.id != item.id %}<option value="{{ route.id }}" {% if item.bind_route_template_id == route.id %}selected{% endif %}>{{ route.name }} · {{ route.route_path }}</option>{% endif %}{% endfor %}</select>
+          <select name="bind_credential_template_id"><option value="">绑定凭证蜜饵（可选）</option>{% for cred in decoy_groups.credential %}{% if cred.id != item.id %}<option value="{{ cred.id }}" {% if item.bind_credential_template_id == cred.id %}selected{% endif %}>{{ cred.name }} · {{ cred.target_service_key }}</option>{% endif %}{% endfor %}</select>
+          <textarea class="span-2" name="description" placeholder="描述">{{ item.description }}</textarea>
+          <textarea class="span-2" name="content_template" placeholder="模板内容，支持变量">{{ item.content_template }}</textarea>
+        </div>
+        <div class="decoy-modal-footer"><button type="button" class="secondary" onclick="closeDecoyModal('decoy-edit-{{ item.id }}')">取消</button><button type="submit">保存修改</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+document.querySelectorAll('.decoy-tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.decoy-tab').forEach((item) => item.classList.remove('active'));
+    document.querySelectorAll('.decoy-pane').forEach((item) => item.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('pane-' + tab.dataset.pane)?.classList.add('active');
+  });
+});
+function openDecoyModal(id){ const modal=document.getElementById(id); if(!modal) return; modal.hidden=false; document.body.style.overflow='hidden'; const first=modal.querySelector('input,select,textarea,button'); if(first) first.focus(); }
+function closeDecoyModal(id){ const modal=document.getElementById(id); if(!modal) return; modal.hidden=true; if(!document.querySelector('.decoy-modal-backdrop:not([hidden])')) document.body.style.overflow=''; }
+function closeDecoyModalOnBackdrop(event,id){ if(event.target && event.target.id===id) closeDecoyModal(id); }
+document.addEventListener('keydown', function(event){ if(event.key==='Escape') document.querySelectorAll('.decoy-modal-backdrop:not([hidden])').forEach(function(modal){ closeDecoyModal(modal.id); }); });
+</script>
+<script>
+  (function () {
+    var paused = false, timer = null;
+    var dot = document.getElementById('dep-live-state');
+    var btn = document.getElementById('dep-refresh-btn');
+    function setState() {
+      dot.style.color = paused ? 'var(--muted-foreground, #8fa3c8)' : 'var(--success, #34d399)';
+      dot.parentNode.childNodes[1].textContent = paused ? ' 已暂停' : ' 实时更新';
+      btn.textContent = paused ? '恢复刷新' : '暂停刷新';
+    }
+    function refresh() {
+      if (paused || document.hidden) return;
+      fetch(location.href, { headers: { 'Accept': 'text/html' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var fresh = doc.getElementById('dep-table-wrap');
+          var current = document.getElementById('dep-table-wrap');
+          if (fresh && current) {
+            current.innerHTML = fresh.innerHTML;
+            dot.style.color = 'var(--success, #34d399)';
+          }
+        })
+        .catch(function () { dot.style.color = 'var(--danger, #fb7185)'; });
+    }
+    btn.addEventListener('click', function () {
+      paused = !paused;
+      setState();
+      if (!paused) refresh();
+    });
+    setState();
+    timer = setInterval(refresh, 8000);
+  })();
+  </script>
+{% endblock %}

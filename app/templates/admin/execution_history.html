@@ -1,0 +1,41 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge %}
+{% block content %}
+{{ page_header('EH', '执行历史', '记录后台管理动作、节点调度、模板变更、API 测试与用户操作，作为平台审计入口。', ['管理审计']) }}
+
+<section class="panel">
+  {{ section_header('执行记录', '按时间排序展示用户、模块、动作、对象与详情', '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+  <form method="get" action="/admin/execution-history" style="display:flex;flex-wrap:nowrap;gap:8px;align-items:center;margin-bottom:14px">
+    <input type="date" name="date_from" value="{{ filters.date_from }}" style="flex:1 1 0;min-width:0;width:auto" />
+    <input type="date" name="date_to" value="{{ filters.date_to }}" style="flex:1 1 0;min-width:0;width:auto" />
+    <input type="text" name="actor_username" value="{{ filters.actor_username }}" placeholder="用户名" style="flex:1 1 0;min-width:0;width:auto" />
+    <input type="text" name="module" value="{{ filters.module }}" placeholder="模块" style="flex:1 1 0;min-width:0;width:auto" />
+    <input type="text" name="status" value="{{ filters.status }}" placeholder="状态 success/failed" style="flex:1.2 1 0;min-width:0;width:auto" />
+    <div class="actions-inline" style="display:flex;gap:8px;flex:0 0 auto">
+      <button type="submit" style="width:auto">应用筛选</button>
+      <a class="chip primary" href="/admin/execution-history" data-filter-action="clear"
+         style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
+    </div>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>用户</th><th>模块</th><th>动作</th><th>对象</th><th>状态</th><th>详情</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="muted"><code>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+          <td><strong>{{ item.actor_username }}</strong></td>
+          <td>{{ badge(item.module, 'info') }}</td>
+          <td>{{ item.action }}</td>
+          <td><code>{{ item.target_ref }}</code></td>
+          <td>{% if item.status == 'success' %}{{ badge('成功', 'success') }}{% elif item.status == 'failed' %}{{ badge('失败', 'danger') }}{% else %}{{ badge(item.status|status_zh if item.status else '—', 'warning') }}{% endif %}</td>
+          <td><pre style="margin:0;max-width:340px;max-height:120px;overflow:auto;font-size:11px">{{ item.detail_json }}</pre></td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无执行历史', '发生后台操作后会自动记录。', 7, 'EH') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

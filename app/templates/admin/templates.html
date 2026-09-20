@@ -1,0 +1,987 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog %}
+{% block content %}
+{{ page_header('TP', title or 'Web应用蜜罐管理', '只管理 Web 应用蜜罐的模板页面上传与节点部署，把仿真登录页、管理后台、业务入口等页面沉淀为可复用部署单元。', ['默认蜜罐', 'Web 应用', '节点部署'],
+      actions='<button type="button" class="chip primary" data-modal-open="clone-modal">＋ 克隆站点</button><button type="button" class="chip primary" data-modal-open="upload-modal">＋ 上传模板</button>') }}
+
+{% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
+{% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
+
+<section class="panel" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="pill">默认蜜罐</span>
+      <strong style="font-size:15px">{{ default_honeypot.name }}</strong>
+      <code style="font-size:12px;color:var(--muted-foreground)">0.0.0.0:{{ default_honeypot.port }}</code>
+      {% if default_honeypot.running %}
+      <span class="badge badge-success">运行中</span>
+      {% else %}
+      <span class="badge badge-warning">已停止</span>
+      {% endif %}
+      {% if default_honeypot.enabled %}
+      <span class="badge badge-info">门面启用</span>
+      {% else %}
+      <span class="badge badge-danger">门面已关闭（404）</span>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开蜜罐站点</a>
+      {% if default_honeypot.running %}
+      <form method="post" action="/admin/templates/honeypot/stop" style="margin:0">
+        <button type="submit" class="secondary btn-sm">停止蜜罐</button>
+      </form>
+      {% else %}
+      <form method="post" action="/admin/templates/honeypot/start" style="margin:0">
+        <button type="submit" class="primary btn-sm">启动蜜罐</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <p class="muted" style="font-size:12.5px;margin:0 0 12px">
+    48777 端口的 ThinkPHP 仿真门面是平台的<b>默认 Web 蜜罐</b>：一个站点承载全部蜜罐诱饵面（MCP / 指令文件 / Portal / 云元数据 / 内网 Wiki / 蜜饵链路），
+    整面 observe-only——攻击者永远不被阻断。停止本蜜罐即下线整个欺骗面；门面指纹与下方诱饵面开关互相联动。
+    {% if default_honeypot.stats.get('hits_24h') is not none %}24h 命中 <b>{{ default_honeypot.stats.get('hits_24h', 0) }}</b> 次。{% endif %}
+  </p>
+
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    {% for face in default_honeypot.faces %}
+    <a class="chip" href="/admin/counter-offense/{{ face.key }}" style="cursor:pointer;text-decoration:none"
+       title="{{ face.name }}——点击进入配置">
+      {% if face.enabled %}<span style="color:var(--success,#34d399)">●</span>{% else %}<span style="color:var(--muted-foreground)">○</span>{% endif %}
+      {{ face.name.split(' · ')[0] }}
+    </a>
+    {% endfor %}
+    <a class="chip" href="/admin/decoy-management" style="cursor:pointer;text-decoration:none">蜜饵管理</a>
+    <a class="chip" href="/admin/services" style="cursor:pointer;text-decoration:none">端口服务蜜罐管理</a>
+  </div>
+
+  <div class="cfg-layout" style="display:grid;grid-template-columns:240px minmax(0,1fr);gap:16px;align-items:start">
+    <nav class="cfg-nav" style="display:flex;flex-direction:column;gap:6px">
+      <div class="muted" style="font-size:11px;font-weight:600;letter-spacing:.08em;padding:2px 10px">诱饵面配置</div>
+      <button type="button" class="cfg-nav-item" data-cfg="thinkphp" aria-pressed="true">
+        <span>门面配置</span>
+        {% if default_honeypot.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
+      </button>
+      <button type="button" class="cfg-nav-item" data-cfg="metadata" aria-pressed="false">
+        <span>云元数据蜜罐（SSRF）</span>
+        {% if metadata_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
+      </button>
+      <button type="button" class="cfg-nav-item" data-cfg="dataset" aria-pressed="false">
+        <span>无限资源消耗数据集</span>
+        {% if dataset_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
+      </button>
+      <button type="button" class="cfg-nav-item" data-cfg="intranet" aria-pressed="false">
+        <span>内网横向 Wiki</span>
+        {% if intranet_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
+      </button>
+      <button type="button" class="cfg-nav-item" data-cfg="portal" aria-pressed="false">
+        <span>功能性伪装反制（Portal）</span>
+        {% if portal_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署</span>{% endif %}
+      </button>
+    </nav>
+    <div class="cfg-body">
+    <div class="cfg-pane" id="cfg-pane-thinkphp" style="display:block">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">预览指纹页</a>
+      <a class="chip" href="#" data-honeypot-open data-path="/admin.php" target="_blank" style="cursor:pointer;text-decoration:none">预览假后台</a>
+    </div>
+    <form method="post" action="/admin/templates/honeypot/config" class="stack" >
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if default_honeypot.enabled %}checked{% endif %}>
+        启用门面（关闭后 48777 上所有 ThinkPHP 路径返回 404，其余诱饵面不受影响）
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>框架显示名称</span>
+          <input name="app_name" value="{{ default_honeypot.config.get('app_name', 'ThinkPHP V5.0.24') }}"></label>
+        <label class="field-label"><span>首页标语</span>
+          <input name="slogan" value="{{ default_honeypot.config.get('slogan', '十年磨一剑 — 为API开发设计的高性能PHP框架') }}"></label>
+        <label class="field-label"><span>Runtime 路径指纹</span>
+          <input name="runtime_path" value="{{ default_honeypot.config.get('runtime_path', '/var/www/html/app/runtime') }}"></label>
+        <label class="field-label"><span>假后台登录页标题</span>
+          <input name="login_title" value="{{ default_honeypot.config.get('login_title', '内容管理后台') }}"></label>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap">
+        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="login_page_enabled" {% if default_honeypot.config.get('login_page_enabled', True) %}checked{% endif %}>
+          假后台登录捕获（/admin.php · /login）
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="rce_simulation_enabled" {% if default_honeypot.config.get('rce_simulation_enabled', True) %}checked{% endif %}>
+          经典 RCE 仿真回显（探测照常记录）
+        </label>
+      </div>
+      <div><button type="submit" class="primary btn-sm">保存门面配置</button></div>
+    </form>
+  
+    </div>
+    <div class="cfg-pane" id="cfg-pane-metadata" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <a class="chip" href="#" data-honeypot-open data-path="/latest/meta-data/" target="_blank" style="cursor:pointer;text-decoration:none">预览元数据目录</a>
+      <a class="chip" href="#" data-honeypot-open data-path="/latest/meta-data/iam/security-credentials/prod-app-role" target="_blank" style="cursor:pointer;text-decoration:none">预览凭证诱饵</a>
+      {% if metadata_face.enabled %}
+      <span class="badge badge-success">部署中</span>
+      {% else %}
+      <span class="badge badge-warning">未部署（404）</span>
+      {% endif %}
+    </div>
+    <form method="post" action="/admin/templates/metadata" class="stack" >
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if metadata_face.enabled %}checked{% endif %}>
+        部署本诱饵面（下线后 /latest/meta-data/* 与 /computeMetadata/v1/* 返回 404）
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>IAM 角色名</span>
+          <input name="role" value="{{ metadata_face.config.get('role', 'prod-app-role') }}"></label>
+        <label class="field-label"><span>AWS 账号 ID</span>
+          <input name="account_id" value="{{ metadata_face.config.get('account_id', '100000000001') }}"></label>
+      </div>
+      <p class="muted" style="font-size:12px;margin:0">仿冒 AWS/GCP 实例元数据服务：探测即 risk 85 事件，读取凭证即 risk 95 + 水印凭证入库（命中可溯源到具体会话）。</p>
+      <div><button type="submit" class="primary btn-sm">保存元数据蜜罐配置</button></div>
+    </form>
+  
+    </div>
+    <div class="cfg-pane" id="cfg-pane-dataset" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <a class="chip" href="#" data-honeypot-open data-path="/portal/api/dataset?page=1" target="_blank" style="cursor:pointer;text-decoration:none">预览数据页</a>
+      {% if dataset_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署（404）</span>{% endif %}
+    </div>
+    <form method="post" action="/admin/templates/dataset" class="stack" >
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if dataset_face.enabled %}checked{% endif %}>
+        部署本诱饵面（下线后 /portal/api/dataset 返回 404）
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>总页数（资源消耗上限）</span>
+          <input type="number" name="total_pages" value="{{ dataset_face.config.get('total_pages', 999999) }}"></label>
+        <label class="field-label"><span>每页行数</span>
+          <input type="number" name="rows_per_page" value="{{ dataset_face.config.get('rows_per_page', 10) }}"></label>
+        <label class="field-label"><span>邮箱域名</span>
+          <input name="email_domain" value="{{ dataset_face.config.get('email_domain', 'corp-internal.example') }}"></label>
+        <label class="field-label"><span>备注前缀</span>
+          <input name="note_prefix" value="{{ dataset_face.config.get('note_prefix', '内部核对') }}"></label>
+      </div>
+      <p class="muted" style="font-size:12px;margin:0">无限分页水印假客户数据：逐行可溯源至（会话， 页， 行），诱导自动化 Agent 陷入翻页消耗。</p>
+      <div><button type="submit" class="primary btn-sm">保存数据集配置</button></div>
+    </form>
+  
+    </div>
+    <div class="cfg-pane" id="cfg-pane-intranet" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <a class="chip" href="#" data-honeypot-open data-path="/intranet/" target="_blank" style="cursor:pointer;text-decoration:none">预览 Wiki</a>
+      {% if intranet_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署（404）</span>{% endif %}
+    </div>
+    <form method="post" action="/admin/templates/intranet" class="stack" >
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if intranet_face.enabled %}checked{% endif %}>
+        部署本诱饵面（下线后 /intranet/* 返回 404）
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>站点标题</span>
+          <input name="title" value="{{ intranet_face.config.get('title', '内部知识库 · Corp Wiki') }}"></label>
+        <label class="field-label"><span>本周值班</span>
+          <input name="duty" value="{{ intranet_face.config.get('duty', 'wei.chen / fang.wang') }}"></label>
+      </div>
+      <label class="field-label"><span>内网主机（每行：名称|IP）</span>
+        <textarea name="hosts" rows="4" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px">{% for h in intranet_face.config.get('hosts', []) %}{{ h.name }}|{{ h.ip }}
+{% endfor %}</textarea></label>
+      <p class="muted" style="font-size:12px;margin:0">SSH 假文件系统内网主机的落点：横向探测即 risk 75 事件，页面带会话水印。</p>
+      <div><button type="submit" class="primary btn-sm">保存内网 Wiki 配置</button></div>
+    </form>
+  
+    </div>
+    <div class="cfg-pane" id="cfg-pane-portal" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <a class="chip" href="#" data-honeypot-open data-path="/portal/api/content" target="_blank" style="cursor:pointer;text-decoration:none">预览 Portal API</a>
+      {% if portal_face.enabled %}<span class="badge badge-success">部署中</span>{% else %}<span class="badge badge-warning">未部署（404）</span>{% endif %}
+    </div>
+    <form method="post" action="/admin/templates/portal" class="stack" >
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="enabled" {% if portal_face.enabled %}checked{% endif %}>
+        部署本通道（下线后 /portal/api/* 返回 404，克隆站页脚不再展示）
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="footer_enabled" {% if portal_face.config.get('footer_enabled') %}checked{% endif %}>
+        克隆站展示 Developer API 伪装页脚
+      </label>
+      <div class="grid-2">
+        <label class="field-label"><span>页脚标题</span>
+          <input name="footer_title" value="{{ portal_face.config.get('footer_title', 'Developer API') }}"></label>
+        <label class="field-label"><span>客户端心跳间隔（秒）</span>
+          <input type="number" name="heartbeat_interval" value="{{ portal_face.config.get('heartbeat_interval', 30) }}"></label>
+        <label class="field-label"><span>注册限速（次/小时/IP）</span>
+          <input type="number" name="register_max_per_ip_hour" value="{{ portal_face.config.get('register_max_per_ip_hour', 20) }}"></label>
+      </div>
+      <p class="muted" style="font-size:12px;margin:0">Developer API 伪装页脚 + 三级客户端链路（内容 → 注册 → 心跳），接入即被画像归因。</p>
+      <div><button type="submit" class="primary btn-sm">保存 Portal 配置</button></div>
+    </form>
+  
+    </div>
+    </div>
+  </div>
+  <style>
+    .cfg-nav-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; text-align: left; cursor: pointer;
+      background: transparent; border: 1px solid transparent; border-radius: 9px;
+      padding: 9px 10px; font-size: 13px; font-family: inherit; color: inherit;
+      transition: background 150ms var(--ease-out, ease), border-color 150ms var(--ease-out, ease);
+    }
+    .cfg-nav-item:hover { background: rgba(96, 165, 250, 0.08); }
+    .cfg-nav-item[aria-pressed="true"] {
+      background: rgba(37, 99, 235, 0.10); border-color: rgba(37, 99, 235, 0.35);
+      font-weight: 600;
+    }
+    [data-theme="dark"] .cfg-nav-item[aria-pressed="true"] { background: rgba(96, 165, 250, 0.12); border-color: rgba(96, 165, 250, 0.35); }
+    .cfg-pane > .stack > div > button, .cfg-pane form { width: 100%; }
+  </style>
+  <script>
+    (function () {
+      var items = document.querySelectorAll('.cfg-nav-item');
+      items.forEach(function (item) {
+        item.addEventListener('click', function () {
+          items.forEach(function (i) { i.setAttribute('aria-pressed', 'false'); });
+          item.setAttribute('aria-pressed', 'true');
+          document.querySelectorAll('.cfg-pane').forEach(function (p) { p.style.display = 'none'; });
+          var pane = document.getElementById('cfg-pane-' + item.dataset.cfg);
+          if (pane) pane.style.display = 'block';
+        });
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var hp = location.protocol + '//' + location.hostname + ':{{ default_honeypot.port }}';
+      document.querySelectorAll('[data-honeypot-open]').forEach(function (a) {
+        a.href = hp + a.dataset.path;
+      });
+    })();
+  </script>
+</section>
+
+
+<style>
+  .web-template-hero {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 2px;
+  }
+  /* 创建入口双栏：克隆（高频）占主列，上传占副列 */
+  .tpl-create-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .tpl-create-grid > .panel { margin-top: 0; height: 100%; }
+  @media (max-width: 1280px) {
+    .tpl-create-grid { grid-template-columns: 1fr; }
+  }
+  /* 启用控件 + 停用按钮保持在同一行 */
+  .deploy-actions {
+    display: flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .deploy-actions .deploy-form .actions-inline {
+    display: flex !important;
+    flex-wrap: nowrap;
+    gap: 6px;
+    grid-template-columns: none;
+  }
+  .deploy-actions .deploy-form select { min-width: 96px; }
+  .deploy-actions .deploy-form input[type="number"] { width: 74px; }
+  .deploy-actions .deploy-form input[type="text"] { width: 90px; }
+  .deploy-form + form { margin-top: 8px; }
+  .deploy-form .actions-inline select,
+  .deploy-form .actions-inline input { width: 100%; min-width: 0; }
+  .deploy-form + form { margin-top: 8px; }
+  .web-template-kpi {
+    position: relative;
+    overflow: hidden;
+    min-height: 118px;
+    border: 1px solid rgba(96, 165, 250, 0.16);
+    border-radius: 20px;
+    padding: 18px;
+    background:
+      radial-gradient(circle at 92% 8%, rgba(14, 165, 233, 0.18), transparent 42%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(8, 13, 25, 0.78));
+    box-shadow: var(--shadow-card);
+  }
+  [data-theme="light"] .web-template-kpi {
+    border-color: rgba(15, 23, 42, 0.1);
+    background:
+      radial-gradient(circle at 92% 8%, rgba(37, 99, 235, 0.08), transparent 46%),
+      linear-gradient(180deg, #ffffff, #f6f9fe);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+  [data-theme="light"] .web-template-kpi strong { color: #0f172a; }
+  [data-theme="light"] .web-template-kpi span { color: #64748b; }
+  [data-theme="light"] .web-template-kpi p { color: #64748b; }
+  [data-theme="light"] .upload-drop { background: rgba(37, 99, 235, 0.04); border-color: rgba(37, 99, 235, 0.3); }
+  [data-theme="light"] .clone-help { background: rgba(37, 99, 235, 0.05); border-color: rgba(37, 99, 235, 0.16); color: #475569; }
+  [data-theme="light"] .clone-help strong { color: #0f172a; }
+  [data-theme="light"] .template-name-cell strong { color: #0f172a; }
+  [data-theme="light"] .template-meta-line code { color: #1d4ed8; }
+  [data-theme="light"] .clone-field-label > span { color: #334155; }
+  .web-template-kpi span {
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .web-template-kpi strong {
+    display: block;
+    margin-top: 12px;
+    color: #f8fbff;
+    font-family: "Fira Code", monospace;
+    font-size: 30px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .web-template-kpi p {
+    margin: 10px 0 0;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .upload-drop {
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    border: 1px dashed rgba(96, 165, 250, 0.34);
+    border-radius: 18px;
+    background: rgba(59, 130, 246, 0.07);
+  }
+  .upload-drop input[type="file"] {
+    border-style: dashed;
+    background: rgba(2, 6, 23, 0.24);
+  }
+  .clone-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .clone-row-full {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .clone-help {
+    padding: 10px 12px;
+    border: 1px solid rgba(96, 165, 250, 0.18);
+    border-radius: 12px;
+    color: var(--muted-foreground);
+    background: rgba(59, 130, 246, 0.06);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .clone-help strong { color: #dbeafe; }
+  .clone-ua-input {
+    min-height: 68px;
+    font-family: "Fira Code", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .clone-field-label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .clone-field-label > span {
+    color: #dbeafe;
+    letter-spacing: .02em;
+  }
+  .template-name-cell {
+    min-width: 220px;
+  }
+  .template-name-cell strong {
+    display: block;
+    color: #f8fbff;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .template-meta-line {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .template-meta-line.tpl-meta-compact { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .template-meta-line code {
+    color: #93c5fd;
+    word-break: break-all;
+  }
+  .clone-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 211, 238, 0.22);
+    background: rgba(34, 211, 238, 0.08);
+    color: #bae6fd;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .clone-source-badge.language {
+    border-color: rgba(52, 211, 153, 0.24);
+    background: rgba(52, 211, 153, 0.08);
+    color: #bbf7d0;
+  }
+  .deploy-form {
+    min-width: 320px;
+  }
+  .deploy-form .actions-inline {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .deploy-form select {
+    min-width: 120px;
+  }
+  .deploy-form input[type="number"] {
+    width: 72px;
+    min-width: 60px;
+    text-align: center;
+    font-family: "Fira Code", monospace;
+  }
+  .deploy-form input[type="text"] {
+    min-width: 80px;
+    font-family: "Fira Code", monospace;
+  }
+  /* deploy row buttons share one size with the sibling disable/delete */
+  .btn-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 11px 13px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #0a0a0a;
+    background: linear-gradient(to bottom, #ffffff, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+    border: none;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+  .btn-preview:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  }
+  .btn-preview:active {
+    transform: translateY(0) scale(0.985);
+  }
+  .btn-preview:focus-visible {
+    outline: 2px solid rgba(34, 211, 238, 0.6);
+    outline-offset: 2px;
+  }
+  /* 紧凑行内用法（克隆结果条 / 部署管理表等） */
+  .actions-inline .btn-preview, .clone-msg .btn-preview {
+    height: 29px !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+  }
+  /* 本页两表的操作按钮统一 29px 控制高度 */
+  .table-wrap td .btn-sm, .table-wrap td button { height: 29px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+  /* 部署表单：控件与按钮同高，路径输入框不再被挤扁 */
+  .deploy-form .actions-inline button { height: 29px !important; }
+  .deploy-form .actions-inline select,
+  .deploy-form .actions-inline input { height: 29px !important; padding-top: 0; padding-bottom: 0; }
+  /* 与 secondary 按钮同排的深色变体（已部署模板管理表） */
+  .btn-preview.subtle {
+    color: #e5e7eb;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    box-shadow: none;
+  }
+  .btn-preview.subtle:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.09);
+    box-shadow: none;
+  }
+  .clone-msg {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .clone-msg-ok {
+    background: rgba(52, 211, 153, 0.10);
+    border: 1px solid rgba(52, 211, 153, 0.28);
+    color: #bbf7d0;
+  }
+  .clone-msg-err {
+    background: rgba(251, 113, 133, 0.10);
+    border: 1px solid rgba(251, 113, 133, 0.28);
+    color: #fecdd3;
+  }
+  .clone-msg-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .grid-top { align-items: start; }
+  @media (max-width: 980px) {
+    .web-template-hero { grid-template-columns: 1fr; }
+    .deploy-form .actions-inline { flex-direction: column; }
+    .deploy-form button { width: 100%; }
+    .clone-row { grid-template-columns: 1fr; }
+    .clone-msg { align-items: flex-start; flex-direction: column; }
+  }
+</style>
+
+<div class="web-template-hero">
+  <div class="web-template-kpi">
+    <span>Template Pages</span>
+    <strong>{{ items|length }}</strong>
+    <p>已上传的 Web 蜜罐页面模板，可直接分配到节点。</p>
+  </div>
+  <div class="web-template-kpi">
+    <span>Deploy Nodes</span>
+    <strong>{{ nodes|length }}</strong>
+    <p>可承载 Web 应用蜜罐的受控节点。</p>
+  </div>
+  <div class="web-template-kpi">
+    <span>Management Scope</span>
+    <strong>Web</strong>
+    <p>本页仅覆盖页面模板、入口路径和 Web 节点部署。</p>
+  </div>
+</div>
+
+{% call modal_dialog('clone-modal', '一键克隆站点为模板', '输入需克隆的互联网系统 URL，系统使用中文 UA / Accept-Language 渲染页面并抓取前端资源，保存为可重复部署的 Web 应用蜜罐模板。', wide=true) %} '输入需克隆的互联网系统 URL，系统使用中文 UA / Accept-Language 渲染页面并抓取前端资源，保存为可重复部署的 Web 应用蜜罐模板') }}
+  <form id="clone-form" class="stack">
+    <div class="clone-row">
+      <input name="clone_url" type="text" placeholder="https://target.example.com/login 或 target.example.com/login" required>
+      <input name="name" placeholder="模板名称（留空则自动取域名）">
+    </div>
+    <div class="clone-row">
+      <select name="web_stack">
+        <option value="管理后台">管理后台</option>
+        <option value="OA 登录">OA 登录</option>
+        <option value="云控制台">云控制台</option>
+        <option value="API 文档">API 文档</option>
+        <option value="业务门户">业务门户</option>
+        <option value="自定义页面" selected>自定义页面</option>
+      </select>
+      <input name="entry_path" value="/" placeholder="入口路径，如 /login">
+    </div>
+    <textarea name="description" placeholder="描述页面用途、仿真业务或采集点（留空则自动填写来源 URL）"></textarea>
+    <div class="clone-row">
+      <label class="clone-field-label">
+        <span>语言请求头</span>
+        <select name="clone_accept_language">
+          <option value="{{ clone_default_accept_language }}" selected>中文优先 · {{ clone_default_accept_language }}</option>
+          <option value="zh-CN,zh;q=0.95">仅中文 · zh-CN</option>
+          <option value="zh-TW,zh;q=0.95,en;q=0.35">繁体中文 · zh-TW</option>
+          <option value="en-US,en;q=0.9">英文 · en-US</option>
+        </select>
+      </label>
+      <label class="clone-field-label">
+        <span>渲染等待</span>
+        <input type="number" name="clone_render_wait" value="8" min="2" max="20" placeholder="秒">
+      </label>
+      <label class="clone-field-label" title="默认保留原站加载时自动弹出的对话框（如客户端下载提示），与真实站点一致；勾选后克隆为无弹窗的纯净快照">
+        <span>关闭加载弹窗</span>
+        <select name="dismiss_popups">
+          <option value="" selected>保留（默认 · 与原站一致）</option>
+          <option value="on">关闭（纯净快照）</option>
+        </select>
+      </label>
+    </div>
+    <label class="clone-field-label">
+      <span>User-Agent（用于控制桌面/移动端与部分站点语言版本）</span>
+      <textarea class="clone-ua-input" name="clone_user_agent" spellcheck="false">{{ clone_default_user_agent }}</textarea>
+    </label>
+    <div class="clone-row">
+      <label class="clone-field-label">
+        <span>触发后跳转动作</span>
+        <select name="redirect_action" id="redirect-action-select">
+          <option value="fake_error" selected>模拟登录失败（诱导反复尝试）</option>
+          <option value="warning">警告页面（拦截并提示）</option>
+          <option value="original">原站点跳转（跳到真实系统）</option>
+          <option value="custom">自定义 URL 跳转</option>
+        </select>
+      </label>
+      <label class="clone-field-label" id="redirect-url-label" style="display:none;">
+        <span>自定义跳转 URL</span>
+        <input name="redirect_url" type="text" placeholder="https://example.com/safe-page" value="">
+      </label>
+    </div>
+    <div class="clone-help">
+      <strong>触发后跳转：</strong>攻击者提交登录凭证后，页面可执行四种动作之一 —— <strong>模拟登录失败</strong>（提示密码错误并清空密码框，诱导攻击者反复尝试以收割更多凭据）、<strong>警告页面</strong>（显示拦截提示，凭证已记录）、<strong>原站点跳转</strong>（跳转到克隆源 URL）、<strong>自定义 URL 跳转</strong>（跳转到指定地址）。
+    </div>
+    <div class="clone-help">
+      <strong>克隆范围：</strong>默认以 zh-CN 语言环境、桌面 Chrome UA 渲染页面，并额外重写 JS / CSS 内的资源路径；仅克隆前端静态资源，不执行业务逻辑、不递归抓取整站。若目标站点根据 UA 输出移动端或英文版，可在这里切换 UA 与语言请求头后重新克隆。
+    </div>
+    <button type="submit" id="clone-btn">克隆并创建模板</button>
+  </form>
+
+  <!-- 进度条（克隆期间显示） -->
+  <div id="clone-progress" style="display:none; margin-top:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <span id="clone-stage" style="color:#dbeafe; font-size:13px; font-weight:600;">准备中…</span>
+      <span id="clone-percent" style="color:#60a5fa; font-family:'Fira Code',monospace; font-size:13px;">0%</span>
+    </div>
+    <div style="height:6px; border-radius:3px; background:rgba(96,165,250,0.12); overflow:hidden;">
+      <div id="clone-bar" style="height:100%; width:0%; border-radius:3px; background:linear-gradient(90deg,#3b82f6,#60a5fa); transition:width .4s ease;"></div>
+    </div>
+    <div style="margin-top:8px; text-align:right;">
+      <button type="button" id="clone-cancel-btn" class="secondary" style="font-size:12px; padding:4px 12px;">取消</button>
+    </div>
+  </div>
+
+  <!-- 结果消息 -->
+  <div id="clone-result"></div>
+
+  {% if clone_ok %}
+  <div class="clone-msg clone-msg-ok">
+    <span>克隆成功 — 模板「{{ clone_name }}」已创建，抓取 {{ clone_assets }} 个资源（{{ clone_kb }} KB）。</span>
+    {% if clone_template_id %}
+    <span class="clone-msg-actions">
+      <a class="btn-preview" href="/admin/templates/{{ clone_template_id }}/preview" target="_blank">立即浏览</a>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if clone_err %}
+  <div class="clone-msg clone-msg-err">克隆失败 — {{ clone_err }}</div>
+  {% endif %}
+</section>
+
+{% endcall %}
+{% call modal_dialog('upload-modal', '上传 Web 应用蜜罐模板', '上传仿真页面或静态页面包，并定义入口路径与页面类型。') %} '上传仿真页面或静态页面包，并定义入口路径与页面类型') }}
+    <form method="post" action="/admin/templates" enctype="multipart/form-data" class="stack">
+      <div class="grid-2">
+        <input name="name" placeholder="模板名称，如 仿真OA登录页" required>
+        <select name="web_stack" required>
+          <option value="管理后台">管理后台</option>
+          <option value="OA 登录">OA 登录</option>
+          <option value="云控制台">云控制台</option>
+          <option value="API 文档">API 文档</option>
+          <option value="业务门户">业务门户</option>
+          <option value="自定义页面">自定义页面</option>
+        </select>
+      </div>
+      <div class="grid-2">
+        <input name="entry_path" value="/" placeholder="入口路径，如 /login" required>
+        <input name="deploy_mode" value="静态页面仿真" placeholder="部署方式">
+      </div>
+      <div class="upload-drop">
+        <div class="muted">模板页面上传：支持 HTML、静态资源压缩包或页面配置文件。</div>
+        <input type="file" name="template_file" accept=".html,.htm,.zip,.tar,.gz,.tgz,.json,.txt">
+      </div>
+      <textarea name="description" placeholder="描述页面用途、仿真业务、采集点或触发条件"></textarea>
+      <button type="submit">上传并创建模板</button>
+    </form>
+{% endcall %}
+
+  <section class="panel">
+    {{ section_header('Web 应用蜜罐部署', '启用模板后立即在指定节点的指定端口生效；停用可重新启用而不丢失配置') }}
+    {% if deploy_ok %}
+    <div class="clone-msg clone-msg-ok">部署成功 — 模板「{{ deploy_name }}」已下发至节点「{{ deploy_node }}」，监听 :{{ deploy_port }}{{ deploy_route }}</div>
+    {% endif %}
+    {% if enable_ok %}
+    <div class="clone-msg clone-msg-ok">已启用 — 模板「{{ enable_name }}」现在在节点「{{ enable_node }}」的 :{{ enable_port }}{{ enable_route }} 提供蜜罐访问。</div>
+    {% endif %}
+    {% if enable_err %}
+    <div class="clone-msg clone-msg-err">{{ enable_err }}</div>
+    {% endif %}
+    {% if disable_ok %}
+    <div class="clone-msg clone-msg-ok">已停用 — 模板「{{ disable_name }}」已从 {{ disable_count }} 个部署中移除，仍保留配置记录。</div>
+    {% endif %}
+    <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
+      <form method="post" action="/admin/templates/bulk-delete" data-confirm="确认删除选中的 {n} 个模板？已部署的实例会一并移除，不可撤销。" class="bulk-del-form">
+        <input type="hidden" name="ids" value="">
+        <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+      </form>
+      <span class="muted" style="font-size:11px">勾选模板后批量移除</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th>
+            <th class="cell-prose">模板</th>
+            <th>Web 类型</th>
+            <th>入口路径</th>
+            <th>上传页面</th>
+            <th>启用到节点</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          {% set is_enabled = item.id in deployed_urls %}
+          <tr>
+            <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
+            <td class="template-name-cell cell-prose">
+              <strong>{{ item.name }}</strong>
+              <div class="template-meta-line" title="{{ item.description or '' }}">{{ item.description or '暂无描述' }}</div>
+              <div class="template-meta-line tpl-meta-compact"
+                   title="{% if item.clone_source_url %}来源：{{ item.clone_source_url }}{% endif %} · 语言：{{ item.clone_accept_language or '-' }} · 创建：{{ item.created_at }}">{% if item.created_by_clone %}<span class="clone-source-badge">URL 克隆</span> {% endif %}{{ item.created_at }}</div>
+            </td>
+            <td><span class="pill">{{ item.web_stack }}</span></td>
+            <td><code>{{ item.entry_path }}</code></td>
+            <td>
+              {% if item.artifact_name %}
+                <span class="pill">{{ item.artifact_name }}</span>
+                {% if item.clone_asset_count is not none %}
+                <div class="template-meta-line">资源：{{ item.clone_asset_count }} 个{% if item.clone_total_kb is not none %} · {{ item.clone_total_kb }} KB{% endif %}</div>
+                {% endif %}
+              {% else %}
+                <span class="muted">未上传文件</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="actions-inline deploy-actions">
+                <form method="post" action="/admin/templates/{{ item.id }}/enable" class="deploy-form" style="margin:0">
+                  <select name="node_id" {% if not nodes %}disabled{% endif %} title="部署节点">
+                    {% for node in nodes %}
+                    <option value="{{ node.id }}">{{ node.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="number" name="deploy_port" value="8080" min="1" max="65535" placeholder="端口" title="部署端口">
+                  <input type="text" name="deploy_route" value="{{ item.entry_path }}" placeholder="/path" title="入口路径">
+                  <button type="submit" {% if not nodes %}disabled{% endif %} class="primary btn-sm">启用</button>
+                </form>
+                {% if is_enabled %}
+                <form method="post" action="/admin/templates/{{ item.id }}/disable" style="margin:0">
+                  <button type="submit" class="secondary btn-sm">停用</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="actions-inline">
+                {% if is_enabled %}
+                <a class="btn-preview" href="{{ deployed_urls[item.id] }}" target="_blank">浏览部署</a>
+                {% elif item.artifact_path %}
+                <a class="btn-preview" href="/admin/templates/{{ item.id }}/preview" target="_blank">浏览模板</a>
+                {% else %}
+                <span class="muted">暂无预览</span>
+                {% endif %}
+                <form method="post" action="/admin/templates/{{ item.id }}/delete">
+                  <button class="danger btn-sm" type="submit">删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          {{ empty_state('暂无 Web 应用蜜罐模板', '上传模板页面后会显示在这里，并可一键部署到节点。', 7, 'TP') }}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    {{ section_header('已部署模板管理', '查看和管理已下发到节点的 Web 应用蜜罐模板') }}
+    {% if undeploy_ok %}
+    <div class="clone-msg clone-msg-ok">已卸载 — 节点「{{ undeploy_node }}」上的模板已移除。</div>
+    {% endif %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>节点</th>
+            <th>模板</th>
+            <th>Web 类型</th>
+            <th>监听端口</th>
+            <th>路由地址</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="color:#f8fbff">内置节点</strong></td>
+            <td><span class="pill">ThinkPHP Web 蜜罐（默认）</span></td>
+            <td><span class="pill">ThinkPHP 仿真门面</span></td>
+            <td><code>0.0.0.0:{{ default_honeypot.port }}</code></td>
+            <td><code>/</code></td>
+            <td>
+              {% if default_honeypot.running %}
+              <span class="pill" style="background:rgba(52,211,153,0.13);border-color:rgba(52,211,153,0.24);color:#bbf7d0">运行中</span>
+              {% else %}
+              <span class="pill" style="background:rgba(251,113,133,0.10);border-color:rgba(251,113,133,0.24);color:#fecdd3">已停止</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="actions-inline">
+                <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开站点</a>
+                <a class="chip" href="#门面配置" onclick="document.querySelector('.cfg-nav-item[data-cfg=\'thinkphp\']')?.click();document.querySelector('.cfg-layout')?.scrollIntoView({behavior:'smooth'});return false" style="cursor:pointer;text-decoration:none">门面配置</a>
+              </div>
+            </td>
+          </tr>
+          {% for d in deployed %}
+          <tr>
+            <td>
+              <strong style="color:#f8fbff">{{ d.node_name }}</strong>
+            </td>
+            <td>
+              <span class="pill">{{ d.template_name }}</span>
+            </td>
+            <td><span class="pill">{{ d.web_stack }}</span></td>
+            <td><code>{{ d.listen_address }}:{{ d.deploy_port }}</code></td>
+            <td><code>{{ d.deploy_route }}</code></td>
+            <td>
+              {% if d.node_status == 'online' %}
+                <span class="pill" style="background:rgba(52,211,153,0.13);border-color:rgba(52,211,153,0.24);color:#bbf7d0">在线</span>
+              {% else %}
+                <span class="pill" style="background:rgba(251,113,133,0.10);border-color:rgba(251,113,133,0.24);color:#fecdd3">离线</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="actions-inline">
+                {% if d.template_id %}
+                <a class="btn-preview subtle" href="/admin/templates/{{ d.template_id }}/preview" target="_blank">预览</a>
+                <form method="post" action="/admin/templates/{{ d.template_id }}/disable" style="margin:0">
+                  <button class="secondary btn-sm" type="submit">停用</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/admin/templates/{{ d.node_id }}/undeploy" style="margin:0">
+                  <button class="danger btn-sm" type="submit">卸载</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+<script>
+// Toggle redirect URL field visibility
+(function(){
+  var sel = document.getElementById('redirect-action-select');
+  var urlLabel = document.getElementById('redirect-url-label');
+  if (sel && urlLabel) {
+    function update() { urlLabel.style.display = (sel.value === 'custom') ? '' : 'none'; }
+    sel.addEventListener('change', update);
+    update();
+  }
+})();
+
+(function(){
+  var form    = document.getElementById('clone-form');
+  var btn     = document.getElementById('clone-btn');
+  var prog    = document.getElementById('clone-progress');
+  var bar     = document.getElementById('clone-bar');
+  var stageEl = document.getElementById('clone-stage');
+  var pctEl   = document.getElementById('clone-percent');
+  var result  = document.getElementById('clone-result');
+  var cancel  = document.getElementById('clone-cancel-btn');
+  var polling = null;
+
+  if (!form) return;
+
+  function showProgress() {
+    prog.style.display = '';
+    bar.style.width    = '0%';
+    stageEl.textContent = '准备中…';
+    pctEl.textContent   = '0%';
+    result.innerHTML    = '';
+    btn.disabled = true;
+    btn.textContent = '克隆中…';
+  }
+
+  function hideProgress() {
+    prog.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '克隆并创建模板';
+    if (polling) { clearInterval(polling); polling = null; }
+  }
+
+  function pollStatus(taskId) {
+    polling = setInterval(function(){
+      fetch('/admin/templates/clone/status/' + taskId, {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          bar.style.width    = (d.percent || 0) + '%';
+          stageEl.textContent = d.stage || '';
+          pctEl.textContent   = (d.percent || 0) + '%';
+
+          if (d.done) {
+            hideProgress();
+            if (d.error) {
+              result.innerHTML = '<div class="clone-msg clone-msg-err">克隆失败 — ' + d.error + '</div>';
+            } else if (d.result) {
+              var r = d.result;
+              result.innerHTML =
+                '<div class="clone-msg clone-msg-ok">' +
+                '<span>克隆成功 — 模板「' + r.template_name + '」已创建，抓取 ' + r.asset_count + ' 个资源（' + r.size_kb + ' KB）。</span>' +
+                '<span class="clone-msg-actions">' +
+                '<a class="btn-preview" href="/admin/templates/' + r.template_id + '/preview" target="_blank">立即浏览</a>' +
+                '</span></div>';
+            }
+          }
+        })
+        .catch(function(e){ /* keep polling */ });
+    }, 1000);
+  }
+
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var fd = new FormData(form);
+    showProgress();
+    fetch('/admin/templates/clone', {method:'POST', body:fd, credentials:'same-origin'})
+      .then(function(r){
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('json') !== -1) return r.json();
+        // If server returned redirect (error), reload the page to show server-side messages
+        window.location.reload();
+        return null;
+      })
+      .then(function(d){
+        if (d && d.task_id) {
+          pollStatus(d.task_id);
+        } else {
+          hideProgress();
+        }
+      })
+      .catch(function(e){
+        hideProgress();
+        result.innerHTML = '<div class="clone-msg clone-msg-err">请求失败 — ' + e.message + '</div>';
+      });
+  });
+
+  cancel.addEventListener('click', function(){
+    hideProgress();
+  });
+  // batch delete
+  var bulkAll = document.querySelector('.bulk-select-all');
+  if (bulkAll) bulkAll.addEventListener('change', function () {
+    document.querySelectorAll('.bulk-check').forEach(function (c) { c.checked = bulkAll.checked; });
+  });
+  var bulkBtn = document.querySelector('.bulk-del-btn');
+  if (bulkBtn) bulkBtn.addEventListener('click', function () {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+    if (!checked.length) { alert('请先勾选要删除的模板'); return; }
+    var form = bulkBtn.closest('form');
+    if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+    form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+    form.submit();
+  });
+})();
+</script>
+
+{% endblock %}

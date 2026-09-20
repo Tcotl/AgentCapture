@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentCapture · 登录</title>
+<style>
+  :root {
+    --line: rgba(96, 165, 250, 0.28);
+    --neon: #3b82f6;
+    --neon-2: #22d3ee;
+    --text: #eaf3ff;
+    --muted: #8fa9d8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; flex-direction: column;
+    color: var(--text);
+    font-family: "Fira Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #030a1c url('/static/login-bg.jpg') center / cover no-repeat fixed;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  header {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 38px;
+  }
+  .top-brand { display: flex; align-items: center; gap: 12px; }
+  .top-brand img { width: 34px; height: 34px; }
+  .top-brand span { font-family: "Fira Code", ui-monospace, monospace; font-size: 13px; letter-spacing: .3em; color: var(--muted); }
+
+  main {
+    position: relative; z-index: 2; flex: 1;
+    width: min(1280px, 100% - 76px);
+    margin: 0 auto;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding: 12px 0 40px;
+  }
+  @media (max-width: 1020px) {
+    main { justify-content: center; width: min(560px, 100% - 40px); }
+  }
+
+  /* ---------- left: brand story ---------- */
+  .logo-row { display: flex; align-items: center; gap: 20px; }
+  .logo-row img { width: 96px; height: 96px; filter: drop-shadow(0 0 22px rgba(59, 130, 246, 0.45)); }
+  .logo-type .en {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: clamp(38px, 4.6vw, 56px); font-weight: 800; letter-spacing: -0.01em; line-height: 1;
+    background: linear-gradient(100deg, #ffffff 38%, #7cc4ff 70%, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .logo-type .zh { font-size: clamp(24px, 2.6vw, 34px); font-weight: 800; letter-spacing: .34em; margin-top: 6px; }
+  .tagline { margin: 22px 0 0; font-size: clamp(15px, 1.6vw, 19px); letter-spacing: .32em; color: #bcd6f7; }
+  .tagline b { color: var(--neon-2); font-weight: 600; }
+  .en-sub { margin: 12px 0 0; font-family: "Fira Code", ui-monospace, monospace; font-size: 12.5px; letter-spacing: .38em; color: var(--muted); }
+  .story-points { margin: 44px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 560px; }
+  .story-points div {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 15px;
+    background: linear-gradient(180deg, rgba(13, 27, 56, 0.55), rgba(6, 15, 34, 0.55));
+    font-size: 13.5px; letter-spacing: .06em; color: #cfe3ff;
+  }
+  .story-points i { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 8px currentColor; }
+  .story-points .stats { display: flex; gap: 20px; margin-top: 26px; }
+
+  /* ---------- right: login card ---------- */
+  .login-wrap { position: relative; width: min(480px, 100%); }
+  .login-card {
+    position: relative;
+    border: 1px solid rgba(59, 130, 246, 0.55);
+    border-radius: 4px;
+    padding: 44px 40px 38px;
+    background:
+      linear-gradient(180deg, rgba(8, 20, 44, 0.88), rgba(3, 10, 26, 0.92));
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.10),
+      0 0 44px rgba(37, 99, 235, 0.22),
+      inset 0 0 60px rgba(37, 99, 235, 0.08);
+  }
+  /* neon corner brackets */
+  .corner { position: absolute; width: 26px; height: 26px; border-color: var(--neon-2); border-style: solid; border-width: 0; }
+  .corner.tl { top: -2px; left: -2px; border-top-width: 2.5px; border-left-width: 2.5px; }
+  .corner.tr { top: -2px; right: -2px; border-top-width: 2.5px; border-right-width: 2.5px; }
+  .corner.bl { bottom: -2px; left: -2px; border-bottom-width: 2.5px; border-left-width: 2.5px; }
+  .corner.br { bottom: -2px; right: -2px; border-bottom-width: 2.5px; border-right-width: 2.5px; }
+
+  .card-brand { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 6px; }
+  .card-brand img { width: 52px; height: 52px; filter: drop-shadow(0 0 14px rgba(59, 130, 246, 0.5)); }
+  .card-brand .en { font-family: "Fira Code", ui-monospace, monospace; font-size: 24px; font-weight: 800; background: linear-gradient(100deg, #ffffff 40%, #7cc4ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card-brand .zh { font-size: 16px; font-weight: 700; letter-spacing: .3em; margin-top: 2px; text-indent: .3em; }
+  .card-brand > div { text-align: left; }
+  .card-tagline { color: var(--muted); font-size: 12px; letter-spacing: .22em; margin: 8px 0 26px; text-align: center; }
+
+  .error {
+    margin-bottom: 18px;
+    border: 1px solid rgba(251, 113, 133, 0.35);
+    background: rgba(251, 113, 133, 0.10);
+    color: #fecdd3;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-size: 13px; font-weight: 600;
+  }
+  form { display: grid; gap: 16px; }
+  .field { position: relative; display: flex; align-items: center; }
+  .field svg { position: absolute; left: 13px; width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+  .field input {
+    width: 100%;
+    padding: 13px 14px 13px 40px;
+    border-radius: 8px;
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    background: rgba(5, 14, 32, 0.72);
+    color: var(--text);
+    font: inherit; font-size: 14px;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .field input::placeholder { color: rgba(143, 169, 216, 0.75); }
+  .field input:focus { border-color: var(--neon-2); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14); }
+  .eye {
+    position: absolute; right: 10px;
+    background: none; border: 0; padding: 4px; cursor: pointer;
+    color: var(--muted); display: grid; place-items: center;
+  }
+  .eye svg { position: static; width: 17px; height: 17px; }
+  .aux { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); margin-top: -4px; }
+  .aux label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .aux input[type="checkbox"] { accent-color: var(--neon); width: 14px; height: 14px; cursor: pointer; }
+  .aux a { color: #9fc3f7; text-decoration: none; }
+  .aux a:hover { text-decoration: underline; }
+  button.login {
+    width: 100%;
+    border: 0; border-radius: 8px;
+    padding: 13px;
+    font: inherit; font-size: 15px; font-weight: 800; letter-spacing: .35em; text-indent: .35em;
+    color: #ffffff;
+    background: linear-gradient(180deg, #2f7cf6, #1d5fe0);
+    box-shadow: 0 10px 30px rgba(29, 95, 224, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+  }
+  button.login:hover { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 14px 36px rgba(29, 95, 224, 0.55); }
+  button.login:active { transform: translateY(0); }
+  .tenant { margin-top: 16px; text-align: center; color: var(--muted); font-size: 11.5px; letter-spacing: .06em; }
+  .tenant code { color: #9fc3f7; font-family: "Fira Code", ui-monospace, monospace; }
+
+  footer {
+    position: relative; z-index: 2;
+    display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 16px 38px 22px;
+    color: var(--muted); font-size: 12.5px;
+  }
+  footer a { color: #9fc3f7; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .foot-right { letter-spacing: .18em; color: #6f8ec4; }
+  @media (max-width: 640px) {
+    header { padding: 16px 20px; }
+    main { width: 100% - 32px; padding: 0 16px 24px; }
+    .login-card { padding: 32px 24px 28px; }
+    footer { padding: 14px 20px 18px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="top-brand"><img src="/static/agentcapture-logo.svg" alt=""><span>AGENTCAPTURE</span></div>
+  <div class="top-brand"><span>HONEYPOT MONITORING SYSTEM</span></div>
+</header>
+
+<main>
+  <section class="login-wrap">
+    <div class="login-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-brand">
+        <img src="/static/agentcapture-logo.svg" alt="">
+        <div>
+          <div class="en">AgentCapture</div>
+          <div class="zh">蜜罐系统</div>
+        </div>
+      </div>
+      <div class="card-tagline">智能捕获 · 威胁感知 · 纵深防御</div>
+
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+      <form method="post" action="">
+        <div class="field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input name="username" autocomplete="username" placeholder="请输入用户名" required />
+        </div>
+        <div class="field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input id="pw" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required />
+          <button type="button" class="eye" id="eye" aria-label="显示或隐藏密码">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="aux">
+          <label><input type="checkbox" name="remember"> 记住账号</label>
+          <a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">了解 AgentCapture ↗</a>
+        </div>
+        <button type="submit" class="login">登 录</button>
+      </form>
+      <div class="tenant">默认租户：<code>{{ site_id }}</code> · 受控沙箱后台</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>开源项目&nbsp;&nbsp;<a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">github.com/Tcotl/AgentCapture</a></span>
+  <span class="foot-right">以蜜罐之名 · 记录每一次威胁</span>
+</footer>
+
+<script>
+  document.getElementById('eye').addEventListener('click', function () {
+    var pw = document.getElementById('pw');
+    pw.type = pw.type === 'password' ? 'text' : 'password';
+  });
+  // 记住账号：填充上次登录的用户名
+  (function () {
+    var saved = localStorage.getItem('ach:login-user');
+    var user = document.querySelector('input[name="username"]');
+    var box = document.querySelector('input[name="remember"]');
+    if (saved && user) { user.value = saved; box.checked = true; }
+    document.querySelector('form').addEventListener('submit', function () {
+      try {
+        if (box.checked) localStorage.setItem('ach:login-user', user.value || '');
+        else localStorage.removeItem('ach:login-user');
+      } catch (e) {}
+    });
+  })();
+  
+</script>
+</body>
+</html>

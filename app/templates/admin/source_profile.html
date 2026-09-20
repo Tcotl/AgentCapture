@@ -1,0 +1,33 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state %}
+{% block content %}
+<style>
+  /* page-local interaction & readability layer (mirrors attacks.html) */
+  .chip {
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+  .chip:hover { border-color: rgba(34, 211, 238, 0.45); background: rgba(34, 211, 238, 0.12); color: #f0fdff; }
+  .chip.primary:hover { box-shadow: 0 0 22px rgba(34, 211, 238, 0.4); }
+  .chip:active { transform: scale(0.97); }
+
+  .sp-mono { font-family: "Fira Code", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .sp-score {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-weight: 700; color: #a5f3fc; font-variant-numeric: tabular-nums;
+  }
+  .sp-score.danger { color: #fda4af; text-shadow: 0 0 10px rgba(251, 113, 133, 0.35); }
+  .sp-score.warn { color: #fcd34d; text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+  .table-wrap .numeric { font-variant-numeric: tabular-nums; }
+</style>
+
+{{ page_header('IP', '来源画像 / ' ~ profile.source_ip, '从单个来源地址观察多会话、多路径、多站点行为，用于识别扫描器、自动化工具和重复攻击链。', ['来源画像']) }}
+<div class="cards">{{ metric_card('事件数', profile.event_count) }}{{ metric_card('会话数', profile.session_count) }}{{ metric_card('首见', '<span class="sp-mono">' ~ profile.first_seen.strftime('%Y-%m-%d %H:%M:%S') ~ '</span>') }}{{ metric_card('末见', '<span class="sp-mono">' ~ profile.last_seen.strftime('%Y-%m-%d %H:%M:%S') ~ '</span>') }}</div>
+<div class="grid-2">
+  <section class="panel">{{ section_header('热点统计', '站点、路径、信号与决策') }}<div class="grid-2"><div><div class="muted">站点</div><pre>{% for name, count in profile.top_sites %}{{ name }} × {{ count }}
+{% endfor %}</pre></div><div><div class="muted">路径</div><pre>{% for name, count in profile.top_paths %}{{ name }} × {{ count }}
+{% endfor %}</pre></div><div><div class="muted">信号</div><pre>{% for name, count in profile.top_signals %}{{ name }} × {{ count }}
+{% endfor %}</pre></div><div><div class="muted">决策</div><pre>{% for name, count in profile.top_decisions %}{{ name }} × {{ count }}
+{% endfor %}</pre></div></div></section>
+  <section class="panel">{{ section_header('最近会话', '按会话粒度进入详情与画像') }}<div class="table-wrap"><table><thead><tr><th>会话</th><th class="numeric">次数</th><th class="numeric">自动化分</th><th>标签</th><th>动作</th></tr></thead><tbody>{% for item in profile.recent_sessions %}<tr><td><code class="sid" title="{{ item.session_id }}">{{ item.session_id[:10] }}…{{ item.session_id[-6:] }}</code></td><td class="numeric">{{ item.count }}</td><td class="numeric"><span class="sp-score {% if item.automation_score >= 70 %}danger{% elif item.automation_score >= 45 %}warn{% endif %}">{{ item.automation_score }}</span></td><td>{% for label in item.portrait_labels %}<span class="pill">{{ label }}</span>{% else %}<span class="text-muted">-</span>{% endfor %}</td><td><div class="actions-inline"><a class="chip" href="/admin/attacks/{{ item.session_id }}">详情</a><a class="chip primary" href="/admin/sessions/{{ item.session_id }}">画像</a></div></td></tr>{% else %}{{ empty_state('暂无关联会话', '该来源当前没有更多会话记录。', 5, 'IP') }}{% endfor %}</tbody></table></div></section>
+</div>
+{% endblock %}

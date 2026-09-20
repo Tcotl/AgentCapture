@@ -1,0 +1,87 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state %}
+{% block content %}
+{{ page_header('AI', title or '提示词注入触发记录', '聚合提示词注入触发、Agent 产品指纹识别、回显与阻断证据，帮助分析自动化渗透链路。', ['Agent 指纹', '提示词注入']) }}
+
+<section class="panel">
+  {{ section_header('提示词注入与回显记录', '检测、注入、信息回显与阻断事件的时间序列表') }}
+  {% set ns = namespace(interaction=0, blocked=0, inj_ok=0, inj_fail=0, product_labels=[]) %}
+  {% for item in items %}
+    {% if item.event_type == 'agent_interaction' %}{% set ns.interaction = ns.interaction + 1 %}{% endif %}
+    {% if item.decision == 'block' %}{% set ns.blocked = ns.blocked + 1 %}{% endif %}
+    {% set p = item.payload_json or {} %}
+    {% set sigs = item.signals_json or [] %}
+    {% set inj_success = p.get('injection_success') or item.token_echo or (item.event_type == 'agent_verification' and p.get('verified')) %}
+    {% set inj_attempt = item.event_type in ['agent_interaction', 'agent_verification'] or 'agent_injected' in (sigs|join(' ')) %}
+    {% if inj_success %}{% set ns.inj_ok = ns.inj_ok + 1 %}
+    {% elif inj_attempt %}{% set ns.inj_fail = ns.inj_fail + 1 %}{% endif %}
+    {% set fp = p.get('agent_fingerprint') %}
+    {% if fp %}{% set ns.product_labels = ns.product_labels + [fp.get('label', '?')] %}{% endif %}
+  {% endfor %}
+  <div class="cards" style="margin-bottom:14px">
+    {{ metric_card('Agent 回显', ns.interaction) }}
+    {{ metric_card('Agent 阻断', ns.blocked) }}
+    {{ metric_card('注入成功', ns.inj_ok) }}
+    {{ metric_card('注入失败', ns.inj_fail) }}
+    {{ metric_card('识别产品', ns.product_labels | unique | list | length) }}
+  </div>
+  {% if ns.product_labels %}
+  <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span class="text-muted" style="font-size:11px;letter-spacing:.1em">AGENT 产品分布</span>
+    {% for label in ns.product_labels | unique %}
+    <span class="badge badge-info" style="cursor:default">{{ label }} × {{ ns.product_labels | select('equalto', label) | list | length }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>来源 IP</th><th>Agent 识别</th><th>会话</th><th>时间</th><th>事件类型</th><th>检测信号</th><th>注入状态</th><th>信息</th><th>风险分</th><th>决策</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        {% set payload = item.payload_json or {} %}
+        {% set fp = payload.get('agent_fingerprint') %}
+        <tr>
+          <td><a href="/admin/attack-sources/{{ item.source_ip }}"><code>{{ item.source_ip }}</code></a></td>
+          <td>
+            {% if fp %}
+            <span class="badge {% if fp.get('confidence', 0) >= 0.9 %}badge-danger{% elif fp.get('confidence', 0) >= 0.7 %}badge-warning{% else %}badge-info{% endif %}" style="cursor:default" title="厂商: {{ fp.get('vendor','') }}&#10;置信度: {{ (fp.get('confidence', 0) * 100)|round|int }}%&#10;匹配依据: {{ fp.get('evidence', [])|join(' | ') }}">{{ fp.get('label') }}{% if fp.get('version') %} {{ fp.get('version') }}{% endif %}</span>
+            <small class="text-muted" style="margin-left:4px">{{ (fp.get('confidence', 0) * 100)|round|int }}%</small>
+            {% else %}<span class="text-muted">-</span>{% endif %}
+          </td>
+          <td><a href="/admin/sessions/{{ item.session_id }}"><code title="{{ item.session_id }}">{{ item.session_id[:12] }}...</code></a></td>
+          <td>{{ item.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+          <td>{% if item.event_type == 'agent_interaction' %}<span class="badge badge-danger">Agent 交互</span>{% elif item.event_type == 'agent_verification' %}<span class="badge badge-warning">合规验证</span>{% elif 'ai_agent_' in (item.signals_json|join(' ')) %}<span class="badge badge-info">Agent 检测</span>{% else %}<span class="badge badge-success">{{ item.event_type }}</span>{% endif %}</td>
+          <td>{% set ns = namespace(found=0) %}{% for signal in (item.signals_json or []) %}{% if 'agent' in signal or 'injection' in signal or 'canary' in signal %}<span class="badge badge-warning" style="margin:1px">{{ signal|signal_zh }}</span>{% set ns.found = ns.found + 1 %}{% endif %}{% endfor %}{% if ns.found == 0 %}<span class="text-muted">-</span>{% endif %}</td>
+          <td>
+            {% set sigs = item.signals_json or [] %}
+            {% set inj_success = payload.get('injection_success') or item.token_echo or (item.event_type == 'agent_verification' and payload.get('verified')) %}
+            {% set inj_attempt = item.event_type in ['agent_interaction', 'agent_verification'] or 'agent_injected' in (sigs|join(' ')) %}
+            {% if inj_success %}
+            <span class="badge badge-danger" style="cursor:default" title="{{ 'Agent 回连并泄露信息/环境' if payload.get('injection_success') else ('蜜标令牌回显命中' if item.token_echo else '合规验证通过') }}">成功</span>
+            {% elif inj_attempt %}
+            <span class="badge badge-warning" style="cursor:default" title="{{ 'Agent 回连但未泄露信息' if item.event_type in ['agent_interaction','agent_verification'] else '已注入但未捕获回显或蜜标命中' }}">失败</span>
+            {% else %}<span class="text-muted">-</span>{% endif %}
+          </td>
+          <td>
+            {% set has_info = false %}
+            {% if payload.get('revealed_ip') and payload.get('revealed_ip') != item.source_ip %}{% set has_info = true %}<span class="badge badge-danger">IP: {{ payload.get('revealed_ip') }}</span>{% endif %}
+            {% if payload.get('revealed_system_info') and payload.get('revealed_system_info')|length > 0 %}{% set has_info = true %}{% for k, v in payload.get('revealed_system_info', {}).items() %}<span class="badge badge-warning" style="margin:1px">{{ k }}: {{ v }}</span>{% endfor %}{% endif %}
+            {% if payload.get('agent_response') %}{% set has_info = true %}
+            <div style="margin-top:4px"><small><code title="{{ payload.get('agent_response', '') }}">响应: {{ payload.get('agent_response', '')[:60] }}{% if payload.get('agent_response', '')|length > 60 %}...{% endif %}</code></small></div>
+            {% endif %}
+            {% if item.event_type == 'agent_verification' and payload.get('token') %}{% set has_info = true %}
+            <span class="badge {{ 'badge-success' if payload.get('verified') else 'badge-warning' }}" style="cursor:default" title="验证令牌: {{ payload.get('token') }}">{{ '验证通过' if payload.get('verified') else '验证未通过' }}</span>
+            {% endif %}
+            {% if item.token_echo and not payload.get('revealed_ip') %}{% set has_info = true %}<span class="badge badge-info" style="cursor:default" title="回显蜜标: {{ item.token_echo }}">蜜标回显</span>{% endif %}
+            {% if not has_info %}<span class="text-muted">无信息</span>{% endif %}
+          </td>
+          <td><span class="badge {% if item.risk_score >= 70 %}badge-danger{% elif item.risk_score >= 45 %}badge-warning{% else %}badge-info{% endif %}">{{ item.risk_score }}</span></td>
+          <td><span class="badge {% if item.decision == 'block' %}badge-danger{% elif item.decision == 'isolate' %}badge-warning{% elif item.decision == 'challenge' %}badge-info{% else %}badge-success{% endif %}">{{ item.decision|decision_zh }}</span></td>
+        </tr>
+        {% endfor %}
+        {% if not items %}{{ empty_state('暂无提示词注入触发记录', '当自动化 Agent 访问站点时，系统将自动记录相关事件并识别其产品指纹（Claude Code、ChatGPT Codex、Kimi Code、Pi、ZCode 等）。', 10, 'AI') }}{% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

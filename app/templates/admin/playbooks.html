@@ -1,0 +1,62 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, badge %}
+{% block content %}
+{{ page_header('PB', '反制剧本', '一键应用成套的反制姿态：联动 Portal 收编、协议蜜罐启停与收编 Agent 任务下发。每步结果落执行历史审计。', ['Playbooks', '一键联动']) }}
+
+{% if applied %}
+<div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
+  <p class="panel-subtitle" style="margin:0">{{ applied }}</p>
+</div>
+{% endif %}
+
+<div class="table-wrap">
+  <table>
+    <colgroup>
+      <col style="width: 22%"><col style="width: 15%"><col style="width: 43%"><col style="width: 20%">
+    </colgroup>
+    <thead><tr><th>剧本</th><th>适用蜜罐类型</th><th>执行步骤</th><th style="text-align:right">应用</th></tr></thead>
+    <tbody>
+    {% for pb in playbooks %}
+      <tr>
+        <td>
+          <strong style="font-size:13px">{{ pb.name }}</strong>
+          <div class="muted" style="font-size:12px;line-height:1.7;margin-top:4px">{{ pb.description }}</div>
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+            {% for t in pb.targets %}
+            <span class="badge badge-info">{{ honeypot_type_labels.get(t, t) }}</span>
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            {% for step in pb.steps %}
+            <div style="font-size:12px;display:flex;gap:6px;align-items:baseline">
+              <span class="pill" style="flex-shrink:0">{{ loop.index }}</span>
+              <span>{{ {'deploy_clone': '部署克隆门户（Web 蜜罐节点）', 'start_service': '启动协议蜜罐：' ~ step.params.service_key, 'portal': '功能性伪装 Portal：' ~ ('启用' if step.params.enabled else '停用'), 'task_recruited': '向收编 Agent 下发任务'}.get(step.action, step.action) }}</span>
+            </div>
+            {% if step.action == 'task_recruited' %}
+            <div style="margin:-2px 0 4px 26px"><code style="font-size:11px">{{ step.params.command }}</code></div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <form method="post" action="/admin/playbooks/{{ pb.id }}/apply" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            <select name="target" style="width:auto;min-width:150px">
+              <option value="">全部适用面</option>
+              {% for t in pb.targets %}
+              <option value="{{ t }}">{{ honeypot_type_labels.get(t, t) }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="primary btn-sm">一键应用到所选蜜罐</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

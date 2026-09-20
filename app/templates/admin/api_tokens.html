@@ -1,0 +1,211 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('AK', '第三方数源接入', '接入第三方威胁情报数源（微步在线）与开放 API Key 管理，为来源研判提供外部数据支撑。', ['威胁数源', 'API Key'],
+      actions='<button type="button" class="chip primary" data-modal-open="api-tokens-create-modal">＋ 快速接入数源</button>') }}
+
+{% if saved %}<div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>{% endif %}
+{% if intel_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ intel_err }}</div>{% endif %}
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('已接入数源', '第三方威胁情报数源及其接入状态——点「＋ 快速接入数源」选择数源模板并填写 Key；配置在弹窗内完成，不在首页展开。') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>数源</th><th>类别</th><th>说明</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>
+      <tbody>
+        {% for p in providers %}
+        <tr>
+          <td><strong style="font-size:13px">{{ p.meta.name }}</strong></td>
+          <td class="muted" style="font-size:12px">{{ p.meta.category }}</td>
+          <td class="muted" style="font-size:12px">{{ p.meta.description }}</td>
+          <td>
+            {% if p.status.enabled %}
+            <span class="badge badge-success">已启用</span> <span class="muted" style="font-size:11.5px">{{ p.status.detail }}</span>
+            {% elif p.status.connected %}
+            <span class="badge badge-warning">已保存未启用</span> <span class="muted" style="font-size:11.5px">{{ p.status.detail }}</span>
+            {% else %}
+            <span class="badge">未接入</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap">
+            <a class="chip btn-sm" href="https://{{ p.meta.docs_url.split('//')[1] }}" target="_blank" rel="noopener" style="cursor:pointer;text-decoration:none">文档</a>
+            <button type="button" class="primary btn-sm" data-modal-open="api-tokens-create-modal" data-provider="{{ p.meta.key }}" style="cursor:pointer">接入 / 配置</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <details style="margin-top:12px">
+    <summary style="cursor:pointer;font-size:13px;color:var(--muted-foreground)">IP 信誉研判工具（微步在线启用后可用）</summary>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0">
+      <input id="tb-ip" placeholder="输入要研判的来源 IP" style="max-width:280px">
+      <button type="button" class="primary btn-sm" id="tb-lookup">查询信誉</button>
+      <span id="tb-status" class="muted" style="font-size:12px"></span>
+    </div>
+    <div id="tb-result" class="muted" style="font-size:12.5px;line-height:1.9;display:none;
+         border:1px solid rgba(96,165,250,.14);border-radius:10px;padding:12px 14px;background:rgba(13,20,36,.5)"></div>
+  </details>
+</section>
+
+<script>
+(function () {
+  var btn = document.getElementById('tb-lookup');
+  var ipInput = document.getElementById('tb-ip');
+  var box = document.getElementById('tb-result');
+  var status = document.getElementById('tb-status');
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function render(r) {
+    box.style.display = 'block';
+    if (!r.ok) {
+      box.innerHTML = '<span style="color:var(--danger,#fb7185)">' + esc(r.error || '查询失败') + '</span>';
+      return;
+    }
+    var cls = { critical: 'badge-danger', high: 'badge-danger', medium: 'badge-warning', low: 'badge-info', info: 'badge-info' }[r.severity] || 'badge-info';
+    box.innerHTML =
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
+      + '<code style="font-size:13px">' + esc(r.ip) + '</code>'
+      + (r.malicious ? '<span class="badge badge-danger">恶意 IP</span>' : '<span class="badge badge-success">未判定为恶意</span>')
+      + '<span class="badge ' + cls + '">' + esc(r.severity) + '</span>'
+      + (r.confidence ? '<span class="badge badge-info">可信度 ' + esc(r.confidence) + '</span>' : '')
+      + '</div>'
+      + '<div>威胁类型：' + (r.judgments.length ? esc(r.judgments.join('、')) : '—') + '</div>'
+      + '<div>归属：' + esc(r.location || '—') + (r.carrier ? ' · ' + esc(r.carrier) : '') + (r.scene ? ' · 场景 ' + esc(r.scene) : '') + '</div>'
+      + (r.permalink ? '<div><a href="' + esc(r.permalink) + '" target="_blank" rel="noopener" style="color:var(--info,#60a5fa)">在微步 X 情报中心查看详情 ↗</a></div>' : '');
+  }
+  btn.addEventListener('click', function () {
+    var ip = ipInput.value.trim();
+    if (!ip) { box.style.display = 'block'; box.innerHTML = '<span style="color:var(--warning,#fbbf24)">请输入 IP</span>'; return; }
+    btn.disabled = true;
+    status.textContent = '查询中…';
+    fetch('/' + {{ admin_access_path | tojson }} + '/api/admin/api-tokens/threatbook/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip: ip })
+    }).then(function (r) { return r.json(); }).then(function (r) {
+      btn.disabled = false;
+      status.textContent = '查询完成';
+      render(r);
+    }).catch(function () {
+      btn.disabled = false;
+      status.textContent = '查询失败（网络错误）';
+    });
+  });
+  // 「接入 / 配置」按钮：打开弹窗并预选对应数源
+  document.querySelectorAll('[data-provider]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var radio = document.getElementById('prov-' + b.dataset.provider);
+      if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+    });
+  });
+})();
+</script>
+
+{% if raw_token %}
+<section class="panel page-banner success">
+  {{ section_header('新建 API Key — 仅显示一次，请立即保存', '复制下方令牌并妥善保管，离开此页面后将无法再次查看。') }}
+  <pre style="margin:0;font-size:14px;color:#bbf7d0;background:rgba(52,211,153,0.06);padding:14px;border-radius:10px;word-break:break-all">{{ raw_token }}</pre>
+</section>
+{% endif %}
+
+<section class="panel">
+  {{ section_header('令牌清单', '查看前缀、权限与最后使用时间') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>名称</th><th>前缀</th><th>权限</th><th>最后使用</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><strong>{{ item.name }}</strong></td>
+          <td><code>{{ item.token_prefix }}…</code></td>
+          <td>{% for p in item.permissions_json %}{{ badge(p, 'info') }}{% endfor %}</td>
+          <td class="muted">{% if item.last_used_at %}<code>{{ item.last_used_at.strftime('%Y-%m-%d %H:%M:%S') }}</code>{% else %}—{% endif %}</td>
+          <td>
+            <form method="post" action="/admin/api-tokens/{{ item.id }}/delete" style="margin:0">
+              <button class="secondary btn-sm" type="submit">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无 API Key', '创建令牌后会显示在这里。', 5, 'AK') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% call modal_dialog('api-tokens-create-modal', '快速接入 · 选择数源模板', '选择要接入的第三方数源并按模板填写即可；开放 API Key 用于对外读取平台数据。') %}
+<form method="post" action="/admin/api-tokens" id="prov-form-openapi" class="stack">
+  <div class="stack" style="gap:8px">
+    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="radio" name="provider_pick" value="openapi" checked> 创建开放 API Key（对外读取攻击来源 / 详情 / 凭证等接口）
+    </label>
+    {% for p in providers %}
+    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="radio" name="provider_pick" value="{{ p.meta.key }}" id="prov-{{ p.meta.key }}"> {{ p.meta.name }}（{{ p.meta.category }}）
+    </label>
+    {% endfor %}
+  </div>
+
+  <div id="prov-fields-openapi">
+    <input name="name" placeholder="令牌名称（如 SOC 只读）" required>
+    <input name="permissions_csv" placeholder="权限列表" value="attack.read,credential.read">
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+      <button type="button" class="secondary" data-modal-close>取消</button>
+      <button type="submit">创建令牌</button>
+    </div>
+  </div>
+</form>
+{% for p in providers %}
+<form method="post" action="/admin/api-tokens/providers/{{ p.meta.key }}" class="stack prov-fields" id="prov-fields-{{ p.meta.key }}" style="display:none">
+  {% for f in p.meta.fields %}
+    {% if f.type == 'bool' %}
+    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="checkbox" name="{{ f.key }}"> {{ f.label }}
+    </label>
+    {% else %}
+    <label class="field-label"><span>{{ f.label }}{% if p.status.connected and f.type == 'password' %} <span class="muted" style="font-size:11.5px">已保存：{{ p.status.detail }}（留空保持不变）</span>{% endif %}</span>
+      <input type="{{ f.type }}" name="{{ f.key }}" placeholder="{{ f.placeholder or '' }}" autocomplete="off">
+    </label>
+    {% endif %}
+  {% endfor %}
+  <p class="muted" style="font-size:12px;margin:0">{{ p.meta.description }} 文档：<a href="{{ p.meta.docs_url }}" target="_blank" rel="noopener" style="color:var(--info,#60a5fa)">{{ p.meta.docs_url }}</a></p>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">保存接入</button>
+  </div>
+</form>
+{% endfor %}
+<script>
+(function () {
+  var openFields = document.getElementById('prov-fields-openapi');
+  function pick(val) {
+    document.querySelectorAll('.prov-fields').forEach(function (f) { f.style.display = 'none'; });
+    if (val === 'openapi') {
+      openFields.style.display = 'block';
+    } else {
+      openFields.style.display = 'none';
+      var target = document.getElementById('prov-fields-' + val);
+      if (target) target.style.display = 'block';
+    }
+  }
+  document.querySelectorAll('input[name="provider_pick"]').forEach(function (r) {
+    r.addEventListener('change', function () { pick(r.value); });
+  });
+  // 表格外「接入 / 配置」按钮：打开弹窗并预选对应数源
+  document.querySelectorAll('[data-provider]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var radio = document.getElementById('prov-' + b.dataset.provider);
+      if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+    });
+  });
+  pick('openapi');
+})();
+</script>
+{% endcall %}
+{% endblock %}

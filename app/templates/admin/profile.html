@@ -1,0 +1,62 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, badge %}
+{% block content %}
+{{ page_header('PF', '系统设置', '账号资料、密码与控制台安全路径。', ['账号设置', '安全路径']) }}
+
+{% if saved %}
+<div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>
+{% endif %}
+{% if path_error %}
+<div class="panel page-banner error" style="margin-bottom:14px">{{ path_error }}</div>
+{% endif %}
+
+<div class="grid-2">
+  <section class="panel">
+    {{ section_header('更新资料', '姓名、邮箱与语言偏好') }}
+    <form method="post" action="/admin/profile" class="stack">
+      <label class="field-label"><span>姓名</span><input name="name" value="{{ current_user.name }}" placeholder="姓名"></label>
+      <label class="field-label"><span>邮箱</span><input name="email" value="{{ current_user.email }}" placeholder="邮箱"></label>
+      <label class="field-label">
+        <span>语言偏好</span>
+        <select name="preferred_language">
+          <option value="zh" {% if current_user.preferred_language == 'zh' %}selected{% endif %}>中文（zh）</option>
+          <option value="en" {% if current_user.preferred_language == 'en' %}selected{% endif %}>English (en)</option>
+        </select>
+      </label>
+      <button type="submit">保存资料</button>
+    </form>
+  </section>
+  <section class="panel">
+    {{ section_header('修改密码', '验证当前密码后设置新密码') }}
+    <form method="post" action="/admin/profile/change-password" class="stack">
+      <label class="field-label"><span>当前密码</span><input name="current_password" type="password" placeholder="当前密码" required></label>
+      <label class="field-label"><span>新密码</span><input name="new_password" type="password" placeholder="请输入密码" required></label>
+      <button type="submit">修改密码</button>
+    </form>
+  </section>
+</div>
+
+<section class="panel" style="margin-top:16px">
+  {{ section_header('控制台安全路径', '后台控制台的访问前缀——修改后立即生效（≤5s），旧路径即刻失效并返回 404。请妥善保管新路径，它是控制台的第一道访问屏障。') }}
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+    <span class="muted" style="font-size:13px">当前访问地址：</span>
+    <code style="font-size:13px">http://&lt;主机&gt;:{{ settings_port }}/{{ admin_access_path }}/</code>
+    {% if admin_path_is_default %}
+    {{ badge('默认路径', 'warning') }}
+    {% else %}
+    {{ badge('已自定义', 'success') }}
+    {% endif %}
+  </div>
+  <form method="post" action="/admin/profile/access-path" class="stack" style="max-width:560px">
+    <label class="field-label"><span>新的访问前缀</span>
+      <input name="access_path" value="{{ admin_access_path }}" placeholder="例如：sec-ops-7x9"
+             pattern="[a-z0-9][a-z0-9-]{2,48}" required>
+    </label>
+    <p class="muted" style="font-size:12px;margin:0">
+      仅允许小写字母、数字与连字符，长度 3-49；不能使用系统保留路径（admin / static / console / c2 / api 等）。
+      修改后请使用新地址访问，本页链接将自动切换；浏览器收藏夹需手动更新。
+    </p>
+    <div><button type="submit">更新安全路径</button></div>
+  </form>
+</section>
+{% endblock %}

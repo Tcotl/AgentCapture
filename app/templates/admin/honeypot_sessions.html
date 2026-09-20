@@ -1,0 +1,41 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
+{% block content %}
+{{ page_header('HS', '蜜罐会话回放', '交互式协议蜜罐（SSH）的完整会话记录：认证尝试、逐条命令与输出，支持终端式回放。', ['会话', '回放'],
+      actions='<form method="get" class="actions-inline" style="gap:8px"><input name="source_ip" value="' ~ filter_source_ip ~ '" placeholder="按来源 IP 过滤" style="width:180px"><select name="status" style="width:130px"><option value="">全部状态</option><option value="active" ' ~ ('selected' if filter_status == 'active' else '') ~ '>在线</option><option value="closed" ' ~ ('selected' if filter_status == 'closed' else '') ~ '>已结束</option></select><button class="secondary btn-sm" type="submit">筛选</button></form>') }}
+
+<div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+  {{ metric_card('会话总数', stats.total, 'info') }}
+  {{ metric_card('进行中', stats.active, 'success') }}
+  {{ metric_card('捕获命令', stats.commands, 'warning') }}
+  {{ metric_card('认证尝试', stats.auth_attempts, 'danger') }}
+</div>
+
+<section class="panel">
+  {{ section_header('会话列表', '点击“回放”查看终端式逐命令回放；进行中的会话实时追加。') }}
+  <div class="table-wrap" style="margin-top:12px;">
+    <table>
+      <thead><tr><th>开始时间</th><th>来源</th><th>服务</th><th>用户</th><th>凭证</th><th>认证尝试</th><th>命令数</th><th>时长</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        {% set row = item.row %}
+        <tr>
+          <td><code>{{ row.started_at.strftime('%m-%d %H:%M:%S') if row.started_at else '—' }}</code></td>
+          <td><a href="/admin/attack-sources/{{ row.source_ip }}"><code>{{ row.source_ip }}</code></a></td>
+          <td>{{ badge(row.service ~ ':' ~ row.port, 'info') }}</td>
+          <td><code>{{ row.username or '—' }}</code></td>
+          <td><code style="color:var(--danger,#fb7185)">{{ row.password if row.password else '—' }}</code></td>
+          <td>{{ row.auth_attempts }}</td>
+          <td>{{ row.command_count }}</td>
+          <td>{{ (item.duration_s // 60).__str__() + 'm' + (item.duration_s % 60).__str__() + 's' }}</td>
+          <td>{% if row.status == 'active' %}{{ badge('进行中', 'success') }}{% else %}{{ badge('已结束', 'muted') }}{% endif %}</td>
+          <td><a class="chip" href="/admin/honeypot-sessions/{{ row.id }}">回放 →</a></td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无蜜罐会话', '启动 SSH 端口服务蜜罐（需已安装 paramiko）后，攻击者的交互会话会出现在这里。', 10, 'HS') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

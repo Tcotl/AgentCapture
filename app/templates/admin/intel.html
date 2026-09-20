@@ -1,0 +1,61 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('IN', '情报与白名单', '管理本地情报条目与白名单地址，抑制误报并辅助来源研判。', [],
+      actions='<button type="button" class="chip primary" data-modal-open="intel-create-modal">＋ 新增情报 / 白名单</button>') }}
+
+{% if saved %}<div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>{% endif %}
+<div class="cards">
+  {{ metric_card('总条目', stats.total) }}
+  {{ metric_card('白名单', stats.whitelist, tone='success') }}
+</div>
+
+<section class="panel">
+  {{ section_header('条目清单', '查看类型、来源与描述') }}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类型</th><th>值</th><th>标签</th><th>来源</th><th class="cell-prose">描述</th><th>操作</th></tr></thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>{{ badge('白名单' if item.entry_type == 'whitelist' else '标签', 'success' if item.entry_type == 'whitelist' else 'info') }}</td>
+            <td><code>{{ item.value }}</code></td>
+            <td class="muted">{{ item.label or '—' }}</td>
+            <td class="muted">{{ item.source }}</td>
+            <td class="cell-prose muted">{{ item.description or '—' }}</td>
+            <td>
+              <form method="post" action="/admin/intel/{{ item.id }}/delete" style="margin:0">
+                <button class="secondary btn-sm" type="submit">删除</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          {{ empty_state('暂无情报条目', '新增条目后将在这里显示。', 6, 'IN') }}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+{% call modal_dialog('intel-create-modal', '新增情报 / 白名单', '支持 IP、CIDR 与标签值录入；白名单条目将抑制误报。') %}
+<form method="post" action="/admin/intel" class="stack">
+  <div class="grid-2">
+    <select name="entry_type">
+      <option value="whitelist">whitelist（白名单）</option>
+      <option value="tag">tag（标签）</option>
+    </select>
+    <input name="value" placeholder="IP / CIDR / 标签值" required>
+  </div>
+  <div class="grid-2">
+    <input name="label" placeholder="标签（可选）">
+    <input name="source" placeholder="来源" value="manual">
+  </div>
+  <textarea name="description" placeholder="描述（可选）"></textarea>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">新增条目</button>
+  </div>
+</form>
+{% endcall %}
+{% endblock %}

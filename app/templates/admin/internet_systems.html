@@ -1,0 +1,351 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('API', title or '嵌入式蜜罐管理', '把你的业务系统接入嵌入式蜜罐：以反向代理、旁路镜像或回源方式纳入，默认放行、灰度注入蜜饵与信号采集、可一键回切。', ['无损接入', '默认放行', '灰度策略'],
+      actions='<button type="button" class="chip" data-modal-open="internet-doc-modal">接入文档</button><button type="button" class="chip primary" data-modal-open="internet-create-modal">＋ 新增互联网系统</button>') }}
+
+<style>
+  .internet-kpi-grid { margin-bottom: 18px; }
+  .internet-layout { display: block; }
+  .internet-system-cell { min-width: 220px; }
+  .internet-system-cell strong { display:block; color:#f8fbff; font-size:14px; margin-bottom:6px; }
+  .internet-system-cell code { max-width: 280px; }
+  .internet-policy-stack { display:grid; gap:6px; min-width: 220px; }
+  .internet-policy-stack .pill { width: fit-content; }
+  .internet-safety-cell { min-width: 190px; color: var(--muted-foreground); line-height: 1.55; }
+  .internet-actions-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; min-width: 220px; }
+  .internet-actions-row button, .internet-actions-row form { width:auto; }
+  .internet-actions-row form button { min-width:72px; }
+  .internet-playbook { display:grid; gap:12px; }
+  .internet-step {
+    position: relative;
+    padding: 14px 14px 14px 46px;
+    border: 1px solid rgba(96,165,250,.15);
+    border-radius: 18px;
+    background: rgba(59,130,246,.06);
+  }
+  .internet-step-num {
+    position:absolute; left:14px; top:14px;
+    width:22px; height:22px; border-radius:8px;
+    display:grid; place-items:center;
+    background: linear-gradient(135deg,#2563eb,#0ea5e9);
+    color:white; font-size:11px; font-weight:900;
+  }
+  .internet-step strong { display:block; color:#f8fbff; margin-bottom:5px; }
+  .internet-step span { color:var(--muted-foreground); font-size:12px; line-height:1.6; }
+  .internet-config-preview {
+    max-height: 220px;
+    overflow: auto;
+  }
+  .internet-modal-backdrop[hidden] { display:none !important; }
+  .internet-modal-backdrop {
+    position:fixed; inset:0; z-index:120;
+    display:grid; place-items:center;
+    padding:24px;
+    background:rgba(2,6,23,.72);
+    backdrop-filter: blur(14px);
+    cursor: pointer; /* backdrop click closes the modal */
+  }
+  .internet-modal-backdrop .internet-modal { cursor: default; }
+  .internet-modal {
+    width:min(1080px,100%);
+    max-height:min(90vh,900px);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    border-radius:24px;
+    border:1px solid rgba(96,165,250,.24);
+    background:
+      radial-gradient(circle at 88% 0%, rgba(14,165,233,.16), transparent 32%),
+      linear-gradient(180deg, rgba(15,23,42,.98), rgba(8,13,25,.98));
+    box-shadow:0 34px 120px rgba(0,0,0,.58), var(--glow-blue);
+  }
+  .internet-modal-header {
+    display:flex; justify-content:space-between; align-items:flex-start; gap:14px;
+    padding:22px 24px 16px;
+    border-bottom:1px solid rgba(148,163,184,.14);
+  }
+  .internet-modal-title { margin:0; color:#f8fbff; font-size:20px; font-weight:900; letter-spacing:-.03em; }
+  .internet-modal-subtitle { margin-top:6px; color:var(--muted-foreground); font-size:13px; line-height:1.55; }
+  .internet-modal-close {
+    width:38px; height:38px; border-radius:14px;
+    background:rgba(15,23,42,.78) !important;
+    color:#dbeafe !important;
+    border:1px solid rgba(148,163,184,.2) !important;
+    box-shadow:none !important;
+    padding:0;
+    transition: border-color 160ms var(--ease-out), color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+  }
+  .internet-modal-close:hover {
+    border-color: rgba(34,211,238,.55) !important;
+    color: #a5f3fc !important;
+    background: rgba(34,211,238,.1) !important;
+  }
+  .internet-modal-body { overflow:auto; padding:20px 24px 24px; }
+  .internet-help {
+    padding:14px;
+    border-radius:16px;
+    border:1px solid rgba(96,165,250,.15);
+    background:rgba(59,130,246,.06);
+    color:var(--muted-foreground);
+    font-size:12px;
+    line-height:1.7;
+  }
+  .internet-modal-footer { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; margin-top:4px; }
+  .internet-modal-footer button { width:auto; min-width:112px; }
+  @media (max-width: 1180px) { .internet-layout { display:block; } }
+  @media (max-width: 980px) {
+    .internet-actions-row { flex-direction:column; align-items:stretch; min-width:0; }
+    .internet-actions-row button, .internet-actions-row form, .internet-actions-row form button { width:100%; }
+    .internet-modal-backdrop { padding:12px; }
+    .internet-modal { max-height:94vh; border-radius:18px; }
+    .internet-modal-header, .internet-modal-body { padding-left:16px; padding-right:16px; }
+    .internet-modal-footer, .internet-modal-footer button { width:100%; }
+  }
+</style>
+
+<div class="cards tight internet-kpi-grid">
+  {{ metric_card('接入系统', summary.total) }}
+  {{ metric_card('启用接入', summary.enabled, 'success') }}
+  {{ metric_card('监测模式', summary.monitoring, 'info') }}
+  {{ metric_card('灰度/反制', summary.protected, 'warning') }}
+</div>
+
+<div class="internet-layout">
+  <section class="panel">
+    {{ section_header('已接入系统清单', '每个系统独立配置域名、上游、接入模式、注入策略和回滚安全阀。建议先用“监测模式”接入，确认无业务影响后再灰度启用蜜饵与注入。') }}
+    <div class="panel page-banner" style="margin-bottom:12px">
+      <p class="panel-subtitle" style="margin:0">⚠ 当前版本中此清单是<strong>接入规划台账</strong>：登记的域名/上游/策略用于规划与评审，不会自动产生反向代理或注入行为。流量要进入采集管道，需将系统流量实际接入本平台（如 nginx 反代到主应用端口）。</p>
+    </div>
+    <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
+      <form method="post" action="/admin/internet-systems/bulk-delete" data-confirm="确认删除选中的 {n} 个系统接入记录？不可撤销。" class="bulk-del-form">
+        <input type="hidden" name="ids" value="">
+        <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+      </form>
+      <span class="muted" style="font-size:11px">勾选系统后批量移除接入记录</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th>
+            <th>系统</th>
+            <th>接入链路</th>
+            <th>策略</th>
+            <th>安全阀</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
+            <td class="internet-system-cell">
+              <strong>{{ item.name }}</strong>
+              <code>{{ item.domain }}</code>
+              <div class="muted" style="margin-top:6px">负责人：{{ item.owner or '未填写' }}</div>
+              {% if item.tags %}<div style="margin-top:6px">{% for tag in item.tags %}<span class="pill" style="margin:1px">{{ tag }}</span>{% endfor %}</div>{% endif %}
+            </td>
+            <td>
+              <div class="internet-policy-stack">
+                <span class="pill">{{ item.deploy_mode }}</span>
+                <code>{{ item.upstream_url }}</code>
+                <span class="muted">TLS：{{ item.tls_mode }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="internet-policy-stack">
+                <span class="pill">{{ item.inject_policy }}</span>
+                <span class="pill">{{ item.decoy_policy }}</span>
+                <span class="muted">Jsonp：{{ item.jsonp_template_key or '未绑定' }}</span>
+                <span class="muted">风险处置：{{ item.risk_policy|decision_zh }}</span>
+              </div>
+            </td>
+            <td class="internet-safety-cell">
+              {{ item.failover_mode }}<br>
+              <span class="muted">配置更新：<code>{{ item.updated_at }}</code></span>
+            </td>
+            <td>
+              {{ badge(item.status, item.status_tone) }}<br>
+              {% if item.is_enabled %}{{ badge('启用', 'success') }}{% else %}{{ badge('暂停', 'warning') }}{% endif %}
+            </td>
+            <td>
+              <div class="internet-actions-row">
+                <button type="button" onclick="openInternetModal('internet-edit-{{ item.id }}')">编辑</button>
+                <form method="post" action="/admin/internet-systems/{{ item.id }}/toggle">
+                  <button type="submit" class="secondary">{% if item.is_enabled %}暂停{% else %}启用{% endif %}</button>
+                </form>
+                <form method="post" action="/admin/internet-systems/{{ item.id }}/delete">
+                  <button type="submit" class="secondary">删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          {{ empty_state('暂未接入业务系统', '点击新增后可把业务域名、上游地址和无损接入策略纳入嵌入式蜜罐管理。', 7, 'API') }}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+{% call modal_dialog('internet-doc-modal', '无损接入路线', '推荐按 4 个阶段为互联网系统逐步接入；关键原则：默认放行、异常旁路、只对 HTML/公开页灰度注入、每个系统独立开关。完整接入文档（五种方式、逐条命令、验收清单）见仓库 docs/integration.md。', wide=true) %}
+<div class="internet-playbook">
+  <div class="internet-step"><div class="internet-step-num">1</div><strong>旁路监测</strong><span>先接入访问日志、攻击流量和扫描器识别，不改业务响应、不注入脚本。</span></div>
+  <div class="internet-step"><div class="internet-step-num">2</div><strong>反向代理</strong><span>按域名配置 upstream，默认放行到原业务；代理层故障时自动旁路或回切。</span></div>
+  <div class="internet-step"><div class="internet-step-num">3</div><strong>灰度蜜饵</strong><span>只在公开页、404、可疑请求或高风险会话注入蜜饵路径、Jsonp 画像和假接口。</span></div>
+  <div class="internet-step"><div class="internet-step-num">4</div><strong>联动处置</strong><span>对确认攻击的来源再启用挑战、隔离或阻断，业务用户始终走原链路。</span></div>
+</div>
+
+<div style="margin-top:18px">
+  <strong style="display:block;color:#f8fbff;margin-bottom:8px">接入拓扑（方式一：路径级反代挂载）</strong>
+  <pre style="background:rgba(2,6,23,.55);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.7;overflow:auto;font-family:'Fira Code',ui-monospace,monospace">访问者 ──► 业务 Nginx :443（现有，证书不变）
+             │
+             ├─ /api  /app …（真实路径）──────► 真实业务（零改动）
+             │
+             └─ /portal/* /recon/* /collect/*  ► AgentCapture :4877
+                /_trap/* /d/* /_bait/* /internal/*   （欺骗层）
+                              │
+                              ├─► 事件 / 凭证 / Agent 招募名册
+                              └─► 态势大屏 · 告警 · 开放 API</pre>
+</div>
+
+<div style="margin-top:14px">
+  <strong style="display:block;color:#f8fbff;margin-bottom:8px">五种接入方式</strong>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+    <div class="internet-step"><div class="internet-step-num">A</div><strong>路径级反代挂载（推荐）</strong><span>业务 Nginx 追加一段 location，蜜饵与回传路径转交平台，业务零感知。</span></div>
+    <div class="internet-step"><div class="internet-step-num">B</div><strong>全站前置（蜜罐 / 克隆站）</strong><span>独立域名整体交给平台：内置模板或一键克隆授权站点，登录表单重写为凭证采集。</span></div>
+    <div class="internet-step"><div class="internet-step-num">C</div><strong>前端注入投放</strong><span>Nginx sub_filter 向真实页面注入 beacon.js 与隐藏蜜饵链接，不新增路由。</span></div>
+    <div class="internet-step"><div class="internet-step-num">D</div><strong>协议蜜罐端口旁挂</strong><span>SSH 2222 / MySQL 33060 / Redis 63790 / FTP 2121 / ES 19200 独立端口暴露。</span></div>
+    <div class="internet-step"><div class="internet-step-num">E</div><strong>分布式节点接入</strong><span>多站点部署节点，X-Node-Token 心跳 / 领取任务，集中运营。</span></div>
+  </div>
+</div>
+
+<div style="margin-top:14px">
+  <strong style="display:block;color:#f8fbff;margin-bottom:8px">核心配置命令（方式一，业务 Nginx）</strong>
+  <pre style="background:rgba(2,6,23,.55);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.7;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># server { ... } 内追加——真实业务路径保持不变
+location ~ ^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/|internal/|backup/) {
+    proxy_pass http://127.0.0.1:4877;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+location /static/beacon.js { proxy_pass http://127.0.0.1:4877/static/beacon.js; }
+
+# 平台侧必须开启真实 IP 信任（.env.docker）
+TRUST_PROXY_HEADERS=true
+
+# 生效与验收
+nginx -t && nginx -s reload
+curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
+</div>
+{% endcall %}
+
+<div class="internet-modal-backdrop" id="internet-create-modal" hidden onclick="closeInternetModalOnBackdrop(event, 'internet-create-modal')">
+  <div class="internet-modal" role="dialog" aria-modal="true" aria-labelledby="internet-create-title">
+    <div class="internet-modal-header">
+      <div>
+        <h2 class="internet-modal-title" id="internet-create-title">新增嵌入式蜜罐接入</h2>
+        <div class="internet-modal-subtitle">填写业务域名与原始上游地址，先以监测模式接入，后续再灰度开启蜜饵能力。</div>
+      </div>
+      <button type="button" class="internet-modal-close" onclick="closeInternetModal('internet-create-modal')">×</button>
+    </div>
+    <div class="internet-modal-body">
+      <form method="post" action="/admin/internet-systems" class="stack">
+        <div class="grid-2"><input name="name" placeholder="系统名称，如 OA门户" required><input name="domain" placeholder="业务域名，如 oa.example.com" required></div>
+        <div class="grid-2"><input name="upstream_url" placeholder="原业务上游，如 http://10.0.1.20:8080" required><input name="owner" placeholder="负责人/团队"></div>
+        <div class="grid-4">
+          <select name="deploy_mode"><option>反向代理无损接入</option><option>旁路镜像监测</option><option>CDN/SLB 回源接入</option><option>测试域名预接入</option></select>
+          <select name="status"><option>监测模式</option><option>灰度注入</option><option>反制模式</option><option>规划中</option><option>暂停</option></select>
+          <select name="tls_mode"><option>沿用原证书</option><option>平台托管证书</option><option>上游 TLS 透传</option></select>
+          <select name="failover_mode"><option>异常自动旁路</option><option>默认放行</option><option>手动回切</option></select>
+        </div>
+        <div class="grid-4">
+          <select name="inject_policy"><option>关闭注入</option><option selected>仅公开页面注入</option><option>高风险请求注入</option><option>全站灰度注入</option></select>
+          <select name="decoy_policy"><option>仅记录</option><option selected>蜜饵路径 + 假接口</option><option>文件蜜饵 + 凭证蜜饵</option><option>全量策略</option></select>
+          <select name="jsonp_template_key"><option value="">不绑定 Jsonp 模版</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}">{{ tmpl.name }}</option>{% endfor %}</select>
+          <select name="risk_policy"><option value="observe">observe 观察</option><option value="challenge">challenge 挑战</option><option value="isolate">isolate 隔离</option><option value="block">block 阻断</option></select>
+        </div>
+        <div class="grid-2"><input name="tags_csv" placeholder="标签，如 生产,公网,OA"><select name="is_enabled"><option value="1">启用</option><option value="0">暂停</option></select></div>
+        <textarea name="notes" placeholder="接入备注：DNS/SLB 切流计划、回滚窗口、测试账号或业务影响评估"></textarea>
+        <div class="internet-help">保存后会生成一份反向代理配置预览，真正切流前建议先完成旁路监测和业务回归验证。</div>
+        <div class="internet-modal-footer"><button type="button" class="secondary" onclick="closeInternetModal('internet-create-modal')">取消</button><button type="submit">保存接入</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% for item in items %}
+<div class="internet-modal-backdrop" id="internet-edit-{{ item.id }}" hidden onclick="closeInternetModalOnBackdrop(event, 'internet-edit-{{ item.id }}')">
+  <div class="internet-modal" role="dialog" aria-modal="true" aria-labelledby="internet-edit-title-{{ item.id }}">
+    <div class="internet-modal-header">
+      <div>
+        <h2 class="internet-modal-title" id="internet-edit-title-{{ item.id }}">编辑接入：{{ item.name }}</h2>
+        <div class="internet-modal-subtitle">{{ item.domain }} · 调整上游地址、灰度策略和异常旁路方式。</div>
+      </div>
+      <button type="button" class="internet-modal-close" onclick="closeInternetModal('internet-edit-{{ item.id }}')">×</button>
+    </div>
+    <div class="internet-modal-body">
+      <form method="post" action="/admin/internet-systems/{{ item.id }}/update" class="stack">
+        <div class="grid-2"><input name="name" value="{{ item.name }}" required><input name="domain" value="{{ item.domain }}" required></div>
+        <div class="grid-2"><input name="upstream_url" value="{{ item.upstream_url }}" required><input name="owner" value="{{ item.owner }}" placeholder="负责人/团队"></div>
+        <div class="grid-4">
+          <select name="deploy_mode"><option {% if item.deploy_mode == '反向代理无损接入' %}selected{% endif %}>反向代理无损接入</option><option {% if item.deploy_mode == '旁路镜像监测' %}selected{% endif %}>旁路镜像监测</option><option {% if item.deploy_mode == 'CDN/SLB 回源接入' %}selected{% endif %}>CDN/SLB 回源接入</option><option {% if item.deploy_mode == '测试域名预接入' %}selected{% endif %}>测试域名预接入</option></select>
+          <select name="status"><option {% if item.status == '监测模式' %}selected{% endif %}>监测模式</option><option {% if item.status == '灰度注入' %}selected{% endif %}>灰度注入</option><option {% if item.status == '反制模式' %}selected{% endif %}>反制模式</option><option {% if item.status == '规划中' %}selected{% endif %}>规划中</option><option {% if item.status == '暂停' %}selected{% endif %}>暂停</option></select>
+          <select name="tls_mode"><option {% if item.tls_mode == '沿用原证书' %}selected{% endif %}>沿用原证书</option><option {% if item.tls_mode == '平台托管证书' %}selected{% endif %}>平台托管证书</option><option {% if item.tls_mode == '上游 TLS 透传' %}selected{% endif %}>上游 TLS 透传</option></select>
+          <select name="failover_mode"><option {% if item.failover_mode == '异常自动旁路' %}selected{% endif %}>异常自动旁路</option><option {% if item.failover_mode == '默认放行' %}selected{% endif %}>默认放行</option><option {% if item.failover_mode == '手动回切' %}selected{% endif %}>手动回切</option></select>
+        </div>
+        <div class="grid-4">
+          <select name="inject_policy"><option {% if item.inject_policy == '关闭注入' %}selected{% endif %}>关闭注入</option><option {% if item.inject_policy == '仅公开页面注入' %}selected{% endif %}>仅公开页面注入</option><option {% if item.inject_policy == '高风险请求注入' %}selected{% endif %}>高风险请求注入</option><option {% if item.inject_policy == '全站灰度注入' %}selected{% endif %}>全站灰度注入</option></select>
+          <select name="decoy_policy"><option {% if item.decoy_policy == '仅记录' %}selected{% endif %}>仅记录</option><option {% if item.decoy_policy == '蜜饵路径 + 假接口' %}selected{% endif %}>蜜饵路径 + 假接口</option><option {% if item.decoy_policy == '文件蜜饵 + 凭证蜜饵' %}selected{% endif %}>文件蜜饵 + 凭证蜜饵</option><option {% if item.decoy_policy == '全量策略' %}selected{% endif %}>全量策略</option></select>
+          <select name="jsonp_template_key"><option value="">不绑定 Jsonp 模版</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}" {% if item.jsonp_template_key == tmpl.method_key %}selected{% endif %}>{{ tmpl.name }}</option>{% endfor %}</select>
+          <select name="risk_policy"><option value="observe" {% if item.risk_policy == 'observe' %}selected{% endif %}>observe 观察</option><option value="challenge" {% if item.risk_policy == 'challenge' %}selected{% endif %}>challenge 挑战</option><option value="isolate" {% if item.risk_policy == 'isolate' %}selected{% endif %}>isolate 隔离</option><option value="block" {% if item.risk_policy == 'block' %}selected{% endif %}>block 阻断</option></select>
+        </div>
+        <div class="grid-2"><input name="tags_csv" value="{{ item.tags|join(',') }}" placeholder="标签"><select name="is_enabled"><option value="1" {% if item.is_enabled %}selected{% endif %}>启用</option><option value="0" {% if not item.is_enabled %}selected{% endif %}>暂停</option></select></div>
+        <textarea name="notes" placeholder="接入备注">{{ item.notes }}</textarea>
+        <div class="internet-help"><strong>配置预览</strong><pre class="internet-config-preview">{{ item.config_preview }}</pre></div>
+        <div class="internet-modal-footer"><button type="button" class="secondary" onclick="closeInternetModal('internet-edit-{{ item.id }}')">取消</button><button type="submit">保存修改</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+  function openInternetModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const firstInput = modal.querySelector('input, select, textarea, button');
+    if (firstInput) setTimeout(() => firstInput.focus(), 20);
+  }
+  function closeInternetModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = true;
+    if (!document.querySelector('.internet-modal-backdrop:not([hidden])')) document.body.style.overflow = '';
+  }
+  function closeInternetModalOnBackdrop(event, id) {
+    if (event.target && event.target.id === id) closeInternetModal(id);
+  }
+  document.addEventListener('keydown', function(event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.internet-modal-backdrop:not([hidden])').forEach(function(modal) { closeInternetModal(modal.id); });
+  });
+  // batch delete
+  var bulkAll = document.querySelector('.bulk-select-all');
+  if (bulkAll) bulkAll.addEventListener('change', function () {
+    document.querySelectorAll('.bulk-check').forEach(function (c) { c.checked = bulkAll.checked; });
+  });
+  var bulkBtn = document.querySelector('.bulk-del-btn');
+  if (bulkBtn) bulkBtn.addEventListener('click', function () {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+    if (!checked.length) { alert('请先勾选要删除的系统'); return; }
+    var form = bulkBtn.closest('form');
+    if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+    form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+    form.submit();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,1248 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+{% set total_events = stats.summary.total_events or 0 %}
+{% set high_risk = stats.summary.high_risk_events or 0 %}
+{% set risk_ratio = (((high_risk / total_events) * 100) if total_events else 0)|round(0, 'floor') %}
+{% set online_nodes = stats.summary.online_nodes or 0 %}
+{% set total_nodes = node_summary.node_count or online_nodes or 1 %}
+{% set online_ratio = (((online_nodes / total_nodes) * 100) if total_nodes else 0)|round(0, 'floor') %}
+{% set chain_items = [
+  {'label': '扫描感知', 'value': chain.scan},
+  {'label': '攻击行为', 'value': chain.attack},
+  {'label': '登录尝试', 'value': chain.login_attempt},
+  {'label': '高危登录', 'value': chain.high_risk_login},
+  {'label': '失陷线索', 'value': chain.compromise_hint},
+] %}
+{% set chain_max = chain_items|map(attribute='value')|max or 1 %}
+<style>
+  /* ---------- 覆盖 admin 外壳：大屏全视口 ---------- */
+  body { height: 100vh; overflow: hidden; background: var(--bs-bg) !important; }
+  .pm-admin-scale-shell { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100vh !important; min-height: 100vh !important; transform: none !important; overflow: hidden !important; }
+  .layout, .main-shell, .workspace, .content {
+    height: 100vh !important; min-height: 100vh !important; max-width: none !important;
+    overflow: hidden !important; background: var(--bs-bg) !important;
+  }
+  .layout { display: block !important; grid-template-columns: minmax(0, 1fr) !important; }
+  .main-shell, .workspace, .content { width: 100% !important; }
+  .sidebar, .utility-strip, .topbar { display: none !important; }
+  .content { padding: 0 !important; }
+
+  /* ---------- 大屏设计令牌 ---------- */
+  .bs-stage {
+    --bs-cyan: #e8eef7;
+    --bs-cyan-dim: rgba(232, 238, 247, 0.5);
+    --bs-blue: #3b82f6;
+    --bs-amber: #f59e0b;
+    --bs-red: #fb7185;
+    --bs-green: #34d399;
+    --bs-panel: rgba(7, 12, 24, 0.72);
+    --bs-line: rgba(255, 255, 255, 0.14);
+    --bs-text: #e8f4ff;
+    --bs-muted: rgba(148, 180, 210, 0.62);
+    /* surface family (theme-switchable) */
+    --bs-bg: #02040a;
+    --bs-headline: #f2faff;
+    --bs-text-strong: #eaf6ff;                /* emphasized body text */
+    --bs-text-code: #d9ecff;                  /* mono data (IP / paths) */
+    --bs-tag-high: #fecdd3;
+    --bs-tag-medium: #fde68a;
+    --bs-wash: var(--bs-wash);      /* generic translucent panel */
+    --bs-wash-strong: var(--bs-wash-strong);
+    --bs-hairline: rgba(255, 255, 255, 0.09);  /* faint dividers */
+    --bs-glow: rgba(255, 255, 255, 0.25);      /* brand glow */
+    --bs-deep: rgba(4, 9, 18, 0.9);            /* inset wells (ring center) */
+    --bs-map-bg: #03060f;                      /* globe viewport */
+    --bs-vignette: rgba(2, 4, 10, 0.6);        /* globe edge falloff */
+  }
+  /* light re-skin: theme tokens only; geometry lives in the base rule */
+  [data-theme="light"] .bs-stage {
+    --bs-cyan: #1e3a8a;
+    --bs-cyan-dim: rgba(30, 58, 138, 0.5);
+    --bs-blue: #2563eb;
+    --bs-amber: #b45309;
+    --bs-red: #e11d48;
+    --bs-green: #059669;
+    --bs-panel: rgba(255, 255, 255, 0.85);
+    --bs-line: rgba(15, 23, 42, 0.16);
+    --bs-text: #1e293b;
+    --bs-muted: rgba(51, 65, 85, 0.68);
+    --bs-bg: #eef2f7;
+    --bs-headline: #0f172a;
+    --bs-text-strong: #1e293b;
+    --bs-text-code: #334155;
+    --bs-tag-high: #be123c;
+    --bs-tag-medium: #b45309;
+    --bs-wash: rgba(15, 23, 42, 0.04);
+    --bs-wash-strong: rgba(15, 23, 42, 0.08);
+    --bs-hairline: rgba(15, 23, 42, 0.10);
+    --bs-glow: rgba(37, 99, 235, 0.25);
+    --bs-deep: rgba(241, 245, 249, 0.92);
+    --bs-map-bg: #ffffff;
+    --bs-vignette: rgba(15, 23, 42, 0.10);
+  }
+  .bs-stage {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1920px;
+    height: 1080px;
+    transform: translate(-50%, -50%) scale(var(--bs-scale, 1));
+    transform-origin: center center;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px 12px;
+    color: var(--bs-text);
+    font-family: "Fira Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background:
+      radial-gradient(ellipse 55% 38% at 50% 0%, var(--bs-wash), transparent 70%),
+      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(37, 99, 235, 0.06), transparent 70%),
+      var(--bs-bg);
+  }
+  .bs-stage::before {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent 0 3px, var(--bs-hairline) 3px 4px);
+  }
+  .bs-mono { font-family: "Fira Code", ui-monospace, monospace; }
+
+  /* ---------- 顶栏 ---------- */
+  .bs-header {
+    position: relative;
+    display: grid;
+    grid-template-columns: 420px minmax(0, 1fr) 620px;
+    align-items: center;
+    gap: 16px;
+    height: 64px;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--bs-line);
+    padding-bottom: 10px;
+  }
+  .bs-header::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--bs-cyan-dim), transparent);
+  }
+  .bs-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .bs-brand img { width: 34px; height: 34px; filter: drop-shadow(0 0 10px var(--bs-glow)); }
+  .bs-title {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 22px; font-weight: 700; letter-spacing: 0.06em; color: var(--bs-headline);
+    text-shadow: 0 0 18px var(--bs-glow);
+  }
+  .bs-subtitle { margin-top: 3px; font-size: 10px; letter-spacing: 0.22em; color: var(--bs-muted); text-transform: uppercase; font-family: "Fira Code", ui-monospace, monospace; }
+  .bs-tabs { display: flex; justify-content: center; gap: 6px; }
+  .bs-tab {
+    width: auto; padding: 8px 22px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.06em;
+    color: var(--bs-muted);
+    background: transparent; border: 1px solid transparent; border-radius: 3px;
+    cursor: pointer;
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+  }
+  .bs-tab:hover { color: var(--bs-text); }
+  .bs-tab.is-active {
+    color: var(--bs-cyan);
+    border-color: var(--bs-line);
+    background: var(--bs-wash);
+    box-shadow: inset 0 -2px 0 var(--bs-cyan);
+  }
+  /* beat admin.css [data-theme=light] button:not(.secondary):not(.ghost)
+     (0-3-1 dark-gradient skin) — these are 0-3-1 later in cascade order
+     plus explicit :hover/:active ownership. */
+  [data-theme="light"] .bs-tab,
+  [data-theme="light"] .bs-tab:visited {
+    color: #64748b !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+  [data-theme="light"] .bs-tab:hover { color: #0f172a !important; background: rgba(15, 23, 42, 0.05) !important; }
+  [data-theme="light"] .bs-tab.is-active,
+  [data-theme="light"] .bs-tab.is-active:visited {
+    color: #0f172a !important;
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.16) !important;
+    box-shadow: inset 0 -2px 0 rgb(var(--pm-accent-rgb)) !important;
+  }
+  [data-theme="light"] .bs-ctl,
+  [data-theme="light"] .bs-ctl:visited {
+    color: #475569 !important;
+    background: transparent !important;
+    border-color: rgba(15, 23, 42, 0.18) !important;
+    box-shadow: none !important;
+  }
+  [data-theme="light"] select.bs-ctl {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  [data-theme="light"] .bs-ctl:hover,
+  [data-theme="light"] .bs-ctl.is-active {
+    color: #0f172a !important;
+    background: rgba(15, 23, 42, 0.06) !important;
+  }
+  [data-theme="light"] .bs-ctl-link,
+  [data-theme="light"] .bs-ctl-link:visited {
+    color: #334155 !important;
+  }
+  [data-theme="light"] .bs-feed-row.is-hot { background: color-mix(in srgb, var(--danger) 6%, white); }
+  .bs-header-right { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
+  .bs-clock { text-align: right; }
+  .bs-clock strong { display: block; font-family: "Fira Code", ui-monospace, monospace; font-size: 26px; font-weight: 700; line-height: 1; color: var(--bs-headline); font-variant-numeric: tabular-nums; }
+  .bs-clock span { display: block; margin-top: 4px; font-size: 10px; letter-spacing: 0.12em; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; }
+  .bs-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .bs-ctl {
+    width: auto; min-height: 26px; padding: 5px 10px;
+    font-size: 11px; font-weight: 600;
+    color: var(--bs-text-strong);
+    background: var(--bs-wash);
+    border: 1px solid var(--bs-line); border-radius: 3px;
+    cursor: pointer;
+    transition: all 160ms ease;
+  }
+  .bs-ctl:hover { border-color: var(--bs-cyan-dim); color: #fff; }
+  .bs-ctl.is-active { color: var(--bs-cyan); border-color: var(--bs-cyan-dim); background: var(--bs-wash-strong); }
+  .bs-ctl-link { text-decoration: none; }
+
+  /* ---------- 主体网格 ---------- */
+  .bs-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 344px minmax(0, 1fr) 344px;
+    gap: 12px;
+  }
+  .bs-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+
+  /* ---------- HUD 面板 ---------- */
+  .bs-panel {
+    position: relative;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    background:
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) left top / 12px 1px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) left top / 1px 12px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) right top / 12px 1px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) right top / 1px 12px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) left bottom / 12px 1px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) left bottom / 1px 12px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) right bottom / 12px 1px,
+      linear-gradient(var(--bs-cyan-dim), var(--bs-cyan-dim)) right bottom / 1px 12px,
+      var(--bs-panel);
+    background-repeat: no-repeat;
+    border: 1px solid var(--bs-line);
+  }
+  .bs-panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--bs-hairline);
+    flex: 0 0 auto;
+  }
+  .bs-panel-title {
+    display: flex; align-items: center; gap: 8px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--bs-text-strong);
+  }
+  .bs-panel-title::before {
+    content: ""; width: 4px; height: 13px;
+    background: var(--bs-headline); box-shadow: none;
+  }
+  .bs-panel-sub { font-size: 10px; letter-spacing: 0.1em; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; }
+  .bs-panel-body { flex: 1 1 auto; min-height: 0; padding: 10px 12px; display: flex; flex-direction: column; }
+
+  /* ---------- 态势环 + KPI ---------- */
+  .bs-overview { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 10px; align-items: center; flex: 1; }
+  .bs-ring { position: relative; width: 128px; height: 128px; }
+  .bs-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .bs-ring circle { fill: none; stroke-linecap: round; }
+  .bs-ring-center {
+    position: absolute; inset: 18px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--bs-deep);
+    border: 1px solid var(--bs-line);
+    text-align: center;
+  }
+  .bs-ring-center strong { font-family: "Fira Code", ui-monospace, monospace; font-size: 28px; line-height: 1; color: var(--bs-headline); text-shadow: 0 0 16px var(--bs-glow); }
+  .bs-ring-center span { margin-top: 4px; font-size: 9px; letter-spacing: 0.12em; color: var(--bs-muted); }
+  .bs-ring-center em { margin-top: 3px; font-style: normal; font-size: 9px; color: var(--bs-amber); font-family: "Fira Code", ui-monospace, monospace; }
+  .bs-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .bs-kpi {
+    padding: 8px 10px;
+    border: 1px solid var(--bs-hairline);
+    background: var(--bs-wash);
+  }
+  .bs-kpi label { display: block; font-size: 10px; letter-spacing: 0.1em; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; }
+  .bs-kpi strong { display: block; margin-top: 5px; font-family: "Fira Code", ui-monospace, monospace; font-size: 20px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bs-kpi .c-cyan { color: var(--bs-cyan); text-shadow: 0 0 12px var(--bs-glow); }
+  .bs-kpi .c-green { color: var(--bs-green); }
+  .bs-kpi .c-red { color: var(--bs-red); }
+  .bs-kpi .c-amber { color: var(--bs-amber); }
+  .bs-kpi-lines { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+  .bs-kpi-line {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 9px; font-size: 10.5px;
+    border-left: 2px solid var(--bs-cyan-dim);
+    background: var(--bs-wash);
+    color: var(--bs-muted);
+    font-family: "Fira Code", ui-monospace, monospace;
+  }
+  .bs-kpi-line strong { color: var(--bs-cyan); font-size: 12px; }
+
+  /* ---------- 图表 ---------- */
+  .bs-chart { flex: 1; width: 100%; min-height: 0; }
+  .bs-chart svg { width: 100%; height: 100%; display: block; }
+
+  /* ---------- 高危会话 / 排行滚动 ---------- */
+  .bs-scroll { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .bs-scroll-track { display: flex; flex-direction: column; animation: bsScroll var(--scroll-duration, 20s) linear infinite; will-change: transform; }
+  .bs-scroll:hover .bs-scroll-track { animation-play-state: paused; }
+  @keyframes bsScroll { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+  .bs-feed-row {
+    display: grid; grid-template-columns: minmax(0, 1.05fr) 42px 40px minmax(0, 1fr);
+    align-items: center; gap: 8px;
+    padding: 7px 8px; margin-bottom: 5px;
+    border: 1px solid var(--bs-hairline);
+    background: var(--bs-wash);
+    font-size: 11px;
+  }
+  .bs-feed-row.is-hot { border-color: rgba(251, 113, 133, 0.4); background: rgba(251, 113, 133, 0.08); }
+  .bs-feed-ip { font-family: "Fira Code", ui-monospace, monospace; color: var(--bs-text-code); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-feed-count { font-family: "Fira Code", ui-monospace, monospace; font-size: 10px; color: var(--bs-cyan); text-align: right; font-variant-numeric: tabular-nums; }
+  .bs-feed-path { color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-tag { padding: 2px 6px; font-size: 9.5px; font-weight: 700; font-family: "Fira Code", ui-monospace, monospace; text-align: center; }
+  .bs-tag.high { color: var(--bs-tag-high); background: color-mix(in srgb, var(--danger) 16%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
+  .bs-tag.medium { color: var(--bs-tag-medium); background: color-mix(in srgb, var(--warning) 15%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 38%, transparent); }
+
+  /* ---------- 中央大数字 ---------- */
+  .bs-bigstats {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-bottom: 1px solid var(--bs-hairline);
+    flex: 0 0 auto;
+  }
+  .bs-bigstat { padding: 12px 14px 10px; position: relative; }
+  .bs-bigstat + .bs-bigstat::before { content: ""; position: absolute; left: 0; top: 18%; bottom: 18%; width: 1px; background: var(--bs-hairline); }
+  .bs-bigstat label { display: block; font-size: 10px; letter-spacing: 0.16em; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; text-transform: uppercase; }
+  .bs-bigstat strong {
+    display: block; margin-top: 6px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 40px; line-height: 1; font-weight: 700;
+    color: var(--bs-headline); font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 22px var(--bs-glow);
+  }
+  .bs-bigstat strong.c-cyan { color: var(--bs-cyan); }
+  .bs-bigstat strong.c-red { color: var(--bs-red); text-shadow: 0 0 22px rgba(251, 113, 133, 0.3); }
+  .bs-bigstat strong.c-amber { color: var(--bs-amber); text-shadow: 0 0 22px rgba(245, 158, 11, 0.3); }
+  .bs-bigstat span { display: block; margin-top: 4px; font-size: 10px; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; }
+
+  /* ---------- 地图 ---------- */
+  .bs-map-wrap { position: relative; flex: 1; min-height: 0; margin: 10px 12px 12px; border: 1px solid var(--bs-hairline); overflow: hidden; background: var(--bs-map-bg); }
+  .bs-globe { position: absolute; inset: 0; }
+  .bs-globe canvas { display: block; }
+  /* 暗角：压住地球边缘亮度，突出中心视野 */
+  .bs-globe::after {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 46%, transparent 52%, var(--bs-vignette) 100%);
+  }
+  /* 平面地图模式 */
+  .bs-flatmap { position: absolute; inset: 0; }
+  .bs-flatmap svg { width: 100%; height: 100%; display: block; }
+  .fm-country { fill: var(--bs-hairline); stroke: var(--bs-line); stroke-width: 0.6; }
+  .fm-arc { fill: none; stroke-width: 1.4; stroke-dasharray: 6 8; animation: fmDash 2.6s linear infinite; }
+  @keyframes fmDash { to { stroke-dashoffset: -56; } }
+  .fm-point { filter: drop-shadow(0 0 4px currentColor); }
+  .fm-ring { fill: none; stroke-width: 1; opacity: 0.8; }
+  .bs-map-toolbar {
+    position: absolute; left: 10px; top: 10px; z-index: 3;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .bs-map-mode {
+    padding: 6px 10px;
+    background: var(--bs-panel); border: 1px solid var(--bs-line);
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 11px; color: var(--bs-cyan); letter-spacing: 0.08em;
+  }
+  .bs-map-toggle { display: flex; gap: 4px; }
+  .bs-map-toggle .bs-ctl { background: var(--bs-deep); }
+  .bs-map-canvas {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, rgba(9, 17, 36, 0.2), rgba(2, 8, 18, 0.72)),
+      url('/static/smart_gis.png');
+    background-size: cover; background-position: center;
+  }
+  .bs-map-canvas::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--bs-wash) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bs-wash) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+  .bs-heat-glow {
+    position: absolute; border-radius: 50%;
+    filter: blur(10px);
+    transform: translate(-50%, -50%);
+    opacity: 0.8;
+    animation: bsPulse 3.2s ease-in-out infinite alternate;
+  }
+  .bs-heat-glow::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    width: 7px; height: 7px; background: #fff;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 16px currentColor;
+  }
+  @keyframes bsPulse { from { opacity: 0.45; } to { opacity: 0.9; } }
+  .bs-map-badges { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+  .bs-map-badge {
+    padding: 6px 10px; min-width: 150px;
+    background: var(--bs-panel); border: 1px solid var(--bs-line);
+    font-size: 10px; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace;
+  }
+  .bs-map-badge strong { display: block; margin-top: 3px; font-size: 13px; color: var(--bs-headline); }
+  .bs-map-legend { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 12px; font-size: 10px; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; z-index: 2; }
+  .bs-map-legend span::before { content: ""; display: inline-block; width: 9px; height: 3px; margin-right: 5px; vertical-align: middle; background: currentColor; box-shadow: 0 0 8px currentColor; }
+  .bs-map-mode {
+    position: static;
+    padding: 6px 10px;
+    background: var(--bs-panel); border: 1px solid var(--bs-line);
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 11px; color: var(--bs-cyan); letter-spacing: 0.08em;
+  }
+
+  /* ---------- 链路条 ---------- */
+  .bs-chain { display: flex; flex-direction: column; gap: 9px; flex: 1; justify-content: center; }
+  .bs-chain-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 52px; align-items: center; gap: 9px; }
+  .bs-chain-name { font-size: 10.5px; color: var(--bs-text-code); font-family: "Fira Code", ui-monospace, monospace; }
+  .bs-chain-track { height: 12px; background: var(--bs-hairline); border: 1px solid var(--bs-hairline); position: relative; overflow: hidden; }
+  .bs-chain-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--bs-headline), var(--bs-cyan-dim)); box-shadow: none; }
+  .bs-chain-fill::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 5px, rgba(2, 4, 10, 0.35) 5px 7px); }
+  .bs-chain-val { font-family: "Fira Code", ui-monospace, monospace; font-size: 12px; font-weight: 700; color: var(--bs-cyan); text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 排行 ---------- */
+  .bs-rank-row {
+    display: grid; grid-template-columns: 30px minmax(0, 1fr) auto;
+    align-items: center; gap: 9px;
+    padding: 7px 8px; margin-bottom: 5px;
+    border: 1px solid var(--bs-hairline);
+    background: var(--bs-wash);
+  }
+  .bs-rank-idx { font-family: "Fira Code", ui-monospace, monospace; font-size: 12px; font-weight: 700; color: var(--bs-muted); }
+  .bs-rank-row:nth-child(odd) .bs-rank-idx { color: var(--bs-cyan); }
+  .bs-rank-main { min-width: 0; }
+  .bs-rank-main strong { display: block; font-size: 11.5px; color: var(--bs-text-strong); font-family: "Fira Code", ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-rank-main span { display: block; margin-top: 2px; font-size: 10px; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bs-rank-bar { margin-top: 5px; height: 4px; background: var(--bs-hairline); overflow: hidden; }
+  .bs-rank-bar span { display: block; height: 100%; width: var(--progress, 0%); background: linear-gradient(90deg, rgba(255,255,255,.8), rgba(255,255,255,.5)); box-shadow: none; }
+  .bs-rank-val { font-family: "Fira Code", ui-monospace, monospace; font-size: 14px; font-weight: 700; color: var(--bs-cyan); font-variant-numeric: tabular-nums; }
+
+  .bs-empty { display: grid; place-items: center; min-height: 80px; font-size: 11px; color: var(--bs-muted); font-family: "Fira Code", ui-monospace, monospace; }
+
+  .bs-footer {
+    flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10px; letter-spacing: 0.1em; color: rgba(148, 180, 210, 0.45);
+    font-family: "Fira Code", ui-monospace, monospace;
+    border-top: 1px solid var(--bs-hairline);
+    padding-top: 8px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bs-scroll-track, .bs-heat-glow { animation: none !important; }
+  }
+</style>
+
+<div class="bs-stage" id="bs-stage">
+  <header class="bs-header">
+    <div class="bs-brand">
+      <img src="/static/agentcapture-logo.svg" alt="AgentCapture">
+      <div>
+        <div class="bs-title">AGENTCAPTURE</div>
+        <div class="bs-subtitle">Honeypot Situation Deck · 诱捕态势</div>
+      </div>
+    </div>
+    <nav class="bs-tabs" aria-label="态势视图导航">
+      <button type="button" class="bs-tab" data-screen-target="overview">诱捕总览</button>
+      <button type="button" class="bs-tab" data-screen-target="sources">攻击来源追踪</button>
+      <button type="button" class="bs-tab" data-screen-target="nodes">蜜罐节点承压</button>
+    </nav>
+    <div class="bs-header-right">
+      <div class="bs-controls">
+        <button type="button" class="bs-ctl" id="smart-refresh-toggle">自动刷新：关</button>
+        <button type="button" class="bs-ctl" id="smart-rotate-toggle">轮播：关</button>
+        <select id="smart-rotate-interval" class="bs-ctl">
+          <option value="15" {% if rotate_interval == '15' %}selected{% endif %}>15s</option>
+          <option value="30" {% if rotate_interval == '30' %}selected{% endif %}>30s</option>
+          <option value="60" {% if rotate_interval == '60' %}selected{% endif %}>60s</option>
+        </select>
+        <button type="button" class="bs-ctl" id="smart-fullscreen-btn">全屏</button>
+        <button type="button" class="bs-ctl" id="smart-wakelock-btn">常亮</button>
+        <a class="bs-ctl bs-ctl-link" href="/admin">返回后台</a>
+      </div>
+      <div class="bs-clock">
+        <strong id="smart-big-clock">--:--:--</strong>
+        <span id="smart-big-date">----/--/--</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="bs-body">
+    <!-- 左列 -->
+    <div class="bs-col">
+      <section class="bs-panel" style="flex: 0 0 auto;">
+        <header class="bs-panel-head">
+          <div class="bs-panel-title">诱捕态势</div>
+          <div class="bs-panel-sub">TRAP // OVERVIEW</div>
+        </header>
+        <div class="bs-panel-body">
+          <div class="bs-overview">
+            <div class="bs-ring">
+              <svg viewBox="0 0 184 184" aria-label="高危占比">
+                <circle cx="92" cy="92" r="76" stroke="rgba(255,255,255,.1)" stroke-width="10"></circle>
+                <circle cx="92" cy="92" r="63" stroke="rgba(56,189,248,.08)" stroke-width="2" stroke-dasharray="2 8"></circle>
+                <circle cx="92" cy="92" r="76" stroke="rgba(34,211,238,.95)" stroke-width="10" stroke-dasharray="{{ (risk_ratio * 4.774)|round(0, 'floor') }} 999"></circle>
+                <circle cx="92" cy="92" r="56" stroke="rgba(52,211,153,.85)" stroke-width="4" stroke-dasharray="{{ (online_ratio * 3.52)|round(0, 'floor') }} 999"></circle>
+              </svg>
+              <div class="bs-ring-center">
+                <strong>{{ risk_ratio }}</strong>
+                <span>高危命中 / %</span>
+                <em>{% if risk_ratio >= 60 %}高压预警{% elif risk_ratio >= 30 %}持续观察{% else %}整体可控{% endif %}</em>
+              </div>
+            </div>
+            <div class="bs-kpis">
+              <div class="bs-kpi"><label>诱捕事件</label><strong class="c-cyan">{{ total_events }}</strong></div>
+              <div class="bs-kpi"><label>蜜罐节点</label><strong class="c-green">{{ online_nodes }}/{{ total_nodes }}</strong></div>
+              <div class="bs-kpi"><label>高危攻击</label><strong class="c-red">{{ high_risk }}</strong></div>
+              <div class="bs-kpi"><label>攻击来源</label><strong class="c-amber">{{ stats.summary.unique_ips }}</strong></div>
+              <div class="bs-kpi-lines">
+                <div class="bs-kpi-line"><span>反制处置 · BLOCK/ISOLATE</span><strong>{{ stats.summary.agent_blocks }}</strong></div>
+                <div class="bs-kpi-line"><span>凭据诱捕 · CRED HIT</span><strong>{{ stats.summary.credential_attempts }}</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bs-panel" style="flex: 0 0 240px;">
+        <header class="bs-panel-head">
+          <div class="bs-panel-title">诱捕趋势</div>
+          <div class="bs-panel-sub">TREND // 7D</div>
+        </header>
+        <div class="bs-panel-body">
+          <div class="bs-chart"><svg id="smart-trend-chart" viewBox="0 0 380 220" preserveAspectRatio="none"></svg></div>
+        </div>
+      </section>
+
+      <section class="bs-panel" style="flex: 1 1 auto;">
+        <header class="bs-panel-head">
+          <div class="bs-panel-title">高危会话</div>
+          <div class="bs-panel-sub">RISK // FEED · {{ top_attacks|length }}</div>
+        </header>
+        <div class="bs-panel-body">
+          {% set threat_feed = top_attacks[:8] %}
+          {% set threat_scroll = threat_feed|length > 3 %}
+          <div class="bs-scroll">
+            <div class="bs-scroll-track" {% if threat_scroll %}style="--scroll-duration: {{ threat_feed|length * 4 }}s"{% endif %}>
+              {% for copy_index in range(2 if threat_scroll else 1) %}
+                {% for item in threat_feed %}
+                  <div class="bs-feed-row {% if loop.first and copy_index == 0 %}is-hot{% endif %}">
+                    <span class="bs-feed-ip">{{ item.source_ip }}</span>
+                    <span class="bs-feed-count">×{{ item.count }}</span>
+                    <span class="bs-tag {{ 'high' if item.risk_score_max >= 70 else 'medium' }}">{{ item.risk_score_max }}</span>
+                    <span class="bs-feed-path">{{ item.top_path }}</span>
+                  </div>
+                {% endfor %}
+              {% endfor %}
+              {% if not threat_feed %}<div class="bs-empty">暂无诱捕样本</div>{% endif %}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 中央 -->
+    <div class="bs-col">
+      <section class="bs-panel" style="flex: 1 1 auto;">
+        <div class="bs-bigstats">
+          <div class="bs-bigstat"><label>诱捕事件 · EVENTS</label><strong class="c-cyan" id="smart-center-total">{{ total_events }}</strong><span id="smart-center-kicker">累计采集事件</span></div>
+          <div class="bs-bigstat"><label>反制处置 · COUNTER</label><strong id="smart-center-blocks">{{ stats.summary.agent_blocks }}</strong><span>阻断 / 隔离 / 质询</span></div>
+          <div class="bs-bigstat"><label>高危命中 · HIGH-RISK</label><strong class="c-red" id="smart-center-risk">{{ high_risk }}</strong><span>风险分 ≥ 70</span></div>
+          <div class="bs-bigstat"><label>独立来源 · SOURCES</label><strong class="c-amber">{{ stats.summary.unique_ips }}</strong><span>轮播间隔 <b id="smart-interval-label">{{ rotate_interval }}s</b></span></div>
+        </div>
+        <div class="bs-map-wrap">
+          <div class="bs-globe" id="bs-globe"></div>
+          <div class="bs-flatmap" id="bs-flatmap" style="display:none">
+            <svg id="bs-flatmap-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+          <div class="bs-map-canvas" id="smart-heat-canvas" style="display:none"></div>
+          <div class="bs-map-toolbar">
+            <div class="bs-map-mode"><span id="smart-screen-label">诱捕总览</span> · <span id="smart-analysis-sub">[SRC] 来源与触发排行</span></div>
+            <div class="bs-map-toggle">
+              <button type="button" class="bs-ctl is-active" data-map-mode="3d">3D 地球</button>
+              <button type="button" class="bs-ctl" data-map-mode="2d">平面地图</button>
+            </div>
+          </div>
+          <div class="bs-map-badges">
+            <div class="bs-map-badge">高频来源<strong>{{ top_sources[0].source_ip if top_sources else '无' }}</strong></div>
+            <div class="bs-map-badge">高频路径<strong>{{ top_paths[0][0] if top_paths else '/' }}</strong></div>
+          </div>
+          <div class="bs-map-legend"><span style="color:var(--bs-headline)">活跃区</span><span style="color:var(--bs-amber)">高压区</span><span style="color:var(--bs-red)">高危区</span><span>· 示意分布</span></div>
+        </div>
+      </section>
+
+      <section class="bs-panel" style="flex: 0 0 210px;">
+        <header class="bs-panel-head">
+          <div class="bs-panel-title">高频路径 · 宿主负载</div>
+          <div class="bs-panel-sub">PATHS // HOST</div>
+        </header>
+        <div class="bs-panel-body" style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:22px;">
+          <div class="bs-chain">
+            {% set path_max = top_paths|map(attribute=1)|max or 1 %}
+            {% for path, count in top_paths[:5] %}
+              <div class="bs-chain-row">
+                <span class="bs-chain-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ path }}">{{ path }}</span>
+                <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ ((count / path_max) * 100)|round(0, 'floor') if count > 0 else 2 }}%"></div></div>
+                <span class="bs-chain-val">{{ count }}</span>
+              </div>
+            {% else %}
+              <div class="bs-empty">暂无路径数据</div>
+            {% endfor %}
+          </div>
+          <div class="bs-chain">
+            <div class="bs-chain-row">
+              <span class="bs-chain-name">CPU</span>
+              <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ stats.system.cpu_percent|round(0, 'floor') }}%"></div></div>
+              <span class="bs-chain-val">{{ stats.system.cpu_percent|round(1) }}%</span>
+            </div>
+            <div class="bs-chain-row">
+              <span class="bs-chain-name">内存</span>
+              <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ stats.system.memory_percent|round(0, 'floor') }}%"></div></div>
+              <span class="bs-chain-val">{{ stats.system.memory_percent|round(1) }}%</span>
+            </div>
+            <div class="bs-chain-row">
+              <span class="bs-chain-name">磁盘</span>
+              <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ stats.system.disk_percent|round(0, 'floor') }}%"></div></div>
+              <span class="bs-chain-val">{{ stats.system.disk_percent|round(1) }}%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右列 -->
+    <div class="bs-col">
+      <section class="bs-panel" style="flex: 1 1 auto;">
+        <header class="bs-panel-head">
+          <div class="bs-panel-title">攻击解析</div>
+          <div class="bs-panel-sub">ANALYSIS</div>
+        </header>
+        <div class="bs-panel-body">
+          <div class="bs-scroll">
+            <div class="bs-ranking-list" id="smart-ranking-list" style="display:flex;flex-direction:column;gap:0;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bs-panel" style="flex: 0 0 240px;">
+        <header class="bs-panel-head">
+          <div class="bs-panel-title">威胁链路</div>
+          <div class="bs-panel-sub">CHAIN // KILL-CHAIN</div>
+        </header>
+        <div class="bs-panel-body">
+          <div class="bs-chain">
+            {% for item in chain_items %}
+              <div class="bs-chain-row">
+                <span class="bs-chain-name">{{ item.label }}</span>
+                <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ ((item.value / chain_max) * 100)|round(0, 'floor') if item.value > 0 else 2 }}%"></div></div>
+                <span class="bs-chain-val">{{ item.value }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <div class="bs-footer">
+    <span>AGENTCAPTURE // SITUATION DECK</span>
+    <span id="smart-screen-track" style="display:none">
+      <span data-track="overview"></span><span data-track="sources"></span><span data-track="nodes"></span>
+    </span>
+    <span>面向蜜罐节点、诱捕事件、凭据命中与反制处置的实时态势面板</span>
+  </div>
+</div>
+
+<script src="/static/vendor/three.min.js"></script>
+<script src="/static/vendor/globe.gl.min.js"></script>
+<script>
+  const SMART_DATA = {
+    screen: {{ screen|tojson }},
+    rotateInterval: {{ rotate_interval|tojson }},
+    summary: {{ stats.summary|tojson }},
+    system: {{ stats.system|tojson }},
+    chain: {{ chain|tojson }},
+    trends: {{ trends|tojson }},
+    topSources: {{ top_sources|tojson }},
+    topAttacks: {{ top_attacks|tojson }},
+    nodeSummary: {{ node_summary|tojson }},
+    nodeItems: {{ node_items_visual|tojson }},
+    topPaths: {{ top_paths|tojson }},
+  };
+
+  const SMART_SCREENS = {
+    overview: { label: '诱捕总览', sub: '[SRC] 来源与触发排行', kicker: '近周期样本' },
+    sources: { label: '攻击来源追踪', sub: '[SRC] 来源集中度与高频路径', kicker: '高频攻击来源聚合' },
+    nodes: { label: '蜜罐节点承压', sub: '[NODE] 节点承压与会话排行', kicker: '蜜罐受击负载视图' },
+  };
+
+  let smartRefreshTimer = null;
+  let smartRotateTimer = null;
+  let smartRefreshEnabled = false;
+  let smartRotateEnabled = false;
+  let smartWakeLock = null;
+  let smartState = {
+    screen: SMART_SCREENS[SMART_DATA.screen] ? SMART_DATA.screen : 'overview',
+  };
+
+  function formatNumber(value) {
+    return new Intl.NumberFormat('zh-CN').format(Number(value || 0));
+  }
+
+  function clampPercent(value) {
+    return Math.max(0, Math.min(100, Number(value || 0)));
+  }
+
+  function currentRotateInterval() {
+    const select = document.getElementById('smart-rotate-interval');
+    const val = Number(select ? select.value : SMART_DATA.rotateInterval || 30);
+    return [15, 30, 60].includes(val) ? val : 30;
+  }
+
+  function updateClock() {
+    const now = new Date();
+    const timeEl = document.getElementById('smart-big-clock');
+    const dateEl = document.getElementById('smart-big-date');
+    if (timeEl) timeEl.textContent = now.toLocaleTimeString('zh-CN', { hour12: false });
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
+  }
+
+  function updateUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('screen', smartState.screen);
+    url.searchParams.set('rotate_interval', String(currentRotateInterval()));
+    if (smartRefreshEnabled) url.searchParams.set('autoplay', '1'); else url.searchParams.delete('autoplay');
+    if (smartRotateEnabled) url.searchParams.set('rotate', '1'); else url.searchParams.delete('rotate');
+    history.replaceState({}, '', url.toString());
+  }
+
+  function restartRefresh() {
+    if (smartRefreshTimer) clearInterval(smartRefreshTimer);
+    if (smartRefreshEnabled) {
+      smartRefreshTimer = setInterval(() => window.location.reload(), 15000);
+    }
+  }
+
+  function restartRotate() {
+    if (smartRotateTimer) clearInterval(smartRotateTimer);
+    if (smartRotateEnabled) {
+      smartRotateTimer = setInterval(() => {
+        const keys = Object.keys(SMART_SCREENS);
+        const idx = keys.indexOf(smartState.screen);
+        const next = keys[(idx + 1) % keys.length];
+        setScreen(next);
+      }, currentRotateInterval() * 1000);
+    }
+  }
+
+  function toggleRefresh() {
+    smartRefreshEnabled = !smartRefreshEnabled;
+    const btn = document.getElementById('smart-refresh-toggle');
+    if (btn) {
+      btn.textContent = smartRefreshEnabled ? '自动刷新：15s' : '自动刷新：关';
+      btn.classList.toggle('is-active', smartRefreshEnabled);
+    }
+    restartRefresh();
+    updateUrl();
+  }
+
+  function toggleRotate() {
+    smartRotateEnabled = !smartRotateEnabled;
+    const btn = document.getElementById('smart-rotate-toggle');
+    if (btn) {
+      btn.textContent = smartRotateEnabled ? `轮播：${currentRotateInterval()}s` : '轮播：关';
+      btn.classList.toggle('is-active', smartRotateEnabled);
+    }
+    restartRotate();
+    updateUrl();
+  }
+
+  function enterFullscreen() {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen();
+    }
+  }
+
+  async function requestWakeLock() {
+    const btn = document.getElementById('smart-wakelock-btn');
+    try {
+      if ('wakeLock' in navigator && navigator.wakeLock.request) {
+        smartWakeLock = await navigator.wakeLock.request('screen');
+        if (btn) {
+          btn.textContent = '常亮：开';
+          btn.classList.add('is-active');
+        }
+        smartWakeLock.addEventListener('release', () => {
+          if (btn) {
+            btn.textContent = '常亮';
+            btn.classList.remove('is-active');
+          }
+        });
+      } else if (btn) {
+        btn.textContent = '常亮：不支持';
+      }
+    } catch (error) {
+      if (btn) btn.textContent = '常亮：失败';
+    }
+  }
+
+  function makeAnalysisRows() {
+    if (smartState.screen === 'sources') {
+      return (SMART_DATA.topSources || []).slice(0, 10).map((item, index) => ({
+        index,
+        title: item.source_ip || 'unknown',
+        subtitle: `${item.top_site || '未知站点'} · ${item.top_path || '/'}`,
+        value: formatNumber(item.count),
+        amount: Number(item.count || 0),
+      }));
+    }
+    if (smartState.screen === 'nodes') {
+      return (SMART_DATA.nodeItems || []).slice(0, 10).map((item, index) => ({
+        index,
+        title: item.node_name || item.site_id || '未命名节点',
+        subtitle: `${item.node_status || 'unknown'} · 命中会话 ${formatNumber(item.session_count || 0)}`,
+        value: formatNumber(item.event_count || 0),
+        amount: Number(item.event_count || 0),
+      }));
+    }
+    return (SMART_DATA.topAttacks || []).slice(0, 10).map((item, index) => ({
+      index,
+      title: item.source_ip || 'unknown',
+      subtitle: `${item.top_path || '/'} · 风险分 ${formatNumber(item.risk_score_max || 0)}`,
+      value: formatNumber(item.count || 0),
+      amount: Number(item.count || 0),
+    }));
+  }
+
+  function renderAnalysis() {
+    const listEl = document.getElementById('smart-ranking-list');
+    const labelEl = document.getElementById('smart-screen-label');
+    const subEl = document.getElementById('smart-analysis-sub');
+    const kickerEl = document.getElementById('smart-center-kicker');
+    const config = SMART_SCREENS[smartState.screen];
+    if (labelEl) labelEl.textContent = config.label;
+    if (subEl) subEl.textContent = config.sub;
+    if (kickerEl) kickerEl.textContent = config.kicker;
+    if (!listEl) return;
+    const rows = makeAnalysisRows();
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="bs-empty">暂无排行数据</div>';
+      return;
+    }
+    const max = Math.max(...rows.map((row) => Number(row.amount || 0)), 1);
+    const rowHtml = rows.map((row) => `
+      <div class="bs-rank-row">
+        <div class="bs-rank-idx">${String(row.index + 1).padStart(2, '0')}</div>
+        <div class="bs-rank-main">
+          <strong>${row.title}</strong>
+          <span>${row.subtitle}</span>
+          <div class="bs-rank-bar" style="--progress:${Math.max(8, (Number(row.amount || 0) / max) * 100)}%"><span></span></div>
+        </div>
+        <div class="bs-rank-val">${row.value}</div>
+      </div>
+    `).join('');
+    const shouldScroll = rows.length > 6;
+    if (!shouldScroll) {
+      listEl.innerHTML = rowHtml;
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="bs-scroll-track" style="--scroll-duration: ${Math.max(18, rows.length * 3)}s">
+        <div>${rowHtml}</div>
+        <div aria-hidden="true">${rowHtml}</div>
+      </div>
+    `;
+  }
+
+  function renderTrendChart() {
+    const svg = document.getElementById('smart-trend-chart');
+    const rows = SMART_DATA.trends || [];
+    if (!svg) return;
+    if (!rows.length) {
+      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="rgba(148,180,210,.5)" font-size="13" font-family="monospace">暂无趋势数据</text>';
+      return;
+    }
+    const width = 380;
+    const height = 220;
+    const padding = { top: 18, right: 14, bottom: 26, left: 26 };
+    const maxCount = Math.max(...rows.map((row) => Number(row.count || 0)), 1);
+    const step = rows.length > 1 ? (width - padding.left - padding.right) / (rows.length - 1) : 0;
+    const points = rows.map((row, idx) => {
+      const value = Number(row.count || 0);
+      return {
+        x: padding.left + idx * step,
+        y: padding.top + (height - padding.top - padding.bottom) * (1 - value / maxCount),
+        label: String(row.day).slice(5),
+        value,
+      };
+    });
+    const line = points.map((point, idx) => `${idx ? 'L' : 'M'}${point.x},${point.y}`).join(' ');
+    const area = `${line} L${points[points.length - 1].x},${height - padding.bottom} L${points[0].x},${height - padding.bottom} Z`;
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="bsTrendArea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="rgba(59,130,246,.30)"/>
+          <stop offset="1" stop-color="rgba(59,130,246,0)"/>
+        </linearGradient>
+      </defs>
+      ${Array.from({ length: 4 }).map((_, index) => `<line x1="${padding.left}" y1="${padding.top + index * 42}" x2="${width - padding.right}" y2="${padding.top + index * 42}" stroke="rgba(255,255,255,.1)" stroke-dasharray="3 6"></line>`).join('')}
+      <path d="${area}" fill="url(#bsTrendArea)"></path>
+      <path d="${line}" fill="none" stroke="#3b82f6" stroke-width="2.4"></path>
+      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.2" fill="#3b82f6"></circle><text x="${point.x}" y="${height - 8}" text-anchor="middle" fill="rgba(148,180,210,.55)" font-size="10" font-family="monospace">${point.label}</text>`).join('')}
+    `;
+  }
+
+  // 3D 地球（globe.gl / three.js，本地 vendored）。WebGL 不可用时回退 2D 热力图。
+  let bsGlobe = null;
+
+  function hashGeo(ip, salt) {
+    let h = 0;
+    const s = String(ip || '') + salt;
+    for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+    return h;
+  }
+
+  function sourcePoints() {
+    // 无 GeoIP 库时的确定性示意坐标：同一来源 IP 永远落在同一位置。
+    const items = (SMART_DATA.topSources || []).slice(0, 8);
+    const max = Math.max(...items.map((item) => Number(item.count || 0)), 1);
+    return items.map((item) => {
+      const intensity = clampPercent((Number(item.count || 0) / max) * 100);
+      return {
+        lat: -52 + (hashGeo(item.source_ip, 'lat') % 104),
+        lng: -175 + (hashGeo(item.source_ip, 'lng') % 350),
+        intensity,
+        label: `${item.source_ip} · ${formatNumber(item.count)} 次`,
+        color: intensity > 78 ? '#fb7185' : intensity > 44 ? '#f59e0b' : '#e8eef7',
+      };
+    });
+  }
+
+  function initGlobe() {
+    const container = document.getElementById('bs-globe');
+    if (!container || typeof Globe !== 'function') {
+      renderHeatMap();  // 库缺失时的 2D 回退
+      return;
+    }
+    try {
+      const points = sourcePoints();
+      // 攻击弧：各来源 → 蜜罐中心（东亚示意位）
+      const HUB = { lat: 31.2, lng: 121.5 };
+      const arcs = points.map((p) => ({
+        startLat: p.lat, startLng: p.lng,
+        endLat: HUB.lat, endLng: HUB.lng,
+        color: p.color,
+      }));
+
+      bsGlobe = Globe()(container)
+        .backgroundColor('rgba(0,0,0,0)')
+        .globeImageUrl('/static/vendor/earth-blue-marble.jpg')
+        .showAtmosphere(true)
+        .atmosphereColor('#dbe7f5')
+        .atmosphereAltitude(0.2)
+        .pointsData(points)
+        .pointLat('lat')
+        .pointLng('lng')
+        .pointColor('color')
+        .pointAltitude((d) => 0.02 + d.intensity * 0.002)
+        .pointRadius((d) => 0.55 + d.intensity * 0.012)
+        .pointLabel('label')
+        .arcsData(arcs)
+        .arcStartLat('startLat')
+        .arcStartLng('startLng')
+        .arcEndLat('endLat')
+        .arcEndLng('endLng')
+        .arcColor('color')
+        .arcDashLength(0.4)
+        .arcDashGap(0.25)
+        .arcDashAnimateTime(2600)
+        .arcStroke(0.8)
+        .arcAltitudeAutoScale(0.5)
+        .ringsData([{ lat: HUB.lat, lng: HUB.lng }])
+        .ringColor(() => (t) => `rgba(232,238,247,${Math.max(0, 0.7 - t / 1200)})`)
+        .ringMaxRadius(6)
+        .ringPropagationSpeed(1.4)
+        .ringRepeatPeriod(1600);
+
+      const controls = bsGlobe.controls();
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.6;
+      controls.enableZoom = false;
+      bsGlobe.pointOfView({ lat: 20, lng: 105, altitude: 1.72 });
+
+      // 国家边界（Natural Earth 110m，本地 vendored）
+      fetch('/static/vendor/countries.geojson')
+        .then((r) => r.json())
+        .then((countries) => {
+          bsGlobe
+            .polygonsData(countries.features)
+            .polygonCapColor(() => document.documentElement.dataset.theme === 'light' ? 'rgba(15, 23, 42, 0.05)' : 'rgba(255, 255, 255, 0.03)')
+            .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
+            .polygonStrokeColor(() => 'rgba(210, 228, 245, 0.45)')
+            .polygonAltitude(0.004);
+        })
+        .catch(() => {});
+
+      // 主要国家代码标注（ISO 双字母码：无字体依赖，任何终端都能渲染）
+      const COUNTRY_LABELS = [
+        { name: 'CN', lat: 35.0, lng: 104.0 },
+        { name: 'US', lat: 39.8, lng: -98.5 },
+        { name: 'RU', lat: 61.0, lng: 99.0 },
+        { name: 'IN', lat: 21.0, lng: 78.0 },
+        { name: 'JP', lat: 36.2, lng: 138.2 },
+        { name: 'KR', lat: 36.4, lng: 127.9 },
+        { name: 'GB', lat: 54.0, lng: -2.0 },
+        { name: 'FR', lat: 46.6, lng: 2.4 },
+        { name: 'DE', lat: 51.1, lng: 10.4 },
+        { name: 'BR', lat: -10.8, lng: -52.9 },
+        { name: 'AU', lat: -25.3, lng: 133.8 },
+        { name: 'CA', lat: 56.1, lng: -106.3 },
+        { name: 'ZA', lat: -29.0, lng: 24.0 },
+        { name: 'EG', lat: 26.8, lng: 30.8 },
+      ];
+      bsGlobe
+        .labelsData(COUNTRY_LABELS)
+        .labelLat('lat')
+        .labelLng('lng')
+        .labelText('name')
+        .labelSize(1.0)
+        .labelColor(() => 'rgba(210, 240, 255, 0.92)')
+        .labelDotRadius(0.3)
+        .labelAltitude(0.006)
+        .labelResolution(2);
+
+      const size = () => bsGlobe.width(container.clientWidth).height(container.clientHeight);
+      size();
+      window.addEventListener('resize', size);
+
+      // 悬停暂停自转
+      container.addEventListener('pointerenter', () => { controls.autoRotate = false; });
+      container.addEventListener('pointerleave', () => { controls.autoRotate = true; });
+    } catch (error) {
+      container.style.display = 'none';
+      const fallback = document.getElementById('smart-heat-canvas');
+      if (fallback) fallback.style.display = '';
+      renderHeatMap();
+    }
+  }
+
+  // ---------- 平面世界地图（等距投影 SVG，与 3D 地球数据同源） ----------
+  let bsMapMode = '3d';
+  let flatmapReady = false;
+  const FM_W = 1000;
+  const FM_H = 500;
+
+  function fmProject(lat, lng) {
+    return [((lng + 180) / 360) * FM_W, ((90 - lat) / 180) * FM_H];
+  }
+
+  function fmPathFromRings(rings) {
+    return rings
+      .map((ring) =>
+        ring
+          .map((pt, i) => {
+            const [x, y] = fmProject(pt[1], pt[0]);
+            return (i ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1);
+          })
+          .join('') + 'Z'
+      )
+      .join('');
+  }
+
+  function buildFlatMap() {
+    const svg = document.getElementById('bs-flatmap-svg');
+    if (!svg || flatmapReady) return;
+    fetch('/static/vendor/countries.geojson')
+      .then((r) => r.json())
+      .then((geo) => {
+        const parts = [];
+        for (const feature of geo.features) {
+          const g = feature.geometry;
+          if (!g) continue;
+          const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+          for (const rings of polys) {
+            parts.push(`<path class="fm-country" d="${fmPathFromRings(rings)}"/>`);
+          }
+        }
+        parts.push('<g id="fm-attacks"></g>');
+        svg.innerHTML = parts.join('');
+        flatmapReady = true;
+        renderFlatAttacks();
+      })
+      .catch(() => {});
+  }
+
+  function renderFlatAttacks() {
+    const layer = document.getElementById('fm-attacks');
+    if (!layer) return;
+    const HUB = { lat: 31.2, lng: 121.5 };
+    const [hx, hy] = fmProject(HUB.lat, HUB.lng);
+    const parts = [];
+    sourcePoints().forEach((p, index) => {
+      const [sx, sy] = fmProject(p.lat, p.lng);
+      const lift = Math.max(30, Math.abs(sx - hx) * 0.22);
+      const mx = (sx + hx) / 2;
+      const my = Math.min(sy, hy) - lift;
+      parts.push(`<path class="fm-arc" stroke="${p.color}" d="M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${hx.toFixed(1)},${hy.toFixed(1)}"/>`);
+      const r = 2.2 + p.intensity * 0.06;
+      const begin = (index * 0.35).toFixed(2);
+      parts.push(`<circle class="fm-point" style="color:${p.color}" fill="${p.color}" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r.toFixed(1)}"><title>${p.label}</title></circle>`);
+      parts.push(`<circle class="fm-ring" stroke="${p.color}" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r.toFixed(1)}">
+        <animate attributeName="r" from="${r.toFixed(1)}" to="${(r + 10).toFixed(1)}" dur="2.2s" begin="${begin}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" from="0.85" to="0" dur="2.2s" begin="${begin}s" repeatCount="indefinite"/>
+      </circle>`);
+    });
+    parts.push(`<circle fill="#ffffff" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="3"><title>蜜罐中心</title></circle>`);
+    parts.push(`<circle class="fm-ring" stroke="#e8eef7" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="4">
+      <animate attributeName="r" from="4" to="16" dur="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.9" to="0" dur="1.8s" repeatCount="indefinite"/>
+    </circle>`);
+    layer.innerHTML = parts.join('');
+  }
+
+  function setMapMode(mode) {
+    bsMapMode = mode === '2d' ? '2d' : '3d';
+    const globe = document.getElementById('bs-globe');
+    const flat = document.getElementById('bs-flatmap');
+    if (globe) globe.style.display = bsMapMode === '3d' ? '' : 'none';
+    if (flat) flat.style.display = bsMapMode === '2d' ? '' : 'none';
+    document.querySelectorAll('[data-map-mode]').forEach((b) => b.classList.toggle('is-active', b.dataset.mapMode === bsMapMode));
+    if (bsGlobe) bsGlobe.controls().autoRotate = bsMapMode === '3d';
+    if (bsMapMode === '2d') buildFlatMap();
+  }
+
+  function renderHeatMap() {
+    const canvas = document.getElementById('smart-heat-canvas');
+    if (!canvas) return;
+    canvas.querySelectorAll('.bs-heat-glow').forEach((node) => node.remove());
+    const items = (SMART_DATA.topSources || []).slice(0, 6);
+    const hashPct = (ip, salt) => {
+      let h = 0;
+      const s = String(ip || '') + salt;
+      for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+      return 14 + (h % 68);
+    };
+    const max = Math.max(...items.map((item) => Number(item.count || 0)), 1);
+    items.forEach((item, index) => {
+      const glow = document.createElement('div');
+      const intensity = clampPercent((Number(item.count || 0) / max) * 100);
+      const palette = intensity > 78 ? '#fb7185' : intensity > 44 ? '#f59e0b' : '#e8eef7';
+      glow.className = 'bs-heat-glow';
+      glow.style.left = `${hashPct(item.source_ip, 'x')}%`;
+      glow.style.top = `${hashPct(item.source_ip, 'y')}%`;
+      glow.style.color = palette;
+      glow.style.background = `radial-gradient(circle, ${palette} 0%, rgba(255,255,255,.16) 18%, transparent 72%)`;
+      glow.style.width = `${80 + intensity * 0.6}px`;
+      glow.style.height = `${80 + intensity * 0.6}px`;
+      glow.style.animationDelay = `${index * 0.45}s`;
+      glow.title = `${item.source_ip} · ${formatNumber(item.count)} 次`;
+      canvas.appendChild(glow);
+    });
+  }
+
+  function renderScreenState() {
+    document.querySelectorAll('[data-screen-target]').forEach((btn) => {
+      btn.classList.toggle('is-active', btn.dataset.screenTarget === smartState.screen);
+    });
+    document.querySelectorAll('[data-track]').forEach((item) => {
+      item.classList.toggle('is-active', item.dataset.track === smartState.screen);
+    });
+    const totalEl = document.getElementById('smart-center-total');
+    const blockEl = document.getElementById('smart-center-blocks');
+    const riskEl = document.getElementById('smart-center-risk');
+    if (smartState.screen === 'sources') {
+      if (totalEl) totalEl.textContent = formatNumber((SMART_DATA.topSources || [])[0]?.count || SMART_DATA.summary.unique_ips || 0);
+      if (blockEl) blockEl.textContent = formatNumber(SMART_DATA.summary.unique_ips || 0);
+      if (riskEl) riskEl.textContent = formatNumber((SMART_DATA.topSources || []).length || 0);
+    } else if (smartState.screen === 'nodes') {
+      if (totalEl) totalEl.textContent = formatNumber((SMART_DATA.nodeItems || [])[0]?.event_count || SMART_DATA.nodeSummary.event_count || 0);
+      if (blockEl) blockEl.textContent = formatNumber(SMART_DATA.nodeSummary.node_count || 0);
+      if (riskEl) riskEl.textContent = formatNumber(SMART_DATA.nodeSummary.credential_hits || 0);
+    } else {
+      if (totalEl) totalEl.textContent = formatNumber(SMART_DATA.summary.total_events || 0);
+      if (blockEl) blockEl.textContent = formatNumber(SMART_DATA.summary.agent_blocks || 0);
+      if (riskEl) riskEl.textContent = formatNumber(SMART_DATA.summary.high_risk_events || 0);
+    }
+    document.getElementById('smart-interval-label').textContent = `${currentRotateInterval()}s`;
+    renderAnalysis();
+    updateUrl();
+  }
+
+  function setScreen(screen) {
+    smartState.screen = SMART_SCREENS[screen] ? screen : 'overview';
+    renderScreenState();
+  }
+
+  // 视口自适应：1920×1080 设计稿等比缩放居中
+  function fitStage() {
+    const stage = document.getElementById('bs-stage');
+    if (!stage) return;
+    const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.setProperty('--bs-scale', String(scale));
+  }
+
+  function bindEvents() {
+    document.getElementById('smart-refresh-toggle')?.addEventListener('click', toggleRefresh);
+    document.getElementById('smart-rotate-toggle')?.addEventListener('click', toggleRotate);
+    document.getElementById('smart-fullscreen-btn')?.addEventListener('click', enterFullscreen);
+    document.getElementById('smart-wakelock-btn')?.addEventListener('click', requestWakeLock);
+    document.getElementById('smart-rotate-interval')?.addEventListener('change', () => {
+      document.getElementById('smart-interval-label').textContent = `${currentRotateInterval()}s`;
+      if (smartRotateEnabled) {
+        document.getElementById('smart-rotate-toggle').textContent = `轮播：${currentRotateInterval()}s`;
+      }
+      restartRotate();
+      updateUrl();
+    });
+    document.querySelectorAll('[data-screen-target]').forEach((btn) => {
+      btn.addEventListener('click', () => setScreen(btn.dataset.screenTarget));
+    });
+    document.querySelectorAll('[data-map-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => setMapMode(btn.dataset.mapMode));
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !smartWakeLock) {
+        requestWakeLock();
+      }
+    });
+    window.addEventListener('resize', fitStage);
+  }
+
+  window.addEventListener('load', () => {
+    fitStage();
+    updateClock();
+    setInterval(updateClock, 1000);
+    bindEvents();
+    renderTrendChart();
+    initGlobe();
+    setScreen(smartState.screen);
+    requestWakeLock();
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autoplay') === '1') toggleRefresh();
+    if (params.get('rotate') === '1') toggleRotate();
+    if (params.get('fullscreen') === '1') setTimeout(enterFullscreen, 280);
+  });
+</script>
+{% endblock %}

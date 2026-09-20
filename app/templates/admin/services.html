@@ -1,0 +1,252 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+<style>
+  .sv-deck { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ---- top status band ---- */
+  .sv-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 16px 20px;
+  }
+  .sv-status-id { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .sv-live-dot {
+    width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto;
+    background: var(--success);
+    box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.12), 0 0 16px rgba(52, 211, 153, 0.5);
+    animation: svPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes svPulse { 50% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0.06), 0 0 16px rgba(52, 211, 153, 0.5); } }
+  .sv-status-title {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 15px; font-weight: 700; color: #f8fbff; letter-spacing: 0.02em;
+  }
+  .sv-status-sub {
+    margin-top: 3px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.18em; color: rgba(103, 232, 249, 0.55);
+    text-transform: uppercase;
+  }
+  .sv-readouts { display: flex; gap: 26px; flex-wrap: wrap; }
+  .sv-readout { text-align: center; }
+  .sv-readout b {
+    display: block;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 24px; font-weight: 700; line-height: 1;
+    color: #a5f3fc; text-shadow: 0 0 16px rgba(34, 211, 238, 0.3);
+    font-variant-numeric: tabular-nums;
+  }
+  .sv-readout b.up { color: #6ee7b7; text-shadow: 0 0 16px rgba(52, 211, 153, 0.35); }
+  .sv-readout span {
+    display: block; margin-top: 5px;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.14em; color: rgba(148, 163, 184, 0.7);
+    text-transform: uppercase;
+  }
+
+  .sv-form-eyebrow {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.2em;
+    color: rgba(103, 232, 249, 0.55); text-transform: uppercase;
+    margin: 2px 0 -4px;
+  }
+  .sv-form-eyebrow::before { content: "// "; color: var(--tech-cyan); }
+  .sv-engine-strip {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding-top: 12px; margin-top: 4px;
+    border-top: 1px dashed rgba(56, 189, 248, 0.16);
+  }
+  .sv-engine-tag {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.08em;
+    color: #67e8f9;
+    padding: 3px 8px;
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    background: rgba(34, 211, 238, 0.06);
+    border-radius: 3px;
+  }
+
+  /* ---- registry table tweaks ---- */
+  .sv-key-cell {
+    font-family: "Fira Code", ui-monospace, monospace;
+  }
+  .sv-port-cell {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 1180px) {
+    .sv-readouts { gap: 18px; }
+    .sv-readout { text-align: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sv-live-dot { animation: none; }
+  }
+</style>
+
+{{ page_header('SV', title or '端口服务蜜罐管理', '管理端口服务型蜜罐，支持 SSH / MySQL / Redis / FTP / ElasticSearch 真实协议仿真。', ['协议仿真', '端口', '凭据捕获', '反制剧本'],
+      actions='<button type="button" class="chip primary" data-modal-open="services-create-modal">＋ 新增端口服务蜜罐</button>') }}
+
+<div class="panel" style="margin-bottom:14px;padding:12px 16px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:wrap;text-align:left">
+  <span class="muted" style="font-size:12.5px">操作一览 · 反制剧本：</span>
+  <form method="post" action="/admin/services/playbook/apply" style="display:inline-flex;gap:8px;align-items:center;margin:0">
+    <select name="playbook_id" style="width:auto;min-width:200px">
+      <option value="">选择反制剧本…</option>
+      {% for pb in playbooks %}<option value="{{ pb.id }}">{{ pb.name }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="primary btn-sm">一键应用</button>
+  </form>
+  <a class="chip" href="/admin/playbooks" style="cursor:pointer;text-decoration:none">剧本详情 →</a>
+</div>
+
+{% if applied %}
+<div class="panel page-banner success">
+  <div class="panel-header"><div><p style="color: var(--success, #34d399); margin: 0;">{{ applied }}</p></div></div>
+</div>
+{% endif %}
+{% if error %}
+<div class="panel page-banner error">
+  <div class="panel-header"><div><p style="color: var(--danger, #fb7185); margin: 0;">{{ error }}</p></div></div>
+</div>
+{% endif %}
+
+<div class="sv-deck">
+  <section class="panel sv-status">
+    <div class="sv-status-id">
+      <span class="sv-live-dot"></span>
+      <div>
+        <div class="sv-status-title">SERVICE GRID · 协议仿真矩阵</div>
+        <div class="sv-status-sub">AgentCapture // Port Honeypot Ops — Emulation Engines Ready</div>
+      </div>
+    </div>
+    <div class="sv-readouts">
+      <div class="sv-readout"><b>{{ items|length }}</b><span>已注册服务</span></div>
+      <div class="sv-readout"><b class="up">{{ running|length }}</b><span>监听中</span></div>
+      <div class="sv-readout"><b>{{ supported|length }}</b><span>仿真引擎</span></div>
+      <div class="sv-readout"><b>5</b><span>协议类型</span></div>
+    </div>
+  </section>
+
+    <section class="panel">
+      {{ section_header('端口服务蜜罐清单', '启动/停止协议仿真引擎，查看运行状态') }}
+      <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
+        <form method="post" action="/admin/services/bulk-delete" data-confirm="确认删除选中的 {n} 项服务？不可撤销。" class="bulk-del-form">
+          <input type="hidden" name="ids" value="">
+          <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+        </form>
+        <span class="muted" style="font-size:11px">勾选条目后批量移除</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th><th>Key</th><th>名称</th><th>分类</th><th>协议</th><th>端口</th><th>状态</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
+              <td class="sv-key-cell"><code>{{ item.service_key }}</code></td>
+              <td><strong style="color:#f8fbff">{{ item.name }}</strong></td>
+              <td><span class="pill">{{ item.category }}</span></td>
+              <td>{{ item.protocols_json|join(', ') }}</td>
+              <td class="sv-port-cell"><code>{{ item.default_port }}</code></td>
+              <td>
+                {% if item.service_key in running %}
+                  {{ badge('运行中 :' ~ running[item.service_key], 'success') }}
+                {% elif item.status == 'running' %}
+                  {{ badge('异常', 'warning') }}
+                {% else %}
+                  {{ badge('已停止', 'default') }}
+                {% endif %}
+                {% if listening is defined %}
+                {% set port_up = listening.get(item.service_key, false) %}
+                {% if item.service_key in running and not port_up %}
+                  {{ badge('端口未监听', 'danger') }}
+                {% elif item.service_key not in running and port_up %}
+                  {{ badge('端口被其他进程占用', 'warning') }}
+                {% endif %}
+                {% endif %}
+              </td>
+              <td>
+                <div class="actions-inline">
+                  {% if item.service_key in supported %}
+                    {% if item.service_key in running %}
+                      <form method="post" action="/admin/services/{{ item.id }}/stop" style="margin:0">
+                        <button class="secondary btn-sm" type="submit">停止</button>
+                      </form>
+                    {% else %}
+                      <form method="post" action="/admin/services/{{ item.id }}/start" style="margin:0">
+                        <button class="primary btn-sm" type="submit">启动</button>
+                      </form>
+                    {% endif %}
+                  {% else %}
+                    <span class="muted">暂无仿真引擎</span>
+                  {% endif %}
+                  <form method="post" action="/admin/services/{{ item.id }}/delete" style="margin:0" onsubmit="return confirm('确认删除该服务?')">
+                    <button class="secondary btn-sm" type="submit">删除</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            {{ empty_state('暂无服务', '新增服务后会在这里显示。', 8, 'SV') }}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+<script>
+(function () {
+  var all = document.querySelector('.bulk-select-all');
+  if (all) all.addEventListener('change', function () {
+    document.querySelectorAll('.bulk-check').forEach(function (c) { if (!c.disabled) c.checked = all.checked; });
+  });
+  var btn = document.querySelector('.bulk-del-btn');
+  if (btn) btn.addEventListener('click', function () {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+    if (!checked.length) { alert('请先勾选要删除的条目'); return; }
+    var form = btn.closest('form');
+    if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+    form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+    form.submit();
+  });
+})();
+</script>
+</div>
+
+{% call modal_dialog('services-create-modal', '新增端口服务蜜罐', '录入 service_key、分类、协议、端口与描述') %}
+<form method="post" action="/admin/services" class="stack">
+  <p class="sv-form-eyebrow">REG.NEW // 身份标识</p>
+  <div class="grid-4">
+    <label class="field-label"><span>service_key *</span><input name="service_key" placeholder="如 ssh" required></label>
+    <label class="field-label"><span>显示名称 *</span><input name="name" placeholder="如 SSH" required></label>
+    <label class="field-label"><span>分类 *</span><input name="category" placeholder="如 remote-access" required></label>
+    <label class="field-label"><span>默认端口 *</span><input name="default_port" type="number" placeholder="如 22" required></label>
+  </div>
+  <p class="sv-form-eyebrow">REG.CFG // 协议与描述</p>
+  <div class="grid-2">
+    <label class="field-label"><span>协议（逗号分隔）*</span><input name="protocols_csv" placeholder="如 tcp,http" required></label>
+    <label class="field-label"><span>预览路径（可选）</span><input name="preview_path" placeholder="如 /admin"></label>
+  </div>
+  <label class="field-label"><span>描述</span><textarea name="description" placeholder="服务的用途说明"></textarea></label>
+  <div class="sv-engine-strip">
+    <span class="sv-engine-tag">SSH</span>
+    <span class="sv-engine-tag">MySQL</span>
+    <span class="sv-engine-tag">Redis</span>
+    <span class="sv-engine-tag">FTP</span>
+    <span class="sv-engine-tag">ElasticSearch</span>
+  </div>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">新增服务</button>
+  </div>
+</form>
+{% endcall %}
+{% endblock %}

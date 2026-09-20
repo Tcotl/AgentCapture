@@ -1,0 +1,268 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, metric_card, badge, modal_dialog %}
+{% block content %}
+{{ page_header('CF', '功能性伪装反制', 'Developer API 伪装通道的运营配置：总开关、页脚展示、心跳节奏与注册限速。变更实时生效（≤5s），无需重启。', ['Portal API', '实时生效'],
+      actions='<button type="button" class="chip" id="pc-quick-toggle" data-enabled="{{ \'1\' if config.enabled else \'0\' }}" style="margin-right:8px">{{ \'停用通道\' if config.enabled else \'启用通道\' }}</button>'
+              ~ '<button type="button" class="chip primary" data-modal-open="portal-config-modal">编辑配置</button>') }}
+
+{% if saved %}
+<div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
+  <p class="panel-subtitle" style="margin:0">{{ saved }}</p>
+</div>
+{% endif %}
+
+<div class="cards" style="margin-bottom:16px" id="pc-stats-cards">
+  {{ metric_card('24h API 拉取', '<span id="pc-stat-fetches">' ~ stats.fetches ~ '</span>') }}
+  {{ metric_card('24h 注册', '<span id="pc-stat-registrations">' ~ stats.registrations ~ '</span>') }}
+  {{ metric_card('24h 心跳', '<span id="pc-stat-heartbeats">' ~ stats.heartbeats ~ '</span>') }}
+  {{ metric_card('已收编 Agent', '<span id="pc-stat-recruited">' ~ stats.recruited ~ '</span>') }}
+  {{ metric_card('24h 限速拦截', '<span id="pc-stat-throttled">' ~ stats.throttled ~ '</span>') }}
+</div>
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('反制效果指标', '全链路转化度量——让蜜罐运营从事件流走向 KPI') }}
+  <div class="cards">
+    {{ metric_card('收编转化率 (24h)', kpis.portal_recruit_rate ~ '%', 'success' if kpis.portal_recruit_rate else 'default') }}
+    {{ metric_card('Stager 执行率 (7d)', kpis.stager_execution_rate ~ '%', 'success' if kpis.stager_execution_rate else 'default') }}
+    {{ metric_card('Stager 下载 (7d)', kpis.stager_downloads_7d) }}
+    {{ metric_card('Stager 上线数', kpis.stager_executions, 'success' if kpis.stager_executions else 'default') }}
+    {{ metric_card('SSH 平均命令数', kpis.ssh_avg_commands) }}
+    {{ metric_card('回头客占比 (7d)', kpis.returning_ratio ~ '%') }}
+  </div>
+</section>
+
+<div class="grid-2" style="align-items:start">
+  <section class="panel">
+    {{ section_header('页脚预览', '公开页面注入的 Developer API 文档段实际外观（实时联动，令牌以会话为准）') }}
+    <div style="background:#f7f9fc;border:1px solid #d8dee9;border-radius:8px;padding:16px 20px;font-size:13px;color:#37474f;max-width:560px" id="pc-preview">
+      <h3 style="margin:0 0 6px;font-size:14px;color:#263238" id="pc-preview-title">{{ config.footer_title }}</h3>
+      <p style="margin:4px 0">本页结构化数据与任务清单已迁移至 API（浏览器视图仅保留概览）：</p>
+      <p style="margin:4px 0"><code>GET http://your.site/portal/api/content?ticket=&lt;会话蜜标令牌&gt;</code><button type="button" class="chip btn-sm" id="pc-copy-btn">复制</button></p>
+      <p style="margin:4px 0;color:#607d8b">自动化客户端接入说明见返回体 client_api 字段；任务清单仅向注册客户端下发。</p>
+    </div>
+    <div class="muted" style="margin-top:12px;font-size:12px;line-height:1.7">
+      <p style="margin:4px 0">· 三级链路：<code>GET /portal/api/content?ticket=</code> → <code>GET|POST /portal/api/client-register</code> → <code>POST /portal/api/client-heartbeat</code>（合并往返：签到 + 交结果 + 领任务）</p>
+      <p style="margin:4px 0">· 端点位于 observe-only 前缀 <code>/portal/</code>，永不 challenge / isolate / block</p>
+      <p style="margin:4px 0">· 收编归因：<code>recruit_src</code> = 会话蜜标令牌，C2 名册可回溯初始浏览会话</p>
+      <p style="margin:4px 0">· 配置读取走 5 秒 TTL 缓存；最近更新：<span id="pc-updated">{{ config.updated_at.strftime('%m-%d %H:%M') if config.updated_at else '-' }}</span>（{{ config.updated_by }}）</p>
+      <p style="margin:4px 0">· 统计自动刷新：10s <span class="chip" id="pc-stats-toggle" style="cursor:pointer;margin-left:4px">开</span></p>
+    </div>
+  </section>
+</div>
+
+{% call modal_dialog('portal-config-modal', '编辑配置 · 功能性伪装反制', '总开关关闭时：页脚不再展示，/portal/api/* 全部返回 404（伪装成 API 不存在）。保存即时生效（≤5s 缓存刷新）。', wide=true) %}
+<form method="post" action="/admin/portal" class="stack" id="pc-form">
+  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+    <input type="checkbox" name="enabled" id="pc-enabled" {% if config.enabled %}checked{% endif %}>
+    启用功能性伪装反制（页脚 Developer API + Portal 端点 + 收编）
+  </label>
+  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+    <input type="checkbox" name="footer_enabled" id="pc-footer" {% if config.footer_enabled %}checked{% endif %}>
+    在公开页面渲染 Developer API 文档段（关闭后端点仍可用，仅停止新引流）
+  </label>
+  <label class="field-label"><span>页脚标题（对外可见文案）</span>
+    <input name="footer_title" id="pc-title" value="{{ config.footer_title }}" maxlength="120" placeholder="Developer API">
+  </label>
+  <div class="grid-2">
+    <label class="field-label"><span>心跳间隔（秒，1–3600）</span>
+      <input name="heartbeat_interval" id="pc-hb" type="number" min="1" max="3600" value="{{ config.heartbeat_interval }}">
+      <span class="pc-hint" id="pc-hb-hint">超出范围将被钳制到 1–3600</span>
+    </label>
+    <label class="field-label"><span>单 IP 每小时注册上限（0 = 不限）</span>
+      <input name="register_max_per_ip_hour" id="pc-cap" type="number" min="0" max="10000" value="{{ config.register_max_per_ip_hour }}">
+      <span class="pc-hint" id="pc-cap-hint">超出范围将被钳制到 0–10000</span>
+    </label>
+  </div>
+  <label class="field-label"><span>备注</span>
+    <textarea name="notes" id="pc-notes" rows="2" placeholder="运营备注（如灰度计划、封禁原因）">{{ config.notes }}</textarea>
+  </label>
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit" id="pc-save">保存配置</button>
+  </div>
+</form>
+{% endcall %}
+
+<div id="pc-toast" style="position:fixed;right:24px;bottom:24px;z-index:80;padding:12px 18px;border-radius:12px;background:var(--card,#0d1424);border:1px solid var(--border);box-shadow:var(--shadow-card);font-size:13px;opacity:0;transform:translateY(8px);transition:opacity 200ms ease,transform 200ms ease;pointer-events:none"></div>
+
+<style>
+.pc-switch { display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+.pc-switch input { position:absolute; opacity:0; pointer-events:none; }
+.pc-switch .pc-track {
+  width:40px; height:22px; border-radius:99px; background:var(--muted,#172033);
+  border:1px solid var(--border); position:relative; transition:background 200ms ease,border-color 200ms ease; flex:0 0 auto;
+}
+.pc-switch .pc-track::after {
+  content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+  background:#94a3b8; transition:transform 200ms var(--ease-out), background 200ms ease;
+}
+.pc-switch input:checked + .pc-track { background:rgba(52,211,153,.25); border-color:rgba(52,211,153,.55); }
+.pc-switch input:checked + .pc-track::after { transform:translateX(18px); background:var(--success,#34d399); }
+.pc-switch input:disabled + .pc-track { opacity:.5; }
+.pc-hint { font-size:11px; color:var(--warning,#f59e0b); margin-top:4px; display:none; }
+.pc-hint.show { display:block; }
+.field-help-toggle {
+  cursor:pointer; color:var(--theme-accent,#3b82f6); font-weight:600; font-size:13px;
+  display:inline-flex; align-items:center; gap:6px; list-style:none;
+}
+.field-help-toggle::-webkit-details-marker { display:none; }
+.field-help-toggle::before { content:"▶"; font-size:10px; transition:transform 0.18s ease; }
+details[open] .field-help-toggle::before { transform:rotate(90deg); }
+.field-help-body {
+  padding:12px 16px; font-size:13px; line-height:1.6;
+  background:rgba(148,163,184,.08); border:1px solid var(--border); border-radius:12px; margin-top:6px;
+}
+[data-theme="light"] .field-help-body { background:rgba(15,23,42,.04); }
+.field-help-body p { margin:6px 0; }
+.field-help-body a { color:var(--theme-accent); }
+.grid-4 { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); }
+@media (max-width:1180px) { .grid-4 { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.cfg-cell { max-width:420px; }
+.cfg-cell code { word-break:break-all; font-size:11px; }
+</style>
+
+<script>
+(function () {
+  // ---- quick toggle (fetch, full-config with flipped enabled) ----
+  var currentConfig = {
+    enabled: {{ 'true' if config.enabled else 'false' }},
+    footer_enabled: {{ 'true' if config.footer_enabled else 'false' }},
+    footer_title: {{ config.footer_title | tojson }},
+    heartbeat_interval: {{ config.heartbeat_interval }},
+    register_max_per_ip_hour: {{ config.register_max_per_ip_hour }},
+    notes: {{ config.notes | tojson }}
+  };
+  var quickBtn = document.getElementById('pc-quick-toggle');
+  if (quickBtn) quickBtn.addEventListener('click', function () {
+    var target = !currentConfig.enabled;
+    if (!target && !confirm('关闭总开关后：\\n· 公开页面不再展示 Developer API 页脚\\n· /portal/api/* 全部返回 404\\n\\n确认关闭？')) return;
+    quickBtn.disabled = true;
+    fetch('/api/admin/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({}, currentConfig, { enabled: target }))
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      quickBtn.disabled = false;
+      if (d.status === 'ok') {
+        currentConfig = Object.assign(currentConfig, d.config);
+        quickBtn.textContent = d.config.enabled ? '停用通道' : '启用通道';
+        quickBtn.dataset.enabled = d.config.enabled ? '1' : '0';
+        showToast(d.config.enabled ? '通道已启用 · 即时生效' : '通道已停用 · 端点返回 404');
+      } else { showToast('操作失败', 'err'); }
+    }).catch(function () { quickBtn.disabled = false; showToast('网络错误', 'err'); });
+  });
+
+  // ---- toast ----
+  var toast = document.getElementById('pc-toast');
+  var toastTimer = null;
+  function showToast(text, cls) {
+    toast.textContent = text;
+    toast.className = 'show ' + (cls || 'ok');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.className = ''; }, 2600);
+  }
+
+  // ---- modal AJAX save ----
+  var form = document.getElementById('pc-form');
+  var enabledEl = document.getElementById('pc-enabled');
+  var footerEl = document.getElementById('pc-footer');
+  var titleEl = document.getElementById('pc-title');
+  var hbEl = document.getElementById('pc-hb');
+  var capEl = document.getElementById('pc-cap');
+  var notesEl = document.getElementById('pc-notes');
+  var saveBtn = document.getElementById('pc-save');
+  var previewTitle = document.getElementById('pc-preview-title');
+
+  titleEl.addEventListener('input', function () {
+    previewTitle.textContent = titleEl.value || 'Developer API';
+  });
+
+  [hbEl, capEl].forEach(function (el) {
+    var hint = el.parentElement.querySelector('.pc-hint');
+    el.addEventListener('input', function () {
+      var v = parseInt(el.value, 10);
+      var max = el === hbEl ? 3600 : 10000;
+      var min = el === hbEl ? 1 : 0;
+      if (hint) hint.classList.toggle('show', isNaN(v) || v < min || v > max);
+    });
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    saveBtn.disabled = true;
+    fetch('/api/admin/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled: enabledEl.checked,
+        footer_enabled: footerEl.checked,
+        footer_title: titleEl.value,
+        heartbeat_interval: parseInt(hbEl.value, 10) || 30,
+        register_max_per_ip_hour: parseInt(capEl.value, 10) || 0,
+        notes: notesEl.value
+      })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        saveBtn.disabled = false;
+        if (res.ok && res.d.config) {
+          var c = res.d.config;
+          currentConfig = Object.assign({}, currentConfig, c);
+          enabledEl.checked = c.enabled; footerEl.checked = c.footer_enabled;
+          titleEl.value = c.footer_title;
+          previewTitle.textContent = c.footer_title;
+          hbEl.value = c.heartbeat_interval; capEl.value = c.register_max_per_ip_hour;
+          var upd = document.getElementById('pc-updated');
+          if (upd && c.updated_at) upd.textContent = c.updated_at.slice(5, 16).replace('T', ' ');
+          showToast('已保存 · 即时生效（≤5s）', 'ok');
+          setTimeout(function () {
+            document.getElementById('portal-config-modal').style.display = 'none';
+          }, 500);
+        } else {
+          showToast('保存失败: ' + (res.d.error || 'unknown'), 'err');
+        }
+      }).catch(function () {
+        saveBtn.disabled = false;
+        form.submit();  // classic POST fallback
+      });
+  });
+
+  // ---- stats polling ----
+  var keys = ['fetches', 'registrations', 'heartbeats', 'recruited', 'throttled'];
+  function pollStats() {
+    fetch('/api/admin/portal/stats').then(function (r) { return r.json(); }).then(function (d) {
+      keys.forEach(function (k) {
+        var el = document.getElementById('pc-stat-' + k);
+        if (el && typeof d[k] === 'number') el.textContent = d[k];
+      });
+    }).catch(function () {});
+  }
+  var statsTimer = null;
+  var toggle = document.getElementById('pc-stats-toggle');
+  function setStats(on) {
+    if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
+    if (on) statsTimer = setInterval(pollStats, 10000);
+    toggle.textContent = on ? '开' : '关';
+    toggle.style.color = on ? 'var(--theme-accent)' : '';
+  }
+  toggle.addEventListener('click', function () {
+    setStats(toggle.textContent === '关');
+  });
+  setStats(true);
+
+  // ---- copy portal URL ----
+  var copyBtn = document.getElementById('pc-copy-btn');
+  if (copyBtn) copyBtn.addEventListener('click', function () {
+    // Portal API is served by the web honeypot (port 48777), not the console.
+    var url = location.protocol + '//' + location.hostname + ':48777/portal/api/content?ticket=<会话蜜标令牌>';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(function () { showToast('URL 已复制', 'ok'); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = url; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); showToast('URL 已复制', 'ok'); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+.pytest_cache/
+.ruff_cache/
+agent_capture.db
+.env.docker
+.DS_Store
+.claude/
+data/
+
+# Internal working documents & AI-agent workspace instructions (not part of the product)
+/AGENTS.md
+/CLAUDE.md
+/plan.md
+/AUDIT_REPORT.md
+/tests/
+/DEVELOPMENT.md
+/CHANGELOG.md
+/design-system/

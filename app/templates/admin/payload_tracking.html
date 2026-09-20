@@ -1,0 +1,31 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state %}
+{% block content %}
+{{ page_header('PL', '文件蜜饵下载记录', '展示文件蜜饵投放、下载和回调追踪记录，把投递链路与攻击来源关联起来。', ['下载记录']) }}
+
+<section class="panel">
+  {{ section_header('文件蜜饵记录', '按时间序列查看文件、追踪 ID、下载回调信息与风险决策') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>来源 IP</th><th>事件类型</th><th>时间</th><th>Payload 类型</th><th>文件</th><th>追踪 ID</th><th>回调信息</th><th>风险分</th><th>决策</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        {% set payload = item.payload_json or {} %}
+        <tr>
+          <td><a href="/admin/attack-sources/{{ item.source_ip }}"><code>{{ item.source_ip }}</code></a></td>
+          <td>{% if item.event_type == 'payload_download' %}<span class="badge badge-info">下载</span>{% elif item.event_type == 'payload_callback' %}<span class="badge badge-danger">回调</span>{% endif %}</td>
+          <td>{{ item.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+          <td><code>{{ payload.get('payload_type', '-') }}</code></td>
+          <td><code>{{ payload.get('filename', '-') }}</code></td>
+          <td><code title="{{ payload.get('tracking_id', '') }}">{{ payload.get('tracking_id', '-')[:16] }}</code></td>
+          <td>{% if item.event_type == 'payload_callback' %}{% if payload.get('action') %}<span class="badge badge-danger">{{ payload.get('action') }}</span>{% endif %}{% if payload.get('host') %}<code>{{ payload.get('host') }}</code>{% endif %}{% if payload.get('user') %}<code class="badge badge-warning">{{ payload.get('user') }}</code>{% endif %}{% if payload.get('referrer') %}<small class="text-muted">via {{ payload.get('referrer', '')[:30] }}</small>{% endif %}{% else %}<span class="text-muted" style="font-size:12px">等待回调触发</span>{% endif %}</td>
+          <td><span class="badge {% if item.risk_score >= 70 %}badge-danger{% elif item.risk_score >= 45 %}badge-warning{% else %}badge-info{% endif %}">{{ item.risk_score }}</span></td>
+          <td><span class="badge {% if item.decision == 'block' %}badge-danger{% elif item.decision == 'isolate' %}badge-warning{% elif item.decision == 'challenge' %}badge-info{% else %}badge-success{% endif %}">{{ item.decision|decision_zh }}</span></td>
+        </tr>
+        {% endfor %}
+        {% if not items %}{{ empty_state('暂无文件蜜饵下载记录', '相关记录出现后会自动聚合在这里。', 9, 'PL') }}{% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

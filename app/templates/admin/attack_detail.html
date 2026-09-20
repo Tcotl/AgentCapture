@@ -1,0 +1,135 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, metric_card, empty_state %}
+{% block content %}
+{% set risk_tone = 'danger' if (detail.max_risk_score or 0) >= 70 else ('warning' if (detail.max_risk_score or 0) >= 45 else 'default') %}
+{% set dur = detail.duration_seconds or 0 %}
+{% if dur >= 86400 %}
+  {% set dur_text = (dur // 86400) ~ '天 ' ~ ((dur % 86400) // 3600) ~ '时' %}
+{% elif dur >= 3600 %}
+  {% set dur_text = (dur // 3600) ~ '时 ' ~ ((dur % 3600) // 60) ~ '分' %}
+{% elif dur >= 60 %}
+  {% set dur_text = (dur // 60) ~ '分 ' ~ (dur % 60) ~ '秒' %}
+{% else %}
+  {% set dur_text = dur ~ '秒' %}
+{% endif %}
+<style>
+  /* page-local interaction & readability layer */
+  .chip {
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+  .chip:hover { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+  .chip:active { transform: scale(0.97); }
+
+  .ad-mono { font-family: "Fira Code", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .ad-risk {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-weight: 700; color: #e5edf8; font-variant-numeric: tabular-nums;
+  }
+  .ad-risk.danger { color: #fda4af; text-shadow: 0 0 10px rgba(251, 113, 133, 0.35); }
+  .ad-risk.warn { color: #fcd34d; text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+  .table-wrap .numeric { font-variant-numeric: tabular-nums; }
+
+  /* 会话概览 */
+  .ad-kv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; }
+  .ad-kv { min-width: 0; }
+  .ad-kv .key {
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-family: "Fira Code", ui-monospace, monospace;
+    margin-bottom: 5px;
+  }
+  .ad-kv .val { font-size: 13px; color: var(--foreground); overflow-wrap: anywhere; }
+
+  /* 高频证据列表 */
+  .ad-evi { display: flex; flex-direction: column; gap: 6px; }
+  .ad-evi-head {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    margin-bottom: 4px;
+  }
+  .ad-evi-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font-size: 12px;
+    padding: 3px 0;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.07);
+  }
+  .ad-evi-row:last-child { border-bottom: 0; }
+  .ad-evi-name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: #d7e3f4;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 11.5px;
+  }
+  .ad-evi-count {
+    flex: 0 0 auto;
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-weight: 700; color: #e5edf8; font-variant-numeric: tabular-nums;
+  }
+
+  /* 时间线 pre 限高 */
+  .ad-pre {
+    max-height: 132px;
+    overflow: auto;
+    font-size: 11px;
+    line-height: 1.5;
+    min-width: 240px;
+  }
+  .ad-pre::-webkit-scrollbar { width: 8px; height: 8px; }
+  .ad-pre::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 999px; }
+  @media (max-width: 980px) { .ad-kv-grid { grid-template-columns: 1fr; } }
+</style>
+
+{{ page_header('AD', '攻击详情 / ' ~ detail.session_id, '按单个会话展开完整时间线，便于回溯入口、路径、请求头、载荷、风险信号与凭据尝试。', ['时间线', '会话详情']) }}
+<div class="cards">{{ metric_card('来源 IP', detail.source_ip) }}{{ metric_card('事件数', detail.event_count) }}{{ metric_card('最大风险', detail.max_risk_score, risk_tone) }}{{ metric_card('持续时间', dur_text) }}</div>
+<div class="grid-2">
+  <section class="panel">
+    {{ section_header('会话概览', '基础元信息与时间边界', '<a class="chip primary" href="/admin/sessions/' ~ detail.session_id ~ '">切换到会话画像</a>') }}
+    <div class="ad-kv-grid">
+      <div class="ad-kv"><div class="key">站点</div><div class="val"><code>{{ detail.site_id }}</code></div></div>
+      <div class="ad-kv"><div class="key">画像标签</div><div class="val">{% for label in detail.portrait_labels %}<span class="pill">{{ label }}</span>{% else %}<span class="muted">—</span>{% endfor %}</div></div>
+      <div class="ad-kv"><div class="key">首见</div><div class="val ad-mono">{{ detail.first_seen.strftime('%Y-%m-%d %H:%M:%S') }}</div></div>
+      <div class="ad-kv"><div class="key">末见</div><div class="val ad-mono">{{ detail.last_seen.strftime('%Y-%m-%d %H:%M:%S') }}</div></div>
+      <div class="ad-kv" style="grid-column: 1 / -1;"><div class="key">User-Agent</div><div class="val"><code style="white-space: normal; word-break: break-all">{{ detail.user_agent }}</code></div></div>
+    </div>
+  </section>
+  <section class="panel">
+    {{ section_header('高频证据', '路径、信号、决策聚合') }}
+    <div class="grid-3">
+      <div class="ad-evi">
+        <div class="ad-evi-head">路径</div>
+        {% for name, count in detail.top_paths[:8] %}
+          <div class="ad-evi-row"><span class="ad-evi-name" title="{{ name }}">{{ name }}</span><span class="ad-evi-count">×{{ count }}</span></div>
+        {% else %}<span class="muted">暂无</span>{% endfor %}
+      </div>
+      <div class="ad-evi">
+        <div class="ad-evi-head">信号</div>
+        {% for name, count in detail.top_signals[:8] %}
+          <div class="ad-evi-row"><span class="ad-evi-name" title="{{ name }}">{{ name }}</span><span class="ad-evi-count">×{{ count }}</span></div>
+        {% else %}<span class="muted">暂无</span>{% endfor %}
+      </div>
+      <div class="ad-evi">
+        <div class="ad-evi-head">决策 / 事件类型</div>
+        {% for name, count in detail.top_decisions[:8] %}
+          <div class="ad-evi-row"><span class="ad-evi-name" title="{{ name }}">{{ name }}</span><span class="ad-evi-count">×{{ count }}</span></div>
+        {% endfor %}
+        {% for name, count in detail.event_types[:4] %}
+          <div class="ad-evi-row"><span class="ad-evi-name" title="{{ name }}">{{ name }}</span><span class="ad-evi-count">×{{ count }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+{% if detail.credentials %}
+  <section class="panel">
+    {{ section_header('凭据尝试', '会话内触发的账号密码提交') }}
+    <div class="table-wrap"><table><thead><tr><th>时间</th><th>服务</th><th>用户名</th><th>密码</th><th>关键词</th></tr></thead><tbody>{% for item in detail.credentials %}<tr><td class="ad-mono">{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td><td><span class="badge badge-info">{{ item.service_name }}</span></td><td><code>{{ item.username }}</code></td><td><code>{{ item.password }}</code></td><td>{% for word in (item.matched_keywords_json or []) %}<span class="badge badge-warning">{{ word }}</span>{% else %}<span class="text-muted">-</span>{% endfor %}</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+{% endif %}
+<section class="panel">
+  {{ section_header('时间线', '按时间顺序排列的事件与证据') }}
+  <div class="table-wrap"><table><thead><tr><th class="numeric">#</th><th>时间</th><th class="numeric">Δms</th><th>类型</th><th>请求</th><th>决策</th><th class="numeric">分数</th><th class="cell-prose">信号</th><th>Headers</th><th>Payload</th></tr></thead><tbody>{% for item in detail.timeline %}<tr><td class="numeric ad-mono">{{ item.index }}</td><td class="ad-mono">{{ item.event.created_at.strftime('%m-%d %H:%M:%S') }}</td><td class="numeric ad-mono">{{ item.delta_ms }}</td><td>{{ item.event.event_type }}</td><td><code>{{ item.event.method }}</code> <code title="{{ item.event.path }}">{{ item.event.path }}</code></td><td><span class="badge {% if item.event.decision == 'block' %}badge-danger{% elif item.event.decision == 'isolate' %}badge-warning{% elif item.event.decision in ['challenge', 'observe'] %}badge-info{% else %}badge-success{% endif %}">{{ item.event.decision|decision_zh }}</span></td><td class="numeric"><span class="ad-risk {% if item.event.risk_score >= 70 %}danger{% elif item.event.risk_score >= 45 %}warn{% endif %}">{{ item.event.risk_score }}</span></td><td class="cell-prose">{{ (item.event.signals_json or [])|signal_zh|join('，') }}</td><td><pre class="ad-pre">{{ item.event.headers_json }}</pre></td><td><pre class="ad-pre">{{ item.event.payload_json }}</pre></td></tr>{% else %}{{ empty_state('暂无时间线', '当前会话没有可展示的事件。', 10, 'TL') }}{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

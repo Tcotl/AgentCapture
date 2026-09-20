@@ -1,0 +1,61 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('US', '用户管理', '维护本地管理员、操作员账号、角色状态与密码重置。', ['本地用户'],
+      actions='<button type="button" class="chip primary" data-modal-open="users-create-modal">＋ 新增用户</button>') }}
+
+<section class="panel">
+  {{ section_header('用户列表', '查看账号状态与最后登录时间，并支持重置密码') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>用户名</th><th>姓名</th><th>邮箱</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><strong>{{ item.username }}</strong></td>
+          <td class="muted">{{ item.name or '—' }}</td>
+          <td class="muted">{{ item.email or '—' }}</td>
+          <td>{{ badge('管理员' if item.role == 'admin' else '操作员', 'warning' if item.role == 'admin' else 'info') }}</td>
+          <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
+          <td class="muted"><code>{{ item.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if item.last_login_at else '—' }}</code></td>
+          <td>
+            <div class="actions-inline">
+              <form method="post" action="/admin/users/{{ item.id }}/reset-password" style="margin:0;display:flex;gap:6px">
+                <input name="new_password" placeholder="新密码" required style="width:120px">
+                <button class="secondary btn-sm" type="submit">重置密码</button>
+              </form>
+              {% if item.username != current_user.username %}
+              <form method="post" action="/admin/users/{{ item.id }}/delete" style="margin:0">
+                <button class="danger btn-sm" type="submit">删除</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无用户', '新增用户后会在这里显示。', 7, 'US') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% call modal_dialog('users-create-modal', '新增用户', '维护用户名、角色、姓名与邮箱') %}
+<form method="post" action="/admin/users" class="stack">
+  <div class="grid-4">
+    <input name="username" placeholder="用户名" required>
+    <input name="password" placeholder="密码" required>
+    <select name="role">
+      <option value="operator">operator（操作员）</option>
+      <option value="admin">admin（管理员）</option>
+    </select>
+    <input name="name" placeholder="姓名">
+  </div>
+  <input name="email" placeholder="邮箱（可选）">
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">新增用户</button>
+  </div>
+</form>
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state %}
+{% block content %}
+{{ page_header('AP', '攻击者画像', '按来源聚合的持久化画像：事件体量、Agent 指纹、凭证捕获、风险峰值与自动标签。点击 IP 查看完整档案。', ['Dossier', 'CRM']) }}
+
+<section class="panel">
+  {{ section_header('来源画像榜', '按事件量排序 · 自动标签：AI Agent / 凭证尝试 / 蜜饵命中 / 高危 / 回头客') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>来源 IP</th><th>事件</th><th>风险峰值</th><th>Agent 指纹</th><th>凭证捕获</th><th>标签</th><th>最近活动</th><th></th></tr></thead>
+      <tbody>
+        {% for p in profiles %}
+        <tr>
+          <td><a href="/admin/attacker-profiles/{{ p.ip }}"><code>{{ p.ip }}</code></a></td>
+          <td class="c2-mono">{{ p.events }}</td>
+          <td><span class="badge {% if p.risk_peak >= 70 %}badge-danger{% elif p.risk_peak >= 45 %}badge-warning{% else %}badge-info{% endif %}">{{ p.risk_peak }}</span></td>
+          <td>{% for prod in p.products %}<span class="badge badge-info" style="margin:1px">{{ prod }}</span>{% endfor %}{% if not p.products %}<span class="text-muted">-</span>{% endif %}</td>
+          <td class="c2-mono">{{ p.credentials }}</td>
+          <td>{% for tag in p.tags %}<span class="badge badge-warning" style="margin:1px">{{ tag }}</span>{% endfor %}</td>
+          <td><code>{{ p.last_seen.strftime('%m-%d %H:%M') if p.last_seen else '-' }}</code></td>
+          <td><a class="chip" href="/admin/attacker-profiles/{{ p.ip }}">档案</a></td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无画像数据', '攻击流量进入平台后将自动按来源聚合画像。', 8, 'AP') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

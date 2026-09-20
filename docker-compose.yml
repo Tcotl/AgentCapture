@@ -1,0 +1,54 @@
+services:
+  honeypot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-capture-honeypot
+    ports:
+      - "${HOST_PORT:-4877}:4877"
+      # Protocol honeypots — override the host side via .env.docker when a
+      # local port is already taken (e.g. HOST_SSH_PORT=2223).
+      - "${HOST_SSH_PORT:-2222}:2222"
+      - "${HOST_FTP_PORT:-2121}:2121"
+      - "${HOST_MYSQL_PORT:-33060}:33060"
+      - "${HOST_REDIS_PORT:-63790}:63790"
+      - "${HOST_ES_PORT:-19200}:19200"
+      - "${HOST_NGINX_ADMIN_PORT:-8081}:8081"
+      - "${HOST_THINKPHP_PORT:-48777}:48777"
+    environment:
+      APP_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4877
+      SITE_ID: docker-local
+      DATABASE_URL: sqlite:////data/agent_capture.db
+      SECRET_KEY: ${SECRET_KEY:-local-docker-secret-change-me}
+      SESSION_COOKIE_NAME: ach_sid
+      ADMIN_SESSION_COOKIE_NAME: ach_admin
+      CANARY_HEADER_NAME: X-Agent-Canary
+      INJECTOR_ENABLED: "true"
+      RECON_JSONP_ENABLED: "true"
+      AGENT_INJECTION_ENABLED: "true"
+      C2_ENABLED: "true"
+      COLLECT_PATH: /collect/beacon
+      KNOWLEDGE_BASE_ROOT: /data/knowledge_base
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-admin}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.local}
+    volumes:
+      - honeypot_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4877/healthz', timeout=3).read()\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    stop_grace_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  honeypot_data:

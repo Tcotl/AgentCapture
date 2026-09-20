@@ -1,0 +1,426 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('AL', '告警配置', '以 SaaS 后台方式统一维护通知渠道、告警阈值与策略映射，让威胁事件能进入清晰的通知闭环。', ['通知配置', '告警策略'],
+      actions='<button type="button" class="chip primary" data-modal-open="channel-create-modal">＋ 新增通知配置</button>') }}
+
+{% if error %}
+<div class="panel page-banner error">
+  <div class="panel-header"><div><p style="color: var(--danger, #fb7185); margin: 0;">{{ error }}</p></div></div>
+</div>
+{% endif %}
+
+<div class="panel page-banner">
+  <div class="panel-header" style="align-items:center;">
+    <div>
+      <h3 class="panel-title">当前模式</h3>
+      <p class="panel-subtitle" style="margin-top:4px;">
+        ALERTS_ENABLED = <code>{{ alerts_enabled }}</code>
+        {% if alerts_enabled %}
+          <span class="badge badge-success" style="margin-left:6px">真实投递</span>
+          <span class="muted" style="margin-left:6px">满足策略的事件将发送到所配置的 channel</span>
+        {% else %}
+          <span class="badge badge-warning" style="margin-left:6px">干跑模式</span>
+          <span class="muted" style="margin-left:6px">仅日志记录，不发送真实通知；在 <code>.env</code> 中设置 <code>ALERTS_ENABLED=true</code> 并重启后生效</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</div>
+
+<section class="panel" style="margin-bottom: 20px;">
+  {{ section_header('主动隔离', 'isolate 判定、canary 回显命中与手动隔离的持久名单（TTL 内对这些来源直接短路）') }}
+  <div class="table-wrap" style="margin-top:12px;">
+    <table>
+      <thead><tr><th>类型</th><th>值</th><th>原因</th><th>创建方</th><th>生效至</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for entry in isolations %}
+        <tr>
+          {% set kind_badge = 'warning' if entry.kind == 'ip' else 'info' %}
+          <td>{{ badge('IP' if entry.kind == 'ip' else 'SESSION', kind_badge) }}</td>
+          <td><code>{{ entry.value }}</code></td>
+          <td>{{ entry.reason }}</td>
+          <td><code>{{ entry.created_by }}</code></td>
+          <td>{{ entry.expires_at.strftime('%m-%d %H:%M') if entry.expires_at else '—' }}</td>
+          <td>
+            <form method="post" action="/admin/isolation/{{ entry.id }}/revoke" style="margin:0;">
+              <button class="secondary btn-sm" type="submit">解除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无活动隔离', '当风险引擎给出 isolate 判定、捕获到 canary 回显或手动添加隔离时显示在这里。', 6, 'AL') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/isolation" class="grid-4" style="margin-top:14px; gap:10px; align-items:end;">
+    <label class="field-label"><span>类型</span>
+      <select name="kind"><option value="ip">IP</option><option value="session">Session</option></select>
+    </label>
+    <label class="field-label"><span>值（IP 或 session_id）*</span><input name="value" required placeholder="203.0.113.7"></label>
+    <label class="field-label"><span>原因</span><input name="reason" value="manual" placeholder="manual"></label>
+    <div style="display:flex;gap:10px;align-items:end;">
+      <label class="field-label" style="flex:1;"><span>TTL（分钟）</span><input name="ttl_minutes" type="number" min="1" value="60"></label>
+      <button type="submit" class="btn-sm" style="white-space:nowrap;">添加隔离</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel" style="margin-bottom: 20px;">
+  {{ section_header('通知配置', '维护 webhook、钉钉、飞书、email 等通知参数') }}
+
+    <details style="margin-bottom: 12px;">
+      <summary class="field-help-toggle">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        渠道类型说明（点击展开）
+      </summary>
+      <div class="field-help-body">
+        <p><strong>webhook</strong> — 任意 HTTP(S) 接收端点。POST JSON 包含 <code>event</code>/<code>channel</code>/<code>timestamp</code> 字段。可用 <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a> 验证。</p>
+        <p><strong>钉钉机器人</strong> — 群设置 → 智能群助手 → 添加机器人 → 自定义机器人 → 复制 webhook URL（含 access_token）。签名可选：机器人"安全设置"里勾选"加签"后得到 <code>SEC...</code> 密钥。</p>
+        <p><strong>飞书机器人</strong> — 群设置 → 群机器人 → 添加机器人 → 自定义机器人 → 复制 webhook URL。签名可选：机器人"安全设置"里勾选"签名校验"。</p>
+        <p><strong>SMTP email</strong> — 自备邮件服务。常用端口 25（无 TLS）、465（SMTPS）、587（STARTTLS）。</p>
+      </div>
+    </details>
+
+    <div class="table-wrap" style="margin-top:16px;">
+      <table>
+        <thead><tr><th>名称</th><th>类型</th><th>配置详情</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          {% for item in channels %}
+          <tr{% if edit_channel_id and edit_channel_id == item.id %} class="row-edit-selected"{% endif %}>
+            <td><strong>{{ item.name }}</strong></td>
+            <td><code>{{ item.channel_type }}</code></td>
+            <td class="cfg-cell">
+              {% if item.channel_type == 'webhook' %}
+                <code>{{ item.config_json.get('url', '—') }}</code>
+                {% if item.config_json.get('headers') %}<br><small class="muted">headers: <code>{{ item.config_json.headers | tojson }}</code></small>{% endif %}
+                {% if item.config_json.get('timeout') %}<br><small class="muted">timeout: {{ item.config_json.timeout }}s</small>{% endif %}
+              {% elif item.channel_type == 'dingtalk' %}
+                <code>{{ item.config_json.get('webhook_url', '—') }}</code>
+                {% if item.config_json.get('sign_secret') %}<br><small class="muted">sign_secret: ●●●●●●●●</small>{% endif %}
+                {% if item.config_json.get('at_all') == 'true' or item.config_json.get('at_all') == true %}<br>{{ badge('@ 所有人', 'info') }}{% endif %}
+                {% if item.config_json.get('at_mobiles') %}<br><small class="muted">@ {{ item.config_json.at_mobiles }}</small>{% endif %}
+              {% elif item.channel_type == 'feishu' %}
+                <code>{{ item.config_json.get('webhook_url', '—') }}</code>
+                {% if item.config_json.get('sign_secret') %}<br><small class="muted">sign_secret: ●●●●●●●●</small>{% endif %}
+                {% if item.config_json.get('at_user_ids') %}<br><small class="muted">@ {{ item.config_json.at_user_ids }}</small>{% endif %}
+              {% elif item.channel_type == 'email' %}
+                <code>{{ item.config_json.get('host', '—') }}:{{ item.config_json.get('port', '—') }}</code>
+                {% if item.config_json.get('username') %}<br><small class="muted">user: {{ item.config_json.username }}</small>{% endif %}
+                {% if item.config_json.get('password') %}<br><small class="muted">password: ●●●●●●●●</small>{% endif %}
+                <br><small class="muted">from: {{ item.config_json.get('from_addr', '—') }}</small>
+                <br><small class="muted">to: {{ (item.config_json.get('to_addrs') or []) | join(', ') }}</small>
+                {% if item.config_json.get('use_tls') is not none %}<br><small class="muted">TLS: {{ '是' if item.config_json.use_tls in [true, 'true', 'True'] else '否' }}</small>{% endif %}
+              {% else %}
+                <pre>{{ item.config_json }}</pre>
+              {% endif %}
+            </td>
+            <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'warning') }}{% endif %}</td>
+            <td>
+              <div class="actions-inline">
+                <form method="post" action="/admin/alerts/test" style="margin: 0;">
+                  <input type="hidden" name="channel_id" value="{{ item.id }}">
+                  <button class="secondary btn-sm" type="submit" title="同步测试发送">测试</button>
+                </form>
+                <a class="chip" href="?edit_channel={{ item.id }}">编辑</a>
+                <form method="post" action="/admin/alerts/channels/{{ item.id }}/toggle" style="margin: 0;">
+                  <button class="secondary btn-sm" type="submit">{{ "启用" if not item.is_active else "停用" }}</button>
+                </form>
+                <form method="post" action="/admin/alerts/channels/{{ item.id }}/delete" style="margin: 0;">
+                  <button class="secondary btn-sm" type="submit">删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% if edit_channel_id and edit_channel_id == item.id %}
+          <tr><td colspan="5" style="padding: 0;">
+            <form method="post" action="/admin/alerts/channels/{{ item.id }}/patch" class="stack edit-form-inline">
+              <h4 class="edit-form-title">编辑 channel：{{ item.name }}</h4>
+              <div class="grid-2">
+                <label class="field-label"><span>名称 *</span><input name="name" value="{{ item.name }}" required></label>
+                <label class="field-label"><span>描述</span><input name="description" value="{{ item.description or '' }}" placeholder="可选"></label>
+              </div>
+              <label class="field-label"><span>config_json（整体替换）</span>
+                <textarea name="config_json" rows="4">{{ item.config_json | tojson(indent=2) }}</textarea>
+              </label>
+              <label class="checkbox-row"><input type="checkbox" name="is_active" {% if item.is_active %}checked{% endif %}> 启用此 channel</label>
+              <div class="grid-2" style="max-width: 320px;">
+                <button type="submit">保存</button>
+                <button type="button" class="secondary" onclick="location.href='/admin/alerts'">取消</button>
+              </div>
+            </form>
+          </td></tr>
+          {% endif %}
+          {% else %}
+          {{ empty_state('暂无通知配置', '新增通知配置后会显示在这里。', 5, 'AL') }}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 20px;">
+    {{ section_header('告警策略', '定义事件范围、阈值与通知配置映射') }}
+    <form method="post" action="/admin/alerts/policies" class="grid-4" style="gap:10px;align-items:end;">
+      <label class="field-label"><span>策略名称 *</span><input name="name" placeholder="如 高危凭据告警" required></label>
+      <label class="field-label"><span>事件范围</span>
+        <select name="event_scope" required>
+          <option value="threat">threat — 风险事件</option>
+          <option value="credential">credential — 凭据诱饵</option>
+          <option value="system">system — 系统级事件</option>
+        </select>
+      </label>
+      <label class="field-label"><span>最小风险分</span><input type="number" name="min_risk_score" value="45" required></label>
+      <div style="display:flex;gap:10px;align-items:end;">
+        <label class="field-label" style="flex:1;"><span>通知配置（逗号分隔）</span><input name="channels_csv" placeholder="如 soc-webhook,slack" required></label>
+        <button type="submit" class="btn-sm" style="white-space:nowrap;">新增策略</button>
+      </div>
+      {% if channels %}
+      <div class="muted" style="font-size: 12px; grid-column: 1 / -1;">
+        可用 channel：{% for c in channels %}<code>{{ c.name }}</code>{% if not loop.last %}，{% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </form>
+
+    <div class="table-wrap" style="margin-top:16px;">
+      <table>
+        <thead><tr><th>名称</th><th>范围</th><th>阈值</th><th>通知</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          {% for item in policies %}
+          <tr{% if edit_policy_id and edit_policy_id == item.id %} class="row-edit-selected"{% endif %}>
+            <td><strong>{{ item.name }}</strong></td>
+            <td>{{ badge(item.event_scope, 'info') }}</td>
+            <td><code>{{ item.min_risk_score }}</code></td>
+            <td>{% for c in item.delivery_channels_json %}<code>{{ c }}</code>{% if not loop.last %} {% endif %}{% endfor %}</td>
+            <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'warning') }}{% endif %}</td>
+            <td>
+              <div class="actions-inline">
+                <a class="chip" href="?edit_policy={{ item.id }}">编辑</a>
+                <form method="post" action="/admin/alerts/policies/{{ item.id }}/toggle" style="margin: 0;">
+                  <button class="secondary btn-sm" type="submit">{{ "启用" if not item.is_active else "停用" }}</button>
+                </form>
+                <form method="post" action="/admin/alerts/policies/{{ item.id }}/delete" style="margin: 0;">
+                  <button class="secondary btn-sm" type="submit">删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% if edit_policy_id and edit_policy_id == item.id %}
+          <tr><td colspan="6" style="padding: 0;">
+            <form method="post" action="/admin/alerts/policies/{{ item.id }}/patch" class="stack edit-form-inline">
+              <h4 class="edit-form-title">编辑 policy：{{ item.name }}</h4>
+              <div class="grid-2">
+                <label class="field-label"><span>名称 *</span><input name="name" value="{{ item.name }}" required></label>
+                <label class="field-label"><span>事件范围</span>
+                  <select name="event_scope" required>
+                    <option value="threat" {% if item.event_scope == 'threat' %}selected{% endif %}>threat</option>
+                    <option value="credential" {% if item.event_scope == 'credential' %}selected{% endif %}>credential</option>
+                    <option value="system" {% if item.event_scope == 'system' %}selected{% endif %}>system</option>
+                  </select>
+                </label>
+              </div>
+              <div class="grid-2">
+                <label class="field-label"><span>最小风险分</span><input type="number" name="min_risk_score" value="{{ item.min_risk_score }}" required></label>
+                <label class="field-label"><span>通知配置（逗号分隔）</span><input name="channels_csv" value="{{ item.delivery_channels_json | join(',') }}" required></label>
+              </div>
+              {% if channels %}
+              <div class="muted" style="font-size: 12px;">
+                可选 channel：{% for c in channels %}<code>{{ c.name }}</code>{% if not loop.last %}、{% endif %}{% endfor %}
+              </div>
+              {% endif %}
+              <div class="grid-2" style="max-width: 320px;">
+                <button type="submit">保存</button>
+                <button type="button" class="secondary" onclick="location.href='/admin/alerts'">取消</button>
+              </div>
+            </form>
+          </td></tr>
+          {% endif %}
+          {% else %}
+          {{ empty_state('暂无告警策略', '新增告警策略后会显示在这里。', 6, 'AL') }}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+{% if test_result is defined %}
+<section class="panel" style="margin-bottom: 20px; border-left: 3px solid var(--info, #60a5fa);">
+  {{ section_header('测试结果', '点击「测试」后通道的同步发送返回') }}
+  <pre style="margin:8px 0 0; font-size: 12px; max-height: 300px; overflow:auto;">{{ test_result }}</pre>
+</section>
+{% endif %}
+
+{% call modal_dialog('channel-create-modal', '新增通知配置', '维护 webhook、钉钉、飞书、email 等通知渠道参数。') %}
+<form method="post" action="/admin/alerts/channels" class="stack" id="channel-create-form">
+  <div class="grid-2">
+    <label class="field-label"><span>名称</span><input name="name" placeholder="唯一标识（如 soc-webhook）" required></label>
+    <label class="field-label"><span>描述</span><input name="description" placeholder="可选"></label>
+  </div>
+  <label class="field-label">
+    <span>渠道类型</span>
+    <select name="channel_type" id="channel-type-select" required>
+      <option value="webhook">webhook</option>
+      <option value="dingtalk">钉钉机器人</option>
+      <option value="feishu">飞书机器人</option>
+      <option value="email">SMTP email</option>
+    </select>
+  </label>
+  <input type="hidden" name="config_json" id="config-json-output" value="{}">
+
+  {# ---- webhook fields ---- #}
+  <div class="channel-fields" data-type="webhook">
+    <label class="field-label"><span>URL *</span><input data-config-key="url" placeholder="https://example.com/webhook"></label>
+    <label class="field-label"><span>请求头（JSON，可选）</span><input data-config-key="headers" placeholder='{"X-Token": "abc"}'></label>
+    <label class="field-label"><span>超时秒数（默认 5）</span><input data-config-key="timeout" type="number" min="1" max="60" placeholder="5"></label>
+  </div>
+
+  {# ---- dingtalk fields ---- #}
+  <div class="channel-fields" data-type="dingtalk" style="display: none;">
+    <label class="field-label"><span>Webhook URL *</span><input data-config-key="webhook_url" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..."></label>
+    <label class="field-label"><span>加签密钥（可选）</span><input data-config-key="sign_secret" type="password" placeholder="SEC..."></label>
+    <div class="grid-2">
+      <label class="field-label"><span>@ 所有人</span>
+        <select data-config-key="at_all"><option value="false">否</option><option value="true">是</option></select>
+      </label>
+      <label class="field-label"><span>@ 手机号（逗号分隔）</span>
+        <input data-config-key="at_mobiles" placeholder="13800138000,13900139000">
+      </label>
+    </div>
+  </div>
+
+  {# ---- feishu fields ---- #}
+  <div class="channel-fields" data-type="feishu" style="display: none;">
+    <label class="field-label"><span>Webhook URL *</span><input data-config-key="webhook_url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."></label>
+    <label class="field-label"><span>签名密钥（可选）</span><input data-config-key="sign_secret" type="password" placeholder="..."></label>
+    <label class="field-label"><span>@ 用户 open_id（逗号分隔）</span><input data-config-key="at_user_ids" placeholder="ou_xxx,ou_yyy"></label>
+  </div>
+
+  {# ---- smtp fields ---- #}
+  <div class="channel-fields" data-type="email" style="display: none;">
+    <div class="grid-2">
+      <label class="field-label"><span>SMTP 主机 *</span><input data-config-key="host" placeholder="smtp.example.com"></label>
+      <label class="field-label"><span>端口 *</span><input data-config-key="port" type="number" placeholder="465"></label>
+    </div>
+    <div class="grid-2">
+      <label class="field-label"><span>用户名（可选）</span><input data-config-key="username" placeholder="user@example.com"></label>
+      <label class="field-label"><span>密码（可选）</span><input data-config-key="password" type="password" placeholder="app-password"></label>
+    </div>
+    <label class="field-label"><span>发件人地址 *</span><input data-config-key="from_addr" placeholder="alerts@example.com"></label>
+    <label class="field-label"><span>收件人（逗号分隔）*</span><input data-config-key="to_addrs" placeholder="soc@example.com,oncall@example.com"></label>
+    <div class="grid-2">
+      <label class="field-label"><span>使用 TLS</span>
+        <select data-config-key="use_tls"><option value="true">是 (SSL/TLS)</option><option value="false">否 (STARTTLS / 明文)</option></select>
+      </label>
+      <label class="field-label"><span>主题模板（可选）</span><input data-config-key="subject_template" placeholder="[AgentCapture] {event_type}: {summary}"></label>
+    </div>
+  </div>
+
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">新增通知配置</button>
+  </div>
+</form>
+{% endcall %}
+
+<style>
+/* ---- alerts page layout polish ---- */
+/* channel config column: long webhook/SMTP strings wrap cleanly */
+.cfg-cell { max-width: 420px; }
+.cfg-cell code { word-break: break-all; font-size: 11px; }
+.cfg-cell small { display: inline-block; margin-top: 2px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Help-block for the field-help toggle */
+.field-help-toggle {
+  cursor: pointer;
+  color: var(--theme-accent, #3b82f6);
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+.field-help-toggle::-webkit-details-marker { display: none; }
+.field-help-toggle::before { content: "▶"; font-size: 10px; transition: transform 0.18s ease; }
+details[open] .field-help-toggle::before { transform: rotate(90deg); }
+.field-help-body {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 6px;
+}
+[data-theme="light"] .field-help-body { background: rgba(15, 23, 42, 0.04); }
+.field-help-body p { margin: 6px 0; }
+.field-help-body a { color: var(--theme-accent); }
+
+/* Highlight the row currently being edited (in-place editor) */
+.row-edit-selected { background: rgba(37, 99, 235, 0.05); }
+.edit-form-inline {
+  margin: 14px;
+  padding: 18px;
+  background: rgba(37, 99, 235, 0.04);
+  border-radius: 14px;
+}
+[data-theme="light"] .edit-form-inline { background: rgba(15, 23, 42, 0.03); }
+.edit-form-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.checkbox-row input { width: auto; margin: 0; }
+</style>
+
+<script>
+// Toggle channel-type-specific fields in the create form
+(function() {
+  const select = document.getElementById('channel-type-select');
+  const form = document.getElementById('channel-create-form');
+  const output = document.getElementById('config-json-output');
+  if (!select || !form) return;
+
+  function showFieldsFor(type) {
+    form.querySelectorAll('.channel-fields').forEach(group => {
+      group.style.display = group.dataset.type === type ? '' : 'none';
+    });
+  }
+
+  select.addEventListener('change', () => showFieldsFor(select.value));
+  showFieldsFor(select.value);
+
+  form.addEventListener('submit', (e) => {
+    const type = select.value;
+    const group = form.querySelector(`.channel-fields[data-type="${type}"]`);
+    if (!group) return;
+    const cfg = {};
+    group.querySelectorAll('[data-config-key]').forEach(inp => {
+      const key = inp.dataset.configKey;
+      let val = inp.value;
+      if (!val) return;
+      if (inp.type === 'number') val = parseInt(val, 10);
+      else if (key === 'at_all' || key === 'use_tls') val = val === 'true';
+      else if (key === 'headers') {
+        try { val = JSON.parse(val); } catch (err) { val = {}; }
+      } else if (key === 'at_mobiles' || key === 'at_user_ids' || key === 'to_addrs') {
+        val = val.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      cfg[key] = val;
+    });
+    output.value = JSON.stringify(cfg);
+  });
+})();
+</script>
+{% endblock %}

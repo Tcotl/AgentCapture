@@ -1,0 +1,54 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
+{% block content %}
+{{ page_header('LG', '登录日志', '审计后台用户登录成功、失败、来源地址与客户端信息，用于识别异常管理入口访问。', ['登录审计']) }}
+
+<div class="cards">
+  {{ metric_card('总数', stats.total) }}
+  {{ metric_card('成功', stats.success, 'success') }}
+  {{ metric_card('失败', stats.failed, 'danger') }}
+</div>
+
+<section class="panel">
+  {% set toolbar %}
+  <div class="actions-inline">
+    <a class="chip primary" href="{{ export_href }}" style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">导出 CSV</a>
+    <form method="post" action="/admin/login-logs/cleanup" style="margin:0">
+      <button class="danger" type="submit" style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important" onclick="return confirm('确定清空所有登录日志？此操作不可撤销。')">清空日志</button>
+    </form>
+  </div>
+  {% endset %}
+  {{ section_header('登录审计', '按时间顺序展示用户、状态、来源 IP 与 User-Agent', toolbar) }}
+  <form method="get" action="/admin/login-logs" class="grid-4" style="margin-bottom:14px">
+    <input type="date" name="date_from" value="{{ filters.date_from }}" />
+    <input type="date" name="date_to" value="{{ filters.date_to }}" />
+    <input type="text" name="username" value="{{ filters.username }}" placeholder="用户名" />
+    <input type="text" name="ip_address" value="{{ filters.ip_address }}" placeholder="来源 IP" />
+    <input type="text" name="login_status" value="{{ filters.login_status }}" placeholder="状态 success/failed" />
+    <div class="actions-inline" style="grid-column:1 / -1">
+      <button type="submit" style="width:auto">应用筛选</button>
+      <a class="chip primary" href="/admin/login-logs" data-filter-action="clear"
+         style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
+    </div>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>用户</th><th>状态</th><th>IP</th><th class="cell-prose">失败原因</th><th>UA</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="muted"><code>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+          <td><strong>{{ item.username }}</strong></td>
+          <td>{% if item.login_status == 'success' %}{{ badge('成功', 'success') }}{% else %}{{ badge('失败', 'danger') }}{% endif %}</td>
+          <td><code>{{ item.ip_address }}</code></td>
+          <td class="muted cell-prose">{{ item.fail_reason or '—' }}</td>
+          <td class="muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis" title="{{ item.user_agent }}">{{ item.user_agent }}</td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无登录日志', '登录成功或失败后将自动记录。', 6, 'LG') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

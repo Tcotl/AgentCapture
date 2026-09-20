@@ -1,0 +1,50 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge %}
+{% block content %}
+{{ page_header('AP', '攻击者档案 · ' ~ ip, '该来源的完整行为档案与捕获证据。', ['Dossier']) }}
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header('凭证捕获', '该来源提交过的全部账号密码（含蜜饵与协议蜜罐捕获）') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>用户名</th><th>密码</th><th>服务</th><th>来源</th></tr></thead>
+      <tbody>
+        {% for c in creds %}
+        <tr>
+          <td><code>{{ c.created_at.strftime('%m-%d %H:%M:%S') if c.created_at else '-' }}</code></td>
+          <td><code>{{ c.username }}</code></td>
+          <td><code>{{ c.password }}</code></td>
+          <td>{{ c.service_name }}</td>
+          <td><span class="pill">{{ c.source_label or '-' }}</span></td>
+        </tr>
+        {% else %}
+        {{ empty_state('无凭证捕获', '该来源尚未提交任何凭证。', 5, 'AP') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  {{ section_header('最近事件', '最近 50 条事件（含指纹与蜜标证据）') }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>类型</th><th>路径</th><th>风险</th><th>决策</th><th>信号</th></tr></thead>
+      <tbody>
+        {% for item in events %}
+        <tr>
+          <td><code>{{ item.created_at.strftime('%m-%d %H:%M:%S') }}</code></td>
+          <td>{{ badge(item.event_type, 'info') }}</td>
+          <td><code>{{ item.path[:48] }}</code></td>
+          <td><span class="badge {% if item.risk_score >= 70 %}badge-danger{% elif item.risk_score >= 45 %}badge-warning{% else %}badge-info{% endif %}">{{ item.risk_score }}</span></td>
+          <td>{{ badge(item.decision, 'default') }}</td>
+          <td><small>{% for s in (item.signals_json or [])[:4] %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无事件', '该来源暂无事件记录。', 6, 'AP') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

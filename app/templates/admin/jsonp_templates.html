@@ -1,0 +1,364 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog %}
+{% block content %}
+{{ page_header('RC', title or 'Jsonp模版管理', '以表格方式管理 Jsonp 请求方法；选择对应模版后在弹窗中编辑请求参数、采集字段和响应模板。',
+      ['表格管理', '弹窗编辑', 'Jsonp 方法'],
+      actions='<button type="button" class="chip primary" data-modal-open="jsonp-create-modal">＋ 新增 Jsonp 模版</button>') }}
+
+<style>
+  .jsonp-kpi-grid { margin-bottom: 18px; }
+  .jsonp-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .jsonp-table-toolbar .jsonp-help-inline {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .jsonp-table-toolbar button { width: auto; min-width: 148px; }
+  .jsonp-template-name strong {
+    display: block;
+    color: #f8fbff;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .jsonp-template-name span {
+    display: block;
+    color: var(--muted-foreground);
+    font-family: "Fira Code", monospace;
+    font-size: 12px;
+  }
+  .jsonp-entry-cell {
+    min-width: 150px;
+  }
+  .jsonp-entry-line { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .jsonp-entry-cell .badge { margin-bottom: 7px; }
+  .jsonp-field-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 320px;
+  }
+  .table-wrap td.jsonp-description-cell {
+    max-width: 220px;
+    color: var(--muted-foreground);
+    line-height: 1.55;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .table-wrap td.jsonp-entry-cell code { word-break: break-all; white-space: normal; }
+  .table-wrap td { overflow-wrap: anywhere; }
+  .jsonp-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 210px;
+  }
+  .jsonp-actions-row button,
+  .jsonp-actions-row form { width: auto; }
+  .jsonp-actions-row form button { min-width: 0; }
+  .jsonp-modal-backdrop[hidden] { display: none !important; }
+  .jsonp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(14px);
+    cursor: pointer;
+  }
+  .jsonp-modal {
+    width: min(1040px, 100%);
+    max-height: min(88vh, 880px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: default;
+    border-radius: 24px;
+    border: 1px solid rgba(96, 165, 250, 0.24);
+    background:
+      radial-gradient(circle at 88% 0%, rgba(14, 165, 233, 0.16), transparent 32%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(8, 13, 25, 0.98));
+    box-shadow: 0 34px 120px rgba(0, 0, 0, 0.58), var(--glow-blue);
+  }
+  .jsonp-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 22px 24px 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+  .jsonp-modal-title {
+    margin: 0;
+    color: #f8fbff;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+  }
+  .jsonp-modal-subtitle {
+    margin-top: 6px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .jsonp-modal-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: #dbeafe !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    box-shadow: none !important;
+    padding: 0;
+  }
+  .jsonp-modal-body {
+    overflow: auto;
+    padding: 20px 24px 24px;
+  }
+  .jsonp-editor {
+    min-height: 250px;
+    font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .jsonp-help {
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(96, 165, 250, 0.15);
+    background: rgba(59, 130, 246, 0.06);
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .jsonp-help code { margin: 2px; }
+  .jsonp-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .jsonp-modal-footer button { width: auto; min-width: 112px; }
+  @media (max-width: 980px) {
+    .jsonp-table-toolbar { align-items: stretch; }
+    .jsonp-table-toolbar button { width: 100%; }
+    .jsonp-actions-row { flex-direction: column; align-items: stretch; min-width: 0; }
+    .jsonp-actions-row button,
+    .jsonp-actions-row form,
+    .jsonp-actions-row form button { width: 100%; }
+    .jsonp-modal-backdrop { padding: 12px; }
+    .jsonp-modal { max-height: 94vh; border-radius: 18px; }
+    .jsonp-modal-header, .jsonp-modal-body { padding-left: 16px; padding-right: 16px; }
+    .jsonp-modal-footer, .jsonp-modal-footer button { width: 100%; }
+  }
+</style>
+
+<div class="cards tight jsonp-kpi-grid">
+  {{ metric_card('Jsonp模版', summary.total) }}
+  {{ metric_card('启用方法', summary.active, 'success') }}
+  {{ metric_card('GET 方法', summary.get_count, 'info') }}
+  {{ metric_card('采集字段', summary.param_count, 'info') }}
+</div>
+
+<section class="panel">
+  {{ section_header('Jsonp 请求方法表格', '列表只展示关键字段；响应 JSON 模板不在页面直接展开，点击“编辑”后在弹窗中维护。') }}
+  <style>
+    .jsonp-table-wrap td, .jsonp-table-wrap th { padding: 8px 8px; }
+  /* long vendor URLs force columns past the wrapper — allow mid-token wrap */
+  .table-wrap td { overflow-wrap: anywhere; }
+  .jsonp-entry-cell code { word-break: break-all; }
+    .jsonp-desc-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+  <div class="jsonp-table-toolbar">
+    <div class="jsonp-help-inline">用于管理反制溯源中的 Jsonp 请求方法、回调参数和字段采集策略。</div>
+    <form method="post" action="/admin/jsonp-templates/bulk-delete" data-confirm="确认删除选中的 {n} 个模版？不可撤销。" class="bulk-del-form">
+      <input type="hidden" name="ids" value="">
+      <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th>
+          <th>模版</th>
+          <th>请求入口</th>
+          <th>回调参数</th>
+          <th>采集字段</th>
+          <th>状态</th>
+          <th class="cell-prose">说明</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
+          <td class="jsonp-template-name"><strong>{{ item.name }}</strong><span>{{ item.method_key }}</span></td>
+          <td class="jsonp-entry-cell">
+            <span class="jsonp-entry-line">{{ badge(item.request_method, 'info') }} <code>{{ item.endpoint_path }}</code></span>
+          </td>
+          <td><span class="pill">{{ item.callback_param }}</span></td>
+          <td>
+            <div class="jsonp-field-list">
+              {% if item.params_json %}
+                {% for param in item.params_json %}<span class="pill">{{ param }}</span>{% endfor %}
+              {% else %}
+                <span class="muted">-</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
+          <td class="jsonp-description-cell" title="{{ item.description or '' }}">{{ item.description or '暂无说明' }}</td>
+          <td>
+            <div class="jsonp-actions-row">
+              <button type="button" onclick="openJsonpModal('jsonp-edit-{{ item.id }}')">编辑</button>
+              <form method="post" action="/admin/jsonp-templates/{{ item.id }}/toggle">
+                <button type="submit" class="secondary">{% if item.is_active %}停用{% else %}启用{% endif %}</button>
+              </form>
+              <form method="post" action="/admin/jsonp-templates/{{ item.id }}/delete">
+                <button type="submit" class="secondary">删除</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state('暂无 Jsonp 请求方法', '点击新增 Jsonp 模版后会显示在这里。', 8, 'RC') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% call modal_dialog('jsonp-create-modal', '新增 Jsonp 请求方法', '创建新的 Jsonp 采集入口，保存后进入表格统一管理。') %}
+<form method="post" action="/admin/jsonp-templates" class="stack">
+  <div class="grid-2">
+    <input name="method_key" placeholder="方法标识，如 browser_fingerprint">
+    <input name="name" placeholder="方法名称" required>
+  </div>
+  <div class="grid-4">
+    <select name="request_method">
+      <option value="GET">GET</option>
+    </select>
+    <input name="endpoint_path" value="/recon/jsonp" placeholder="请求路径">
+    <input name="callback_param" value="callback" placeholder="回调参数名">
+    <select name="is_active">
+      <option value="1">启用</option>
+      <option value="0">停用</option>
+    </select>
+  </div>
+  <input name="params_csv" placeholder="采集字段，如 fingerprint,webrtc_ips,canvas_hash">
+  <textarea name="description" placeholder="用途说明、适用探针或接入方式"></textarea>
+  <textarea class="jsonp-editor" name="response_template" required placeholder='响应 JSON 模板，如 {"status":"collected","method":"{method_key}","timestamp":"{timestamp}"}'></textarea>
+  <div class="jsonp-help">
+    调用示例：<code>/recon/jsonp?method=browser_fingerprint&callback=reconCallback&fingerprint=demo</code><br>
+    可用变量：<code>{timestamp}</code><code>{source_ip}</code><code>{method_key}</code><code>{fingerprint}</code><code>{webrtc_ips}</code><code>{canvas_hash}</code>
+  </div>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>取消</button>
+    <button type="submit">保存模版</button>
+  </div>
+</form>
+{% endcall %}
+
+{% for item in items %}
+<div class="jsonp-modal-backdrop" id="jsonp-edit-{{ item.id }}" hidden onclick="closeJsonpModalOnBackdrop(event, 'jsonp-edit-{{ item.id }}')">
+  <div class="jsonp-modal" role="dialog" aria-modal="true" aria-labelledby="jsonp-edit-title-{{ item.id }}">
+    <div class="jsonp-modal-header">
+      <div>
+        <h2 class="jsonp-modal-title" id="jsonp-edit-title-{{ item.id }}">编辑 Jsonp 模版：{{ item.name }}</h2>
+        <div class="jsonp-modal-subtitle">{{ item.method_key }} · 在弹窗中维护请求入口、采集字段和响应 JSON 模板。</div>
+      </div>
+      <button type="button" class="jsonp-modal-close" onclick="closeJsonpModal('jsonp-edit-{{ item.id }}')">×</button>
+    </div>
+    <div class="jsonp-modal-body">
+      <form method="post" action="/admin/jsonp-templates/{{ item.id }}/update" class="stack">
+        <div class="grid-2">
+          <input name="method_key" value="{{ item.method_key }}" required>
+          <input name="name" value="{{ item.name }}" required>
+        </div>
+        <div class="grid-4">
+          <select name="request_method">
+            <option value="GET" {% if item.request_method == 'GET' %}selected{% endif %}>GET</option>
+          </select>
+          <input name="endpoint_path" value="{{ item.endpoint_path }}" required>
+          <input name="callback_param" value="{{ item.callback_param }}" required>
+          <select name="is_active">
+            <option value="1" {% if item.is_active %}selected{% endif %}>启用</option>
+            <option value="0" {% if not item.is_active %}selected{% endif %}>停用</option>
+          </select>
+        </div>
+        <input name="params_csv" value="{{ (item.params_json or [])|join(',') }}" placeholder="采集字段">
+        <textarea name="description" placeholder="用途说明">{{ item.description or '' }}</textarea>
+        <textarea class="jsonp-editor" name="response_template" required>{{ item.response_template or '' }}</textarea>
+        <div class="jsonp-help">
+          调用示例：
+          {% if item.endpoint_path[:4] == 'http' %}
+            <code>{{ item.endpoint_path }}?{{ item.callback_param }}=reconCallback</code>
+          {% else %}
+            <code>{{ item.endpoint_path }}?method={{ item.method_key }}&{{ item.callback_param }}=reconCallback</code>
+          {% endif %}
+          <br>
+          可用变量：<code>{timestamp}</code><code>{source_ip}</code><code>{method_key}</code><code>{fingerprint}</code><code>{webrtc_ips}</code><code>{canvas_hash}</code>
+        </div>
+        <div class="jsonp-modal-footer">
+          <button type="button" class="secondary" onclick="closeJsonpModal('jsonp-edit-{{ item.id }}')">取消</button>
+          <button type="submit">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+  function openJsonpModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const firstInput = modal.querySelector('input, select, textarea, button');
+    if (firstInput) setTimeout(() => firstInput.focus(), 20);
+  }
+  function closeJsonpModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = true;
+    if (!document.querySelector('.jsonp-modal-backdrop:not([hidden])')) {
+      document.body.style.overflow = '';
+    }
+  }
+  function closeJsonpModalOnBackdrop(event, id) {
+    if (event.target && event.target.id === id) closeJsonpModal(id);
+  }
+  document.addEventListener('keydown', function(event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.jsonp-modal-backdrop:not([hidden])').forEach(function(modal) {
+      closeJsonpModal(modal.id);
+    });
+  });
+  // batch delete
+  var bulkAll = document.querySelector('.bulk-select-all');
+  if (bulkAll) bulkAll.addEventListener('change', function () {
+    document.querySelectorAll('.bulk-check').forEach(function (c) { c.checked = bulkAll.checked; });
+  });
+  var bulkBtn = document.querySelector('.bulk-del-btn');
+  if (bulkBtn) bulkBtn.addEventListener('click', function () {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+    if (!checked.length) { alert('请先勾选要删除的模版'); return; }
+    var form = bulkBtn.closest('form');
+    if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+    form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+    form.submit();
+  });
+</script>
+{% endblock %}
