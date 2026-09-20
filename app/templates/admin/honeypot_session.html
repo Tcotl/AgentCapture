@@ -21,7 +21,9 @@
       <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57;display:inline-block"></span>
       <span style="width:11px;height:11px;border-radius:50%;background:#febc2e;display:inline-block"></span>
       <span style="width:11px;height:11px;border-radius:50%;background:#28c840;display:inline-block"></span>
-      <span style="color:#4a5f83;margin-left:8px">ssh {{ row.username }}@{{ row.source_ip }} (port {{ row.port }})</span>
+      <span style="color:#4a5f83;margin-left:8px">{{ row.service or 'ssh' }} {{ row.username }}@{{ row.source_ip }} (port {{ row.port }})</span>
+      <span style="flex:1"></span>
+      <a class="chip" href="/admin/honeypot-sessions/{{ row.id }}/export.pcap" style="cursor:pointer;text-decoration:none">导出流量包 (.pcap)</a>
     </div>
     {% for entry in transcript %}
       {% if entry.kind == 'auth' %}

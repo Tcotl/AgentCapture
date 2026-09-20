@@ -620,15 +620,50 @@ def _mysql_tls_context() -> "ssl.SSLContext":
     return context
 
 
+
+def _ps_open(service_key: str, addr: tuple, port: int) -> int | None:
+    try:
+        from app.services.protocol_sessions import open_protocol_session
+
+        return open_protocol_session(service=service_key, source_ip=addr[0], port=port)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _ps_log(pk: int | None, *, client_line: str | None = None,
+            server_line: str | None = None, auth: dict | None = None) -> None:
+    if pk is None:
+        return
+    try:
+        from app.services.protocol_sessions import log_interaction
+
+        log_interaction(pk, client_line=client_line, server_line=server_line, auth=auth)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _ps_close(pk: int | None) -> None:
+    if pk is None:
+        return
+    try:
+        from app.services.protocol_sessions import close_session
+
+        close_session(pk)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _handle_mysql(reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
                         service_key: str, port: int):
     addr = writer.get_extra_info("peername")
     session = _honeypot_session(service_key, addr)
+    ps = _ps_open(service_key, addr, port)
     try:
         writer.write(mysql_packet(build_mysql_greeting(os.urandom(20)), 0))
         await writer.drain()
         _log_event(service_key, port, addr, "mysql_connect", {"protocol": "mysql"},
                    session_id=session)
+        _ps_log(ps, server_line="server greeting (mysql handshake v10)")
 
         header = await asyncio.wait_for(reader.readexactly(4), timeout=15)
         length = int.from_bytes(header[:3], "little")
@@ -669,6 +704,8 @@ async def _handle_mysql(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         }, session_id=session,
            credential={"username": handshake["username"], "password": ""},
         )
+        _ps_log(ps, auth={"username": handshake["username"], "accepted": True},
+                server_line="OK — login accepted")
 
         # Accept any credentials (the password arrives as a salted scramble we
         # cannot verify anyway) and keep the session open for queries.
@@ -689,6 +726,8 @@ async def _handle_mysql(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 query = payload[1:].decode("utf-8", errors="replace").strip()
                 _log_event(service_key, port, addr, "mysql_query",
                            {"query": query[:500]}, session_id=session)
+                _ps_log(ps, client_line="QUERY: " + query[:500],
+                        server_line="result set returned")
                 writer.write(mysql_query_response(query, seq + 1))
             elif command == COM_INIT_DB:
                 writer.write(build_mysql_ok(seq + 1))
@@ -707,6 +746,7 @@ async def _handle_mysql(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         pass
     finally:
         writer.close()
+        _ps_close(ps)
 
 
 # ---------------------------------------------------------------------------
@@ -717,6 +757,7 @@ async def _handle_redis(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                         service_key: str, port: int):
     addr = writer.get_extra_info("peername")
     session = _honeypot_session(service_key, addr)
+    ps = _ps_open(service_key, addr, port)
     try:
         _log_event(service_key, port, addr, "redis_connect", {"protocol": "redis"},
                    session_id=session)
@@ -754,6 +795,7 @@ async def _handle_redis(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 "command": command,
                 "args": command_args[:5],
             }, session_id=session)
+            _ps_log(ps, client_line=" ".join([command] + [str(a) for a in command_args[:3]]))
 
             if command == "PING":
                 writer.write(b"+PONG\r\n")
@@ -770,7 +812,8 @@ async def _handle_redis(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                     "username": credential["username"],
                     "password_len": len(credential["password"]),
                 }, session_id=session, credential=credential)
-                writer.write(b"-ERR invalid password\r\n")
+                _ps_log(ps, auth={"username": credential["username"], "accepted": False},
+                        server_line="-ERR invalid password")
             elif command in ("SET", "SETEX", "HSET", "LPUSH", "RPUSH", "SADD", "EXPIRE"):
                 writer.write(b"+OK\r\n")
             elif command in ("GET", "HGET"):
@@ -802,6 +845,7 @@ async def _handle_redis(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         pass
     finally:
         writer.close()
+        _ps_close(ps)
 
 
 # ---------------------------------------------------------------------------
@@ -812,6 +856,7 @@ async def _handle_ftp(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
                       service_key: str, port: int):
     addr = writer.get_extra_info("peername")
     session = _honeypot_session(service_key, addr)
+    ps = _ps_open(service_key, addr, port)
     try:
         writer.write(b"220 ProFTPD 1.3.8 Server ready.\r\n")
         await writer.drain()
@@ -844,6 +889,7 @@ async def _handle_ftp(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
                         "password_len": len(arg),
                     }, session_id=session,
                        credential={"username": username, "password": arg})
+                    _ps_log(ps, client_line=f"PASS {arg[:64]}", auth={"username": username, "accepted": True}, server_line="230 Login successful")
                     # Accept any credential (logged above) and grant access: a
                     # working session keeps attackers engaged far longer than
                     # an instant 530 rejection.
@@ -979,6 +1025,7 @@ async def _handle_elasticsearch(reader: asyncio.StreamReader, writer: asyncio.St
                                 service_key: str, port: int):
     addr = writer.get_extra_info("peername")
     session = _honeypot_session(service_key, addr)
+    ps = _ps_open(service_key, addr, port)
     try:
         _log_event(service_key, port, addr, "elasticsearch_connect", {"protocol": "http"},
                    session_id=session)
@@ -998,6 +1045,7 @@ async def _handle_elasticsearch(reader: asyncio.StreamReader, writer: asyncio.St
                 key, _, value = line.partition(":")
                 headers[key.strip().lower()] = value.strip()
 
+        _ps_log(ps, client_line=f"{method} {path}", server_line="elasticsearch json response")
         _log_event(service_key, port, addr, "elasticsearch_request", {
             "method": method,
             "path": path,
@@ -1124,6 +1172,7 @@ async def _handle_nginx_admin(reader: asyncio.StreamReader, writer: asyncio.Stre
         pass
     finally:
         writer.close()
+        _ps_close(ps)
 
 
 # ---------------------------------------------------------------------------

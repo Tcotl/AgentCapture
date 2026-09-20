@@ -4182,6 +4182,30 @@ def admin_honeypot_session_detail(session_pk: int, request: Request, db: Session
     )
 
 
+@router.get("/admin/honeypot-sessions/{session_pk}/export.pcap")
+def export_honeypot_session_pcap(session_pk: int, request: Request, db: Session = Depends(get_db)):
+    """Export a honeypot session replay as a synthesized pcap traffic file."""
+    _require_user(request, db)
+    from app.models.honeypot_session import HoneypotSession
+    from app.services.protocol_sessions import export_pcap
+
+    row = db.get(HoneypotSession, session_pk)
+    if not row:
+        raise HTTPException(status_code=404)
+    pcap = export_pcap(
+        list(row.transcript_json or []),
+        service=row.service or "ssh",
+        source_ip=row.source_ip or "0.0.0.0",
+        port=row.port or 22,
+    )
+    filename = f"honeypot-session-{row.session_id or session_pk}.pcap"
+    return Response(
+        content=pcap,
+        media_type="application/vnd.tcpdump.pcap",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/admin/services")
 def create_service(
     request: Request,
