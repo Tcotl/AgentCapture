@@ -46,6 +46,17 @@
         --glow-amber: 0 0 20px rgba(245, 158, 11, 0.14);
         --surface-gradient: linear-gradient(180deg, rgba(17, 26, 47, 0.72), rgba(10, 16, 30, 0.9));
         --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+        /* Legacy aliases from the retired HUD/monochrome passes. Final values,
+           defined once here — components reference them via var() and the
+           light theme overrides them in its single [data-theme="light"] block. */
+        --tech-cyan: #e5e7eb;
+        --tech-cyan-dim: rgba(229, 231, 235, 0.5);
+        --tech-cyan-faint: rgba(255, 255, 255, 0.07);
+        --tech-panel: #0a0a0a;
+        --tech-panel-2: #101010;
+        --tech-line: rgba(255, 255, 255, 0.08);
+        --tech-corner: rgba(255, 255, 255, 0.14);
       }
 
       * { box-sizing: border-box; }
@@ -1564,50 +1575,23 @@ input, select, textarea, button { border-radius: 8px; }
 .badge { border-radius: 5px; }
 
 /* ---------------------------------------------------------------------------
- * TECH REDESIGN — HUD command-console language for page content
- * Corner-framed panels, scanlines, mono eyebrows, electric cyan accents.
+ * TECH REDESIGN — HUD command-console language for page content.
+ * (Tokens consolidated into the canonical :root; rules below carry the final
+ * visual values after the monochrome pass.)
  * ------------------------------------------------------------------------- */
-:root {
-  --tech-cyan: #22d3ee;
-  --tech-cyan-dim: rgba(34, 211, 238, 0.55);
-  --tech-cyan-faint: rgba(34, 211, 238, 0.12);
-  --tech-panel: #080d1a;
-  --tech-panel-2: #0a1122;
-  --tech-line: rgba(56, 189, 248, 0.14);
-  --tech-corner: rgba(34, 211, 238, 0.55);
-}
-
-/* --- corner-bracket frame (HUD) --- */
-.card, .panel {
-  background:
-    linear-gradient(var(--tech-corner), var(--tech-corner)) left top / 14px 1px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) left top / 1px 14px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) right top / 14px 1px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) right top / 1px 14px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) left bottom / 14px 1px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) left bottom / 1px 14px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) right bottom / 14px 1px,
-    linear-gradient(var(--tech-corner), var(--tech-corner)) right bottom / 1px 14px,
-    linear-gradient(180deg, var(--tech-panel-2), var(--tech-panel));
-  background-repeat: no-repeat;
-  border: 1px solid var(--tech-line);
-  border-radius: 4px;
-}
-.card:hover, .panel:hover {
-  border-color: rgba(56, 189, 248, 0.3);
-}
+/* --tech-* tokens are consolidated in the canonical :root at the top. */
 
 /* --- panel headers: mono eyebrow + accent tick --- */
 .panel-header {
-  border-bottom: 1px solid rgba(56, 189, 248, 0.09);
+  border-bottom: 1px solid var(--tech-line);
   padding-bottom: 12px;
   margin-bottom: 0;
 }
 .panel-title {
-  font-family: "Fira Code", ui-monospace, monospace;
+  font-family: "Fira Sans", Inter, sans-serif;
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.01em;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1616,52 +1600,39 @@ input, select, textarea, button { border-radius: 8px; }
   content: "";
   width: 4px;
   height: 14px;
-  background: var(--tech-cyan);
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
 }
 .panel-subtitle { font-size: 12px; }
 
 /* --- page header: HUD banner --- */
 .page-header {
   border: 1px solid var(--tech-line);
-  border-radius: 4px;
-  background:
-    linear-gradient(90deg, rgba(34, 211, 238, 0.06), transparent 45%),
-    repeating-linear-gradient(0deg, transparent 0 3px, rgba(56, 189, 248, 0.016) 3px 4px),
-    var(--tech-panel);
+  border-radius: 14px;
+  background: var(--tech-panel);
   position: relative;
 }
-.page-header::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, var(--tech-cyan), #2563eb);
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
-}
 .page-title {
-  font-family: "Fira Code", ui-monospace, monospace;
-  letter-spacing: -0.01em;
+  font-family: "Fira Sans", Inter, sans-serif;
+  letter-spacing: -0.03em;
 }
 .page-title-icon {
-  border-radius: 6px;
-  color: #a5f3fc;
-  background: rgba(34, 211, 238, 0.1);
-  border: 1px solid rgba(34, 211, 238, 0.28);
-  box-shadow: 0 0 14px rgba(34, 211, 238, 0.18);
+  border-radius: 10px;
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
 }
 .page-eyebrow {
   font-family: "Fira Code", ui-monospace, monospace;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.22em;
-  color: var(--tech-cyan-dim);
+  color: rgba(156, 163, 175, 0.75);
   text-transform: uppercase;
   margin-bottom: 8px;
 }
-.page-eyebrow::before { content: "▸ "; color: var(--tech-cyan); }
+.page-eyebrow::before { content: "▸ "; color: rgba(229, 231, 235, 0.7); }
 
 /* --- metric cards: terminal readouts --- */
 .metric-card {
@@ -1890,21 +1861,12 @@ td > .actions-inline, td > .jsonp-actions-row, td > .prompt-actions-row {
 td > pre { white-space: pre-wrap; }
 
 /* ---------------------------------------------------------------------------
- * MONOCHROME ALIGNMENT — final visual layer (wins over the earlier cyan tech
- * layer). Strata note: this file carries three historical layers (base blue
- * SOC tokens :1, cyan HUD :~1553, this monochrome pass). Later rules win; new
- * styling should extend THIS layer or the UI INFRASTRUCTURE block at EOF, and
- * use tokens (--foreground/--card/...) instead of hardcoded colors.
+ * MONOCHROME ALIGNMENT — final visual pass over the HUD layer. Component
+ * values are folded in place; every custom property is defined exactly once
+ * (canonical :root + the [data-theme="light"] block). New styling: use tokens
+ * (--foreground/--card/--tech-*) or the UI INFRASTRUCTURE block at EOF.
  * ------------------------------------------------------------------------- */
-:root {
-  --tech-cyan: #e5e7eb;
-  --tech-cyan-dim: rgba(229, 231, 235, 0.5);
-  --tech-cyan-faint: rgba(255, 255, 255, 0.07);
-  --tech-panel: #0a0a0a;
-  --tech-panel-2: #101010;
-  --tech-line: rgba(255, 255, 255, 0.08);
-  --tech-corner: rgba(255, 255, 255, 0.14);
-}
+/* --tech-* tokens are consolidated in the canonical :root at the top. */
 
 body {
   font-family: "Fira Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1912,40 +1874,11 @@ body {
 
 /* Panels & cards: plain monochrome, no corner brackets / scanlines */
 .card, .panel {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--tech-panel);
+  border: 1px solid var(--tech-line);
   border-radius: 14px;
 }
 .card:hover, .panel:hover { border-color: rgba(255, 255, 255, 0.16); }
-
-/* Section titles: neutral tick instead of cyan glow bar */
-.panel-title {
-  font-family: "Fira Sans", Inter, sans-serif;
-  letter-spacing: -0.01em;
-}
-.panel-title::before {
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: none;
-}
-.panel-header { border-bottom-color: rgba(255, 255, 255, 0.06); }
-
-/* Page header: flat black, no scanlines / cyan bar */
-.page-header {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-}
-.page-header::before { content: none; }
-.page-title { font-family: "Fira Sans", Inter, sans-serif; letter-spacing: -0.03em; }
-.page-title-icon {
-  border-radius: 10px;
-  color: #e5e7eb;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: none;
-}
-.page-eyebrow { color: rgba(156, 163, 175, 0.75); }
-.page-eyebrow::before { color: rgba(229, 231, 235, 0.7); }
 
 /* Tables */
 th {
