@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, pagination %}
 {% block content %}
 {{ page_header('HS', '蜜罐会话回放', '交互式协议蜜罐（SSH）的完整会话记录：认证尝试、逐条命令与输出，支持终端式回放。', ['会话', '回放'],
       actions='<form method="get" class="actions-inline" style="gap:8px"><input name="source_ip" value="' ~ filter_source_ip ~ '" placeholder="按来源 IP 过滤" style="width:180px"><select name="status" style="width:130px"><option value="">全部状态</option><option value="active" ' ~ ('selected' if filter_status == 'active' else '') ~ '>在线</option><option value="closed" ' ~ ('selected' if filter_status == 'closed' else '') ~ '>已结束</option></select><button class="secondary btn-sm" type="submit">筛选</button></form>') }}
@@ -20,7 +20,7 @@
         {% for item in items %}
         {% set row = item.row %}
         <tr>
-          <td><code>{{ row.started_at.strftime('%m-%d %H:%M:%S') if row.started_at else '—' }}</code></td>
+          <td><code>{{ row.started_at | dt('%m-%d %H:%M:%S') }}</code></td>
           <td><a href="/admin/attack-sources/{{ row.source_ip }}"><code>{{ row.source_ip }}</code></a></td>
           <td>{{ badge(row.service ~ ':' ~ row.port, 'info') }}</td>
           <td><code>{{ row.username or '—' }}</code></td>
@@ -37,5 +37,6 @@
       </tbody>
     </table>
   </div>
+  {{ pagination(pager.page, pager.per_page, pager.total, pager.base_url) }}
 </section>
 {% endblock %}

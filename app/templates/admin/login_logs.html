@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, pagination %}
 {% block content %}
 {{ page_header('LG', '登录日志', '审计后台用户登录成功、失败、来源地址与客户端信息，用于识别异常管理入口访问。', ['登录审计']) }}
 
@@ -37,7 +37,7 @@
       <tbody>
         {% for item in items %}
         <tr>
-          <td class="muted"><code>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+          <td class="muted"><code>{{ item.created_at | dt('%Y-%m-%d %H:%M:%S') }}</code></td>
           <td><strong>{{ item.username }}</strong></td>
           <td>{% if item.login_status == 'success' %}{{ badge('成功', 'success') }}{% else %}{{ badge('失败', 'danger') }}{% endif %}</td>
           <td><code>{{ item.ip_address }}</code></td>
@@ -50,5 +50,6 @@
       </tbody>
     </table>
   </div>
+  {{ pagination(pager.page, pager.per_page, pager.total, pager.base_url) }}
 </section>
 {% endblock %}

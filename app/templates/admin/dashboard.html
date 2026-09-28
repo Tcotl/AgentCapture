@@ -44,7 +44,7 @@
     border: 1px solid rgba(255, 255, 255, 0.14);
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(6px);
-    font-size: 12px; color: #9ca3af;
+    font-size: 12px; color: var(--muted-foreground);
   }
   .lp-pill b { color: #e5e7eb; font-weight: 600; }
   .lp-pill .lp-dot { width: 7px; height: 7px; border-radius: 999px; background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.7); }
@@ -68,7 +68,7 @@
     margin: 16px auto 0;
     max-width: 640px;
     font-size: 14px; line-height: 1.75;
-    color: #9ca3af;
+    color: var(--muted-foreground);
   }
 
   /* ---------- 卡片通用（黑白灰阶层） ---------- */
@@ -88,7 +88,7 @@
   /* ---------- KPI 卡带 ---------- */
   .lp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
   .lp-kpi { padding: 18px 18px 14px; }
-  .lp-kpi-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7280; font-weight: 500; }
+  .lp-kpi-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); font-weight: 500; }
   .lp-kpi-value {
     margin-top: 10px;
     font-size: 30px; font-weight: 600; line-height: 1;
@@ -98,18 +98,18 @@
   .lp-kpi-value.tone-danger { color: #fda4af; }
   .lp-kpi-value.tone-warning { color: #fcd34d; }
   .lp-kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
-  .lp-kpi-note { font-size: 11px; color: #6b7280; }
+  .lp-kpi-note { font-size: 11px; color: var(--muted-foreground); }
   .lp-delta { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
   .lp-delta.up { color: #fda4af; background: rgba(251, 113, 133, 0.12); }
   .lp-delta.down { color: #6ee7b7; background: rgba(52, 211, 153, 0.12); }
-  .lp-delta.flat { color: #9ca3af; background: rgba(255, 255, 255, 0.06); }
+  .lp-delta.flat { color: var(--muted-foreground); background: rgba(255, 255, 255, 0.06); }
 
   /* ---------- 主区 ---------- */
   .lp-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 16px; align-items: stretch; }
   .lp-grid > .lp-card { min-width: 0; }
   .lp-panel { padding: 20px; }
   .lp-panel-title { margin: 0; font-size: 15px; font-weight: 600; color: #f3f4f6; letter-spacing: -0.01em; }
-  .lp-panel-sub { margin-top: 4px; font-size: 12px; color: #6b7280; }
+  .lp-panel-sub { margin-top: 4px; font-size: 12px; color: var(--muted-foreground); }
   .lp-panel-head { margin-bottom: 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
   /* 图表紧凑化 */
@@ -119,7 +119,7 @@
   .lp-deck .snow-chart-tab { color: rgba(255, 255, 255, 0.42); font-family: "Poppins", sans-serif; }
   .lp-deck .snow-chart-tab.active { color: #f9fafb; font-weight: 600; }
   .lp-deck .snow-chart-tag.current { color: #e5e7eb; }
-  .lp-chart-meta { display: flex; gap: 16px; margin-left: auto; font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+  .lp-chart-meta { display: flex; gap: 16px; margin-left: auto; font-size: 11px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
   .lp-chart-meta b { margin-left: 5px; font-size: 13px; color: #f3f4f6; font-weight: 600; }
 
   /* 链路分布 */
@@ -161,7 +161,7 @@
   .lp-q:hover { background: rgba(255, 255, 255, 0.05); }
   .lp-q .q-icon { color: #d1d5db; display: inline-flex; flex: 0 0 auto; }
   .lp-q .q-name { flex: 1; font-size: 12.5px; font-weight: 500; color: #e5e7eb; }
-  .lp-q .q-arrow { color: #6b7280; transition: transform 150ms ease, color 150ms ease; }
+  .lp-q .q-arrow { color: var(--muted-foreground); transition: transform 150ms ease, color 150ms ease; }
   .lp-q:hover .q-arrow { transform: translateX(3px); color: #f9fafb; }
 
   /* 模块卡 */
@@ -170,9 +170,9 @@
   .lp-module-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .lp-module-icon { color: #e5e7eb; display: inline-flex; }
   .lp-module-metric { font-size: 19px; font-weight: 600; color: #f9fafb; font-variant-numeric: tabular-nums; }
-  .lp-module-metric-label { display: block; text-align: right; font-size: 9.5px; letter-spacing: 0.12em; color: #6b7280; text-transform: uppercase; }
+  .lp-module-metric-label { display: block; text-align: right; font-size: 9.5px; letter-spacing: 0.12em; color: var(--muted-foreground); text-transform: uppercase; }
   .lp-module-title { font-size: 13.5px; font-weight: 600; color: #f3f4f6; }
-  .lp-module-desc { font-size: 11.5px; color: #6b7280; line-height: 1.6; }
+  .lp-module-desc { font-size: 11.5px; color: var(--muted-foreground); line-height: 1.6; }
   .lp-module-link { margin-top: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: #f3f4f6; }
   .lp-module-link svg { transition: transform 150ms ease; }
   .lp-module:hover .lp-module-link svg { transform: translateX(3px); }

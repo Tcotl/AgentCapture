@@ -53,7 +53,7 @@
 {% macro page_header(icon_name, title, description, badges=[], actions='') -%}
 <div class="page-header">
   <div class="page-header-copy">
-    <div class="page-eyebrow">AGENTCAPTURE // SYS.{{ icon_name|upper }}</div>
+    <div class="page-eyebrow">AGENTCAPTURE</div>
     <h1 class="page-title">
       <span class="page-title-icon">{{ icon(name=icon_name, class_name='ui-icon ui-icon-lg') }}</span>
       <span>{{ title }}</span>
@@ -67,6 +67,27 @@
     {% endfor %}
   </div>
 </div>
+{%- endmacro %}
+
+{% macro pagination(page, per_page, total, base_url='') -%}
+{% set pages = ((total / per_page) | round(0, 'ceil')) | int %}
+{% if pages > 0 %}
+<nav class="pager" aria-label="分页">
+  <span class="pager-summary">共 {{ total }} 条 · 第 {{ page }} / {{ pages }} 页</span>
+  <div class="pager-links">
+    {% set sep = '&' if '?' in base_url else '?' %}
+    {% if page > 1 %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ page - 1 }}">上一页</a>{% else %}<span class="chip is-disabled">上一页</span>{% endif %}
+    {% set window_start = [1, page - 2] | max %}
+    {% set window_end = [pages, window_start + 4] | min %}
+    {% if window_start > 1 %}<a class="chip" href="{{ base_url }}{{ sep }}page=1">1</a>{% if window_start > 2 %}<span class="pager-ellipsis">…</span>{% endif %}{% endif %}
+    {% for p in range(window_start, window_end + 1) %}
+      {% if p == page %}<span class="chip primary">{{ p }}</span>{% else %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ p }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if window_end < pages %}{% if window_end < pages - 1 %}<span class="pager-ellipsis">…</span>{% endif %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ pages }}">{{ pages }}</a>{% endif %}
+    {% if page < pages %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ page + 1 }}">下一页</a>{% else %}<span class="chip is-disabled">下一页</span>{% endif %}
+  </div>
+</nav>
+{% endif %}
 {%- endmacro %}
 
 {% macro modal_dialog(id, title, subtitle='', wide=false) -%}

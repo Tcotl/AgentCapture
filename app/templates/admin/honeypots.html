@@ -1,14 +1,14 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, badge %}
 {% block content %}
-{{ page_header('IP', '蜜罐部署', '同一套蜜饵与捕获引擎，三种挂载方式。每个蜜罐类型在这里选择部署哪些诱饵面；各诱饵面的具体内容在「配置」页独立维护。', ['Web 应用', '嵌入式', '端口服务']) }}
+{{ page_header('IP', '蜜罐部署', '同一套蜜饵与捕获引擎，三种挂载方式。每个蜜罐类型在这里选择部署哪些诱饵面；各诱饵面的具体内容在「配置」页独立维护。') }}
 
-{% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
-{% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
+{% if hp_ok %}<div class="panel page-banner page-banner-success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
+{% if hp_err %}<div class="panel page-banner page-banner-warning" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
 
 <div class="tabs" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
-  <a class="chip {% if active_tab == 'web' %}primary{% endif %}" href="/admin/honeypots?tab=web" style="cursor:pointer;text-decoration:none">Web 应用蜜罐 {% if web_running %}●{% else %}○{% endif %}</a>
-  <a class="chip {% if active_tab == 'embedded' %}primary{% endif %}" href="/admin/honeypots?tab=embedded" style="cursor:pointer;text-decoration:none">嵌入式蜜罐 {% if embedded_enabled %}●{% else %}○{% endif %}</a>
+  <a class="chip {% if active_tab == 'web' %}primary{% endif %}" href="/admin/honeypots?tab=web" style="cursor:pointer;text-decoration:none">Web 应用蜜罐 <span class="state-dot {% if web_running %}is-on{% endif %}"></span></a>
+  <a class="chip {% if active_tab == 'embedded' %}primary{% endif %}" href="/admin/honeypots?tab=embedded" style="cursor:pointer;text-decoration:none">嵌入式蜜罐 <span class="state-dot {% if embedded_enabled %}is-on{% endif %}"></span></a>
   <a class="chip {% if active_tab == 'protocol' %}primary{% endif %}" href="/admin/honeypots?tab=protocol" style="cursor:pointer;text-decoration:none">端口服务蜜罐</a>
 </div>
 

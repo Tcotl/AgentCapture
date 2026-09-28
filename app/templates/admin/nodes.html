@@ -152,7 +152,7 @@
         <code>{{ node.callback_address }}</code>
       </div>
       <div class="nd-heart">
-        {% if item.latest_heartbeat %}{{ item.latest_heartbeat.created_at.strftime('%d %b %Y %H:%M') }}{% else %}<span class="muted">暂无心跳</span>{% endif %}
+        {% if item.latest_heartbeat %}{{ item.latest_heartbeat.created_at | dt('%Y-%m-%d %H:%M') }}{% else %}<span class="muted">暂无心跳</span>{% endif %}
       </div>
       <div class="nd-meter">
         <span class="nd-segs">{% for i in range(10) %}<i class="{% if i < segs %}on{% if node.status != 'online' %} warn{% endif %}{% endif %}"></i>{% endfor %}</span>

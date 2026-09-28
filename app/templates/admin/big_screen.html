@@ -16,7 +16,12 @@
 {% set chain_max = chain_items|map(attribute='value')|max or 1 %}
 <style>
   /* ---------- 覆盖 admin 外壳：大屏全视口 ---------- */
-  body { height: 100vh; overflow: hidden; background: var(--bs-bg) !important; }
+  /* 大屏锁定深色：--bs-bg 定义在 body 作用域，两种站点主题（light/dark）下外壳都不露浅底 */
+  body {
+    height: 100vh; overflow: hidden;
+    --bs-bg: #070b16; /* = admin.css 深色 :root 的 --background */
+    background: var(--bs-bg) !important;
+  }
   .pm-admin-scale-shell { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100vh !important; min-height: 100vh !important; transform: none !important; overflow: hidden !important; }
   .layout, .main-shell, .workspace, .content {
     height: 100vh !important; min-height: 100vh !important; max-width: none !important;
@@ -24,62 +29,40 @@
   }
   .layout { display: block !important; grid-template-columns: minmax(0, 1fr) !important; }
   .main-shell, .workspace, .content { width: 100% !important; }
-  .sidebar, .utility-strip, .topbar { display: none !important; }
+  .sidebar, .utility-strip, .topbar, #admin-path-banner, .nav-open-btn { display: none !important; }
   .content { padding: 0 !important; }
 
-  /* ---------- 大屏设计令牌 ---------- */
+  /* ---------- 大屏设计令牌（深色 OLED 基调，与 admin.css 深色 :root 对齐） ----------
+     稳定变量直接引用 admin.css（--card/--success/--danger/--warning/--info/--theme-accent
+     不随站点主题切换）；背景/文字/边框类在 light 主题下会被 admin.css 翻转为浅色，
+     因此此处按深色 :root 的取值写死，保证大屏在两种站点主题下都是深底浅字。 */
   .bs-stage {
-    --bs-cyan: #e8eef7;
-    --bs-cyan-dim: rgba(232, 238, 247, 0.5);
-    --bs-blue: #3b82f6;
-    --bs-amber: #f59e0b;
-    --bs-red: #fb7185;
-    --bs-green: #34d399;
-    --bs-panel: rgba(7, 12, 24, 0.72);
-    --bs-line: rgba(255, 255, 255, 0.14);
-    --bs-text: #e8f4ff;
-    --bs-muted: rgba(148, 180, 210, 0.62);
-    /* surface family (theme-switchable) */
-    --bs-bg: #02040a;
+    --bs-cyan: #e5edf8;                        /* 主强调文字（深色 --foreground） */
+    --bs-cyan-dim: rgba(229, 237, 248, 0.5);
+    --bs-blue: var(--theme-accent);            /* #3b82f6 */
+    --bs-amber: var(--warning);                /* #f59e0b */
+    --bs-red: var(--danger);                   /* #fb7185 */
+    --bs-green: var(--success);                /* #34d399 */
+    --bs-panel: var(--card);                   /* #0d1424 */
+    --bs-line: rgba(148, 163, 184, 0.14);      /* = 深色 --border */
+    --bs-text: #e5edf8;                        /* = 深色 --foreground */
+    --bs-muted: #94a3b8;                       /* = 深色 --muted-foreground（≥4.5:1） */
+    /* surface family（大屏锁定深色，不随站点主题切换） */
+    --bs-bg: #070b16;                          /* = 深色 --background */
     --bs-headline: #f2faff;
-    --bs-text-strong: #eaf6ff;                /* emphasized body text */
-    --bs-text-code: #d9ecff;                  /* mono data (IP / paths) */
+    --bs-text-strong: #e5edf8;                 /* emphasized body text */
+    --bs-text-code: #d9ecff;                   /* mono data (IP / paths) */
     --bs-tag-high: #fecdd3;
     --bs-tag-medium: #fde68a;
-    --bs-wash: var(--bs-wash);      /* generic translucent panel */
-    --bs-wash-strong: var(--bs-wash-strong);
-    --bs-hairline: rgba(255, 255, 255, 0.09);  /* faint dividers */
-    --bs-glow: rgba(255, 255, 255, 0.25);      /* brand glow */
-    --bs-deep: rgba(4, 9, 18, 0.9);            /* inset wells (ring center) */
+    --bs-wash: rgba(148, 163, 184, 0.06);      /* generic translucent panel */
+    --bs-wash-strong: rgba(148, 163, 184, 0.12);
+    --bs-hairline: rgba(148, 163, 184, 0.10);  /* faint dividers */
+    --bs-glow: rgba(96, 165, 250, 0.30);       /* brand glow（冷蓝辉光） */
+    --bs-deep: rgba(2, 6, 14, 0.92);           /* inset wells (ring center) */
     --bs-map-bg: #03060f;                      /* globe viewport */
     --bs-vignette: rgba(2, 4, 10, 0.6);        /* globe edge falloff */
   }
-  /* light re-skin: theme tokens only; geometry lives in the base rule */
-  [data-theme="light"] .bs-stage {
-    --bs-cyan: #1e3a8a;
-    --bs-cyan-dim: rgba(30, 58, 138, 0.5);
-    --bs-blue: #2563eb;
-    --bs-amber: #b45309;
-    --bs-red: #e11d48;
-    --bs-green: #059669;
-    --bs-panel: rgba(255, 255, 255, 0.85);
-    --bs-line: rgba(15, 23, 42, 0.16);
-    --bs-text: #1e293b;
-    --bs-muted: rgba(51, 65, 85, 0.68);
-    --bs-bg: #eef2f7;
-    --bs-headline: #0f172a;
-    --bs-text-strong: #1e293b;
-    --bs-text-code: #334155;
-    --bs-tag-high: #be123c;
-    --bs-tag-medium: #b45309;
-    --bs-wash: rgba(15, 23, 42, 0.04);
-    --bs-wash-strong: rgba(15, 23, 42, 0.08);
-    --bs-hairline: rgba(15, 23, 42, 0.10);
-    --bs-glow: rgba(37, 99, 235, 0.25);
-    --bs-deep: rgba(241, 245, 249, 0.92);
-    --bs-map-bg: #ffffff;
-    --bs-vignette: rgba(15, 23, 42, 0.10);
-  }
+  /* 站点 light 主题下的浅色 re-skin 令牌已移除：大屏在两种主题下统一使用上述深色令牌。 */
   .bs-stage {
     position: absolute;
     left: 50%;
@@ -148,45 +131,45 @@
     background: var(--bs-wash);
     box-shadow: inset 0 -2px 0 var(--bs-cyan);
   }
-  /* beat admin.css [data-theme=light] button:not(.secondary):not(.ghost)
-     (0-3-1 dark-gradient skin) — these are 0-3-1 later in cascade order
-     plus explicit :hover/:active ownership. */
+  /* Beat admin.css [data-theme=light] button:not(.secondary):not(.ghost)
+     (0-3-1 blue-gradient skin) — same selector strength plus !important,
+     but resolved to the deck's dark OLED palette so controls stay dark in
+     both site themes. Explicit :hover/:active ownership included. */
   [data-theme="light"] .bs-tab,
   [data-theme="light"] .bs-tab:visited {
-    color: #64748b !important;
+    color: #94a3b8 !important;
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
   }
-  [data-theme="light"] .bs-tab:hover { color: #0f172a !important; background: rgba(15, 23, 42, 0.05) !important; }
+  [data-theme="light"] .bs-tab:hover { color: #e5edf8 !important; background: rgba(148, 163, 184, 0.08) !important; }
   [data-theme="light"] .bs-tab.is-active,
   [data-theme="light"] .bs-tab.is-active:visited {
-    color: #0f172a !important;
-    background: #ffffff !important;
-    border-color: rgba(15, 23, 42, 0.16) !important;
-    box-shadow: inset 0 -2px 0 rgb(var(--pm-accent-rgb)) !important;
+    color: #f2faff !important;
+    background: #0d1424 !important;
+    border-color: rgba(148, 163, 184, 0.14) !important;
+    box-shadow: inset 0 -2px 0 var(--theme-accent) !important;
   }
   [data-theme="light"] .bs-ctl,
   [data-theme="light"] .bs-ctl:visited {
-    color: #475569 !important;
-    background: transparent !important;
-    border-color: rgba(15, 23, 42, 0.18) !important;
+    color: #e5edf8 !important;
+    background: rgba(148, 163, 184, 0.06) !important;
+    border-color: rgba(148, 163, 184, 0.14) !important;
     box-shadow: none !important;
   }
   [data-theme="light"] select.bs-ctl {
-    background: #ffffff !important;
-    color: #0f172a !important;
+    background: #0d1424 !important;
+    color: #e5edf8 !important;
   }
   [data-theme="light"] .bs-ctl:hover,
   [data-theme="light"] .bs-ctl.is-active {
-    color: #0f172a !important;
-    background: rgba(15, 23, 42, 0.06) !important;
+    color: #f2faff !important;
+    background: rgba(148, 163, 184, 0.12) !important;
   }
   [data-theme="light"] .bs-ctl-link,
   [data-theme="light"] .bs-ctl-link:visited {
-    color: #334155 !important;
+    color: #94a3b8 !important;
   }
-  [data-theme="light"] .bs-feed-row.is-hot { background: color-mix(in srgb, var(--danger) 6%, white); }
   .bs-header-right { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
   .bs-clock { text-align: right; }
   .bs-clock strong { display: block; font-family: "Fira Code", ui-monospace, monospace; font-size: 26px; font-weight: 700; line-height: 1; color: var(--bs-headline); font-variant-numeric: tabular-nums; }
@@ -443,7 +426,7 @@
   .bs-footer {
     flex: 0 0 auto;
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 10px; letter-spacing: 0.1em; color: rgba(148, 180, 210, 0.45);
+    font-size: 10px; letter-spacing: 0.1em; color: var(--bs-muted);
     font-family: "Fira Code", ui-monospace, monospace;
     border-top: 1px solid var(--bs-hairline);
     padding-top: 8px;
@@ -603,7 +586,7 @@
             {% for path, count in top_paths[:5] %}
               <div class="bs-chain-row">
                 <span class="bs-chain-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ path }}">{{ path }}</span>
-                <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ ((count / path_max) * 100)|round(0, 'floor') if count > 0 else 2 }}%"></div></div>
+                <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ [((count / path_max) * 100)|round(0, 'floor'), 2]|max if count > 0 else 0 }}%"></div></div>
                 <span class="bs-chain-val">{{ count }}</span>
               </div>
             {% else %}
@@ -655,7 +638,7 @@
             {% for item in chain_items %}
               <div class="bs-chain-row">
                 <span class="bs-chain-name">{{ item.label }}</span>
-                <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ ((item.value / chain_max) * 100)|round(0, 'floor') if item.value > 0 else 2 }}%"></div></div>
+                <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ [((item.value / chain_max) * 100)|round(0, 'floor'), 2]|max if item.value > 0 else 0 }}%"></div></div>
                 <span class="bs-chain-val">{{ item.value }}</span>
               </div>
             {% endfor %}
@@ -740,7 +723,11 @@
   function restartRefresh() {
     if (smartRefreshTimer) clearInterval(smartRefreshTimer);
     if (smartRefreshEnabled) {
-      smartRefreshTimer = setInterval(() => window.location.reload(), 15000);
+      // 数据全部来自服务端渲染（SMART_DATA 为模板内联 JSON，无独立 JSON 数据端点可增量拉取），
+      // 因此保留整页刷新；但仅在页面可见时执行，避免投屏切走后回切时闪烁。
+      smartRefreshTimer = setInterval(function () {
+        if (!document.hidden) window.location.reload();
+      }, 15000);
     }
   }
 
@@ -880,7 +867,7 @@
     const rows = SMART_DATA.trends || [];
     if (!svg) return;
     if (!rows.length) {
-      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="rgba(148,180,210,.5)" font-size="13" font-family="monospace">暂无趋势数据</text>';
+      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="rgba(148,163,184,.85)" font-size="13" font-family="monospace">暂无趋势数据</text>';
       return;
     }
     const width = 380;
@@ -909,7 +896,7 @@
       ${Array.from({ length: 4 }).map((_, index) => `<line x1="${padding.left}" y1="${padding.top + index * 42}" x2="${width - padding.right}" y2="${padding.top + index * 42}" stroke="rgba(255,255,255,.1)" stroke-dasharray="3 6"></line>`).join('')}
       <path d="${area}" fill="url(#bsTrendArea)"></path>
       <path d="${line}" fill="none" stroke="#3b82f6" stroke-width="2.4"></path>
-      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.2" fill="#3b82f6"></circle><text x="${point.x}" y="${height - 8}" text-anchor="middle" fill="rgba(148,180,210,.55)" font-size="10" font-family="monospace">${point.label}</text>`).join('')}
+      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.2" fill="#3b82f6"></circle><text x="${point.x}" y="${height - 8}" text-anchor="middle" fill="rgba(148,163,184,.85)" font-size="10" font-family="monospace">${point.label}</text>`).join('')}
     `;
   }
 
@@ -997,7 +984,7 @@
         .then((countries) => {
           bsGlobe
             .polygonsData(countries.features)
-            .polygonCapColor(() => document.documentElement.dataset.theme === 'light' ? 'rgba(15, 23, 42, 0.05)' : 'rgba(255, 255, 255, 0.03)')
+            .polygonCapColor(() => 'rgba(255, 255, 255, 0.03)')
             .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
             .polygonStrokeColor(() => 'rgba(210, 228, 245, 0.45)')
             .polygonAltitude(0.004);

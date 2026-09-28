@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, badge %}
+{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state %}
 {% block content %}
 {{ page_header('PB', '反制剧本', '一键应用成套的反制姿态：联动 Portal 收编、协议蜜罐启停与收编 Agent 任务下发。每步结果落执行历史审计。', ['Playbooks', '一键联动']) }}
 
@@ -54,6 +54,8 @@
           </form>
         </td>
       </tr>
+    {% else %}
+    {{ empty_state('暂无反制剧本', '当前条件下没有可显示的记录。', 4) }}
     {% endfor %}
     </tbody>
   </table>

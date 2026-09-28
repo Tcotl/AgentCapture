@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, pagination %}
 {% block content %}
 {{ page_header('EH', '执行历史', '记录后台管理动作、节点调度、模板变更、API 测试与用户操作，作为平台审计入口。', ['管理审计']) }}
 
@@ -23,7 +23,7 @@
       <tbody>
         {% for item in items %}
         <tr>
-          <td class="muted"><code>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+          <td class="muted"><code>{{ item.created_at | dt('%Y-%m-%d %H:%M:%S') }}</code></td>
           <td><strong>{{ item.actor_username }}</strong></td>
           <td>{{ badge(item.module, 'info') }}</td>
           <td>{{ item.action }}</td>
@@ -37,5 +37,6 @@
       </tbody>
     </table>
   </div>
+  {{ pagination(pager.page, pager.per_page, pager.total, pager.base_url) }}
 </section>
 {% endblock %}

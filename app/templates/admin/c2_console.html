@@ -1,5 +1,4 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header %}
 {% block content %}
 <script>document.documentElement.classList.add('c2-appmode');</script>
 
@@ -65,14 +64,11 @@ html.c2-appmode .workspace { min-height:100%; }
   box-shadow:0 0 28px rgba(var(--pm-accent-rgb), 0.30);
 }
 .mc-toolbar-divider { width:1px; height:24px; background:var(--tech-line); margin:0 4px; }
-.mcs button.mc-tab-btn {
-  height:30px; padding:0 13px; border-radius:999px; cursor:pointer;
-  border:1px solid var(--border); background:var(--border-weak, rgba(148,163,184,0.08));
-  font-family:"Fira Code", ui-monospace, monospace; font-size:11.5px; font-weight:800;
-  color:var(--muted-foreground); transition:all 150ms ease;
-}
-.mcs button.mc-tab-btn:hover { border-color:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 40%, transparent); color:var(--foreground); background:color-mix(in srgb, rgb(var(--pm-accent-rgb)) 9%, transparent); }
-.mcs button.mc-tab-btn.active { border-color:transparent; color:#f8fbff; background:linear-gradient(135deg, rgba(var(--pm-accent-rgb), 0.95), rgba(var(--pm-accent-rgb), 0.65)); box-shadow:0 0 28px rgba(var(--pm-accent-rgb), 0.30); }
+/* Tab strip uses the shared admin.css chip style (one primary accent only);
+   .mc-tab scopes the toolbar buttons, switchTab toggles the `primary` class. */
+.mc-toolbar .chip.mc-tab { cursor:pointer; font-size:11.5px; }
+/* JS-rendered empty states (renderHosts / renderTasks / listeners grid). */
+td.empty-cell, .empty-cell { padding:24px 14px !important; text-align:center; }
 .mc-toolbar-right { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:12px; color:var(--muted-foreground); font-variant-numeric:tabular-nums; }
 .mc-toolbar-right b.ok { color:var(--success); } .mc-toolbar-right b { color:var(--foreground); }
 
@@ -150,16 +146,13 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
    [data-theme=light] dark-gradient button skin (0-3-1); these rules are
    0-4-1 and come later, so every console control reverts to its own
    light surface. ==== */
-[data-theme="light"] .mcs .mc-toolbar button.mc-tab-btn,
 [data-theme="light"] .mcs .mc-quick button.mc-qbtn,
-[data-theme="light"] .mcs button.btn-ghost,
-[data-theme="light"] .mcs button.mc-tab-btn {
+[data-theme="light"] .mcs button.btn-ghost {
   background: #f1f5f9;
   color: #334155;
   border-color: rgba(15, 23, 42, 0.14);
   box-shadow: none;
 }
-[data-theme="light"] .mcs button.mc-tab-btn:hover,
 [data-theme="light"] .mcs .mc-quick button.mc-qbtn:hover,
 [data-theme="light"] .mcs button.btn-ghost:hover {
   background: #e2e8f0;
@@ -206,19 +199,26 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
 </style>
 
 <div id="host-menu" style="display:none;position:fixed;z-index:60;min-width:180px;padding:6px;border-radius:10px;"></div>
+<div class="page-header">
+  <div class="page-header-copy">
+    <div class="page-eyebrow">AGENTCAPTURE</div>
+    <h1 class="page-title">命令式 C2 管理</h1>
+    <p class="page-description">Beacon 会话、任务队列、监听器与 Artifact 的实时控制台。</p>
+  </div>
+</div>
 <div class="mcs">
   <div class="mc-shell">
     <!-- toolbar row -->
     <div class="mc-toolbar">
       <span class="mc-chip">AgentCapture</span>
       <span class="mc-toolbar-divider"></span>
-      <button type="button" class="mc-tab-btn active" data-tab="table" onclick="switchTab('table')">Beacon 列表</button>
-      <button type="button" class="mc-tab-btn" data-tab="tasks" onclick="switchTab('tasks')">任务队列</button>
-      <button type="button" class="mc-tab-btn" data-tab="beacons" onclick="switchTab('beacons')">Beacon 生成</button>
-      <button type="button" class="mc-tab-btn" data-tab="listeners" onclick="switchTab('listeners')">Listener</button>
-      <button type="button" class="mc-tab-btn" data-tab="msf" onclick="switchTab('msf')">MSF</button>
-      <button type="button" class="mc-tab-btn" data-modal-open="bundler-modal">木马捆绑</button>
-      <button type="button" class="mc-tab-btn" onclick="loadOverview()">↻ 刷新</button>
+      <button type="button" class="chip mc-tab primary" data-mctab="table" onclick="switchTab('table')">Beacon 列表</button>
+      <button type="button" class="chip mc-tab" data-mctab="tasks" onclick="switchTab('tasks')">任务队列</button>
+      <button type="button" class="chip mc-tab" data-mctab="beacons" onclick="switchTab('beacons')">Beacon 生成</button>
+      <button type="button" class="chip mc-tab" data-mctab="listeners" onclick="switchTab('listeners')">监听器</button>
+      <button type="button" class="chip mc-tab" data-mctab="msf" onclick="switchTab('msf')">MSF</button>
+      <button type="button" class="chip mc-tab" data-modal-open="bundler-modal">木马捆绑</button>
+      <button type="button" class="chip mc-tab" onclick="loadOverview()">↻ 刷新</button>
       <div class="mc-toolbar-right">
         <span>在线 <b class="ok" id="t-online">0</b>/<b id="t-hosts">0</b></span>
         <span>任务 <b id="t-tasks">0</b></span>
@@ -231,18 +231,17 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <div class="tab-content" id="tab-table" style="display:block">
       <div class="mc-grid-wrap">
         <table class="mc-table">
-          <thead><tr><th style="width:32px"></th><th>外部 IP</th><th>内部 IP</th><th>用户</th><th>主机名</th><th>系统</th><th>架构</th><th>Listener</th><th>最后心跳</th><th>备注</th><th style="width:40px"></th></tr></thead>
+          <thead><tr><th style="width:32px"></th><th>外部 IP</th><th>内部 IP</th><th>用户</th><th>主机名</th><th>系统</th><th>架构</th><th>监听器</th><th>最后心跳</th><th>备注</th><th style="width:40px"></th></tr></thead>
           <tbody id="hosts-tbody"></tbody>
         </table>
       </div>
-      <div class="empty-hint" id="hosts-empty" style="display:none">暂无受管主机 — 在「Listener」创建监听器，于「Beacon 生成」产出脚本并在目标环境执行后，主机将在此上线。</div>
     </div>
 
     <!-- ======== TAB: tasks ======== -->
     <div class="tab-content" id="tab-tasks" style="display:none">
       <div class="mc-grid-wrap">
         <table class="mc-table">
-          <thead><tr><th>ID</th><th>代码</th><th>类型</th><th class="cp">命令</th><th>状态</th><th>风险</th><th>审批</th><th>结果摘要</th><th>动作</th></tr></thead>
+          <thead><tr><th>编号</th><th>代码</th><th>类型</th><th class="cp">命令</th><th>状态</th><th>风险</th><th>审批</th><th>结果摘要</th><th>动作</th></tr></thead>
           <tbody id="tasks-tbody"></tbody>
         </table>
       </div>
@@ -253,8 +252,8 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
       <div class="tabpad g2" style="align-items:start">
         <div>
           <div style="display:flex;gap:8px;margin-bottom:12px">
-            <button type="button" class="mc-tab-btn active" id="gen-mode-beacon" onclick="switchGenMode('beacon')">Agent-Contract Beacon</button>
-            <button type="button" class="mc-tab-btn" id="gen-mode-artifact" onclick="switchGenMode('artifact')">Artifact 矩阵</button>
+            <button type="button" class="chip primary" id="gen-mode-beacon" onclick="switchGenMode('beacon')">Agent-Contract Beacon</button>
+            <button type="button" class="chip" id="gen-mode-artifact" onclick="switchGenMode('artifact')">Artifact 矩阵</button>
           </div>
           <div id="gen-beacon">
           <h3 class="sec">受管 Beacon 生成器</h3>
@@ -357,7 +356,7 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
         </div>
         <h3 class="sec" style="margin-top:16px">会话</h3>
         <div class="mc-grid-wrap" style="max-height:240px">
-          <table class="mc-table"><thead><tr><th>ID</th><th>类型</th><th>信息</th><th>来源</th><th>动作</th></tr></thead><tbody id="msf-sessions-tbody"></tbody></table>
+          <table class="mc-table"><thead><tr><th>编号</th><th>类型</th><th>信息</th><th>来源</th><th>动作</th></tr></thead><tbody id="msf-sessions-tbody"></tbody></table>
         </div>
       </div>
     </div><!-- /tab-msf -->
@@ -484,13 +483,28 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
 </div>
 
 <script>
+/* Unified fetch wrapper for this console: surface network / HTTP failures via
+   the shared base.html toast, then rethrow so callers keep their .then chains. */
+async function mcFetch(url, opts) {
+  let res;
+  try { res = await fetch(url, opts); } catch (e) { showToast('网络错误：' + url, 'error'); throw e; }
+  if (!res.ok) {
+    let msg = res.status;
+    try { const j = await res.json(); if (j && j.detail) msg = j.detail; } catch (e) {}
+    showToast('操作失败（' + msg + '）', 'error');
+    throw new Error(String(msg));
+  }
+  return res;
+}
+</script>
+<script>
 /* Populate the bundler's listener binding select from the implant listener
    registry (includes registration tokens — operator-facing console only). */
 (function () {
   var sel = document.getElementById('bundler-listener');
   if (!sel) return;
-  fetch('/api/admin/c2/listeners', { credentials: 'same-origin' })
-    .then(function (r) { return r.ok ? r.json() : []; })
+  mcFetch('/api/admin/c2/listeners', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
     .then(function (listeners) {
       (listeners || []).forEach(function (l) {
         var opt = document.createElement('option');
@@ -500,7 +514,7 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
         sel.appendChild(opt);
       });
     })
-    .catch(function () { /* leave anonymous-only */ });
+    .catch(function () { /* mcFetch 已 toast；失败时退化为仅匿名模式 */ });
 })();
 </script>
 <script>
@@ -561,7 +575,7 @@ function log(text, kind) {
 
 function switchTab(name) {
   state.tab = name;
-  $$('.mc-tab-btn[data-tab]').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === name); });
+  $$('.mc-tab[data-mctab]').forEach(function(b){ b.classList.toggle('primary', b.dataset.mctab === name); });
   $$('.tab-content').forEach(function(c){ c.style.display = (c.id === 'tab-' + name) ? 'block' : 'none'; });
   renderDock();
   if (name === 'listeners') loadListeners();
@@ -572,7 +586,7 @@ function switchTab(name) {
 /* ---------------- overview polling ---------------- */
 
 function loadOverview() {
-  fetch('/api/admin/managed/overview').then(function(r){ return r.json(); }).then(function(data){
+  mcFetch('/api/admin/managed/overview').then(function(r){ return r.json(); }).then(function(data){
     state.overview = data;
     $('#t-online').textContent = data.stats.onlineHosts;
     $('#t-hosts').textContent = data.stats.hosts;
@@ -621,8 +635,11 @@ function renderHosts(hosts) {
       + '<td><button class="mc-x" title="删除主机" onclick="deleteHost(' + h.id + ',event)">✕</button></td>'
       + '</tr>';
   });
-  $('#hosts-tbody').innerHTML = rows;
-  $('#hosts-empty').style.display = hosts.length ? 'none' : 'block';
+  if (!hosts.length) {
+    $('#hosts-tbody').innerHTML = '<tr><td colspan="11" class="empty-cell"><span class="muted">暂无 Beacon 上线</span></td></tr>';
+  } else {
+    $('#hosts-tbody').innerHTML = rows;
+  }
   if (state.selectedHostId && !hosts.some(function(h){ return h.id === state.selectedHostId; })) {
     state.selectedHostId = null; state.interactMode = false;
   }
@@ -756,7 +773,7 @@ function renderTasks(tasks) {
       + '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(t.resultSummary || '') + '">' + esc((t.resultSummary || '-').substr(0,80)) + '</td>'
       + '<td style="white-space:nowrap">' + actions + '</td></tr>';
   });
-  $('#tasks-tbody').innerHTML = rows || '<tr><td colspan="9" class="empty-hint">暂无任务</td></tr>';
+  $('#tasks-tbody').innerHTML = rows || '<tr><td colspan="9" class="empty-cell"><span class="muted">任务队列为空</span></td></tr>';
 }
 
 /* ---------------- dispatch ---------------- */
@@ -764,11 +781,12 @@ function renderTasks(tasks) {
 function dispatchTask(taskType, payload) {
   if (!state.selectedHostId) { log('[err] 未选择主机 — 双击 Beacon 进入交互后下发。', 'error'); return; }
   var body = Object.assign({ hostId: state.selectedHostId, taskType: taskType }, payload || {});
-  fetch('/api/admin/managed/tasks', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+  mcFetch('/api/admin/managed/tasks', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (d.detail) { log('[err] ' + d.detail, 'error'); return; }
       log('[ok] Task #' + d.taskId + (d.requiresApproval ? ' 已创建，等待审批' : ' queued'), 'ok');
+      showToast(d.requiresApproval ? '任务已创建，等待审批' : '任务已下发', 'success');
       loadOverview();
     })
     .catch(function(e){ log('[err] ' + e.message, 'error'); });
@@ -833,50 +851,56 @@ function cmdKeydown(ev) {
 /* host metadata helpers (source: 设置心跳 / 设置备注 context-menu actions) */
 function setHostNote(note) {
   if (!state.selectedHostId) return;
-  fetch('/api/admin/managed/hosts/' + state.selectedHostId + '/note', {
+  mcFetch('/api/admin/managed/hosts/' + state.selectedHostId + '/note', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ note: note }),
-  }).then(function(){ log('[ok] 备注已更新', 'info'); loadOverview(); });
+  }).then(function(){ log('[ok] 备注已更新', 'info'); loadOverview(); })
+    .catch(function(){ /* mcFetch 已提示 */ });
 }
 function setIntervalValue(seconds) {
   if (!seconds || seconds < 1) { log('[err] 心跳间隔需为正整数秒', 'error'); return; }
-  fetch('/api/admin/managed/hosts/' + state.selectedHostId + '/note', {
+  mcFetch('/api/admin/managed/hosts/' + state.selectedHostId + '/note', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ beaconIntervalSeconds: seconds }),
-  }).then(function(){ log('[ok] Beacon 心跳间隔 → ' + seconds + 's（下次 checkin 生效）', 'info'); loadOverview(); });
+  }).then(function(){ log('[ok] Beacon 心跳间隔 → ' + seconds + 's（下次 checkin 生效）', 'info'); loadOverview(); })
+    .catch(function(){ /* mcFetch 已提示 */ });
 }
 
 function reviewTask(taskId, action) {
   var reason = action === 'approve' ? '' : (prompt('原因（可选）：') || '');
-  fetch('/api/admin/managed/tasks/' + taskId + '/review', {
+  mcFetch('/api/admin/managed/tasks/' + taskId + '/review', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: action, reason: reason }),
   }).then(function(r){ return r.json(); }).then(function(d){
-    if (d.detail) { log('[err] ' + d.detail, 'error'); }
-    else { log('[ok] Task #' + taskId + ' ' + action, 'ok'); }
+    if (d.detail) { showToast(d.detail, 'error'); }
+    else {
+      log('[ok] Task #' + taskId + ' ' + action, 'ok');
+      showToast('任务 #' + taskId + ' 已' + ({approve:'批准',reject:'拒绝',cancel:'取消'}[action] || action), 'success');
+    }
     loadOverview();
-  });
+  }).catch(function(){ /* mcFetch 已提示 */ });
 }
 
 function deleteHost(id, ev) {
   ev.stopPropagation();
   if (!confirm('确认删除该主机及其任务/证据/会话记录？')) return;
-  fetch('/api/admin/managed/hosts/' + id + '?force=true', { method:'DELETE' })
+  mcFetch('/api/admin/managed/hosts/' + id + '?force=true', { method:'DELETE' })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (d.detail) { alert(d.detail); return; }
+      if (d.detail) { showToast(d.detail, 'error'); return; }
       log('[ok] 主机 #' + id + ' 已删除（级联）', 'info');
+      showToast('主机 #' + id + ' 已删除', 'success');
       loadOverview();
-    });
+    }).catch(function(){ /* mcFetch 已提示 */ });
 }
 
 /* ---------------- listeners tab ---------------- */
 
 function loadListeners() {
-  fetch('/api/admin/managed/listeners').then(function(r){ return r.json(); }).then(function(data){
+  mcFetch('/api/admin/managed/listeners').then(function(r){ return r.json(); }).then(function(data){
     var sel = $('#listener-transport');
     if (!sel.options.length) (data.transports || []).forEach(function(t){
       var o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o);
     });
     renderListenerCards(data.listeners || []);
-  });
+  }).catch(function(){ /* mcFetch 已提示 */ });
 }
 
 function renderListenerCards(listeners) {
@@ -892,53 +916,57 @@ function renderListenerCards(listeners) {
       + '<button class="btn-ghost danger" onclick="deleteManagedListener(' + l.id + ')">删除</button>'
       + '</div></div>';
   });
-  $('#listener-grid').innerHTML = html || '<p class="muted-sm">暂无监听器</p>';
+  $('#listener-grid').innerHTML = html || '<div class="empty-cell"><span class="muted">暂无监听器</span></div>';
 }
 
 function createListener(ev) {
   ev.preventDefault();
   var f = ev.target;
-  fetch('/api/admin/managed/listeners', {
+  mcFetch('/api/admin/managed/listeners', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ name:f.name.value.trim(), transport:f.transport.value, bindAddress:f.bindAddress.value, bindPort:parseInt(f.bindPort.value,10), tlsEnabled:f.transport.value.indexOf('https')===0, status:'active' }),
   }).then(function(r){ return r.json(); }).then(function(d){
-    if (d.detail) { alert(d.detail); return; }
+    if (d.detail) { showToast(d.detail, 'error'); return; }
     $('#listener-new-token').style.display = 'block';
     $('#listener-token-value').textContent = d.listener.registrationToken;
     f.reset();
     loadListeners(); loadOverview();
-  });
+    showToast('监听器创建成功', 'success');
+  }).catch(function(){ /* mcFetch 已提示 */ });
   return false;
 }
 function toggleManagedListener(id, status) {
-  fetch('/api/admin/managed/listeners/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:status }) })
-    .then(function(){ loadListeners(); loadOverview(); });
+  mcFetch('/api/admin/managed/listeners/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:status }) })
+    .then(function(){ showToast(status === 'active' ? '监听器已启动' : '监听器已停止', 'success'); loadListeners(); loadOverview(); })
+    .catch(function(){ /* mcFetch 已提示 */ });
 }
 function rotateManagedListener(id) {
   if (!confirm('轮换后已部署 Beacon 将无法通过校验，需重新生成分发。继续？')) return;
-  fetch('/api/admin/managed/listeners/' + id + '/rotate-token', { method:'POST' })
+  mcFetch('/api/admin/managed/listeners/' + id + '/rotate-token', { method:'POST' })
     .then(function(r){ return r.json(); }).then(function(d){
-      if (d.detail) { alert(d.detail); return; }
+      if (d.detail) { showToast(d.detail, 'error'); return; }
       $('#listener-new-token').style.display = 'block';
       $('#listener-token-value').textContent = d.listener.registrationToken;
       loadListeners();
-    });
+      showToast('注册令牌已轮换', 'success');
+    }).catch(function(){ /* mcFetch 已提示 */ });
 }
 function deleteManagedListener(id) {
   var reason = prompt('删除监听器需审计原因：');
   if (!reason || !reason.trim()) return;
-  fetch('/api/admin/managed/listeners/' + id, { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ auditReason:reason }) })
+  mcFetch('/api/admin/managed/listeners/' + id, { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ auditReason:reason }) })
     .then(function(r){ return r.json(); }).then(function(d){
-      if (d.detail) { alert(d.detail); return; }
+      if (d.detail) { showToast(d.detail, 'error'); return; }
       log('[ok] 监听器已删除（解绑主机 ' + d.detachedHosts + ' / 关闭会话 ' + d.closedSessions + ' / 取消任务 ' + d.cancelledTasks + '）', 'info');
+      showToast('监听器已删除', 'success');
       loadListeners(); loadOverview();
-    });
+    }).catch(function(){ /* mcFetch 已提示 */ });
 }
 
 /* ---------------- beacons tab ---------------- */
 
 function populateListenerSelect() {
-  fetch('/api/admin/managed/listeners').then(function(r){ return r.json(); }).then(function(data){
+  mcFetch('/api/admin/managed/listeners').then(function(r){ return r.json(); }).then(function(data){
     var sel = $('#beacon-listener');
     sel.innerHTML = '';
     (data.listeners || []).filter(function(l){ return l.status === 'active'; }).forEach(function(l){
@@ -947,7 +975,7 @@ function populateListenerSelect() {
       sel.appendChild(o);
     });
     onBeaconListenerChange();
-  });
+  }).catch(function(){ /* mcFetch 已提示 */ });
 }
 function onBeaconListenerChange() {
   var listeners = ((state.overview || {}).listeners) || [];
@@ -962,16 +990,17 @@ function onBeaconListenerChange() {
 function generateBeacon(ev) {
   ev.preventDefault();
   var f = ev.target;
-  fetch('/api/admin/managed/beacons/generate', {
+  mcFetch('/api/admin/managed/beacons/generate', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ listenerId:parseInt(f.listenerId.value||'0',10), runtimeType:f.runtimeType.value, targetHost:f.targetHost.value, targetPort:parseInt(f.targetPort.value,10), sleepSeconds:parseInt(f.sleepSeconds.value,10) }),
   }).then(function(r){ return r.json(); }).then(function(d){
-    if (d.detail) { $('#beacon-result').textContent = '生成失败：' + d.detail; return; }
+    if (d.detail) { $('#beacon-result').textContent = '生成失败：' + d.detail; showToast(d.detail, 'error'); return; }
     state.lastBeacon = d;
     $('#beacon-result').textContent = d.code;
     $('#beacon-meta').textContent = d.filename + ' · sha256:' + (d.metadata||{}).artifactHash;
     log('[ok] Beacon 已生成：' + d.filename, 'info');
-  });
+    showToast('Beacon 已生成：' + d.filename, 'success');
+  }).catch(function(){ /* mcFetch 已提示 */ });
   return false;
 }
 function downloadBeacon() {
@@ -990,7 +1019,7 @@ function copyBeacon() {
 /* ---------------- msf tab ---------------- */
 
 function loadMsfStatus() {
-  fetch('/api/admin/msf/status').then(function(r){ return r.json(); }).then(function(data){
+  mcFetch('/api/admin/msf/status').then(function(r){ return r.json(); }).then(function(data){
     var bar = $('#msf-status-bar');
     if (!data.available) bar.innerHTML = '<span style="color:var(--warning)">⚠ 降级模式</span> — ' + esc(data.reason || '');
     else if (data.connected) { bar.innerHTML = '<span style="color:var(--success)">● 已连接 msfrpcd ' + esc(data.version) + '</span>'; loadMsfSessions(); }
@@ -1000,33 +1029,39 @@ function loadMsfStatus() {
       var o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o);
     });
     loadMsfConfig();
-  });
+  }).catch(function(){ /* mcFetch 已提示 */ });
 }
 function loadMsfConfig() {
-  fetch('/api/admin/msf/config').then(function(r){ return r.json(); }).then(function(cfg){
+  mcFetch('/api/admin/msf/config').then(function(r){ return r.json(); }).then(function(cfg){
     var f = $('#msf-config-form');
     f.host.value = cfg.host; f.port.value = cfg.port; f.username.value = cfg.username; f.ssl.checked = cfg.ssl;
-  });
+  }).catch(function(){ /* mcFetch 已提示 */ });
 }
 function saveMsfConfig(ev) {
   ev.preventDefault();
   var f = ev.target;
-  fetch('/api/admin/msf/config', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ host:f.host.value, port:parseInt(f.port.value,10), username:f.username.value, password:f.password.value, ssl:f.ssl.checked }) })
+  mcFetch('/api/admin/msf/config', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ host:f.host.value, port:parseInt(f.port.value,10), username:f.username.value, password:f.password.value, ssl:f.ssl.checked }) })
     .then(function(r){ return r.json(); }).then(function(d){
-      if (d.detail) { alert(d.detail); return; }
-      log('[ok] MSF 配置已保存', 'info'); loadMsfStatus();
-    });
+      if (d.detail) { showToast(d.detail, 'error'); return; }
+      log('[ok] MSF 配置已保存', 'info');
+      showToast('MSF 配置已保存', 'success');
+      loadMsfStatus();
+    }).catch(function(){ /* mcFetch 已提示 */ });
   return false;
 }
 function msfDaemon(action) {
-  fetch('/api/admin/msf/daemon/' + action, { method:'POST' })
+  mcFetch('/api/admin/msf/daemon/' + action, { method:'POST' })
     .then(function(r){ return r.json(); }).then(function(d){
-      if (d.detail) { log('[err] ' + d.detail, 'error'); } else { log('[ok] msfrpcd ' + action, 'ok'); }
+      if (d.detail) { log('[err] ' + d.detail, 'error'); }
+      else {
+        log('[ok] msfrpcd ' + action, 'ok');
+        showToast(action === 'start' ? 'msfrpcd 已启动' : 'msfrpcd 已停止', 'success');
+      }
       loadMsfStatus();
-    });
+    }).catch(function(){ /* mcFetch 已提示 */ });
 }
 function loadMsfSessions() {
-  fetch('/api/admin/msf/sessions').then(function(r){ return r.json(); }).then(function(data){
+  mcFetch('/api/admin/msf/sessions').then(function(r){ return r.json(); }).then(function(data){
     if (data.detail) { $('#msf-sessions-tbody').innerHTML=''; return; }
     var rows = '';
     (data.sessions || []).forEach(function(s){
@@ -1037,22 +1072,27 @@ function loadMsfSessions() {
     $('#msf-sessions-tbody').innerHTML = rows || '<tr><td colspan="5" class="empty-hint">暂无 MSF 会话</td></tr>';
   }).catch(function(){ $('#msf-sessions-tbody').innerHTML=''; });
 }
-function closeMsfSession(id) { fetch('/api/admin/msf/sessions/' + id, { method:'DELETE' }).then(loadMsfSessions); }
+function closeMsfSession(id) {
+  mcFetch('/api/admin/msf/sessions/' + id, { method:'DELETE' })
+    .then(function(){ showToast('MSF 会话已关闭', 'success'); loadMsfSessions(); })
+    .catch(function(){ /* mcFetch 已提示 */ });
+}
 function generateMsfPayload(ev) {
   ev.preventDefault();
   var f = ev.target;
-  fetch('/api/admin/msf/payloads/generate', {
+  mcFetch('/api/admin/msf/payloads/generate', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ payload:f.payload.value, lhost:f.lhost.value, lport:parseInt(f.lport.value,10), format:f.format.value }),
   }).then(function(r){ return r.json(); }).then(function(d){
-    if (d.detail) { alert(d.detail); return; }
+    if (d.detail) { showToast(d.detail, 'error'); return; }
     var blob = new Blob([atob(d.contentBase64)], { type:'application/octet-stream' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = d.filename;
     a.click();
     log('[ok] MSF payload 已生成：' + d.filename + '（' + d.size + ' B）', 'ok');
-  });
+    showToast('Payload 已生成并开始下载', 'success');
+  }).catch(function(){ /* mcFetch 已提示 */ });
   return false;
 }
 
@@ -1074,8 +1114,8 @@ function switchGenMode(mode) {
   GEN_MODE = mode;
   document.getElementById('gen-beacon').style.display = mode === 'beacon' ? 'block' : 'none';
   document.getElementById('gen-artifact').style.display = mode === 'artifact' ? 'block' : 'none';
-  document.getElementById('gen-mode-beacon').classList.toggle('active', mode === 'beacon');
-  document.getElementById('gen-mode-artifact').classList.toggle('active', mode === 'artifact');
+  document.getElementById('gen-mode-beacon').classList.toggle('primary', mode === 'beacon');
+  document.getElementById('gen-mode-artifact').classList.toggle('primary', mode === 'artifact');
 }
 
 function initArtifactUI() {
@@ -1108,7 +1148,7 @@ function initArtifactUI() {
 
 function generateArtifact() {
   var fmt = document.querySelector('input[name=artfmt]:checked').value;
-  fetch('/api/admin/managed/artifacts/generate', {
+  mcFetch('/api/admin/managed/artifacts/generate', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       format: fmt,
@@ -1126,6 +1166,7 @@ function generateArtifact() {
     document.getElementById('beacon-result').textContent = head + bodyText + '\n[compile_log] ' + (d.compileLog || '');
     document.getElementById('beacon-meta').textContent = d.description;
     log('[ok] Artifact 已生成：' + d.filename + (d.is_binary ? '（二进制）' : ''), 'ok');
+    showToast('Artifact 已生成：' + d.filename, 'success');
   }).catch(function(e){ log('[err] ' + e.message, 'error'); });
 }
 
@@ -1183,9 +1224,12 @@ document.addEventListener('click', function(ev){
   if (m.style.display === 'block' && !m.contains(ev.target)) hideHostMenu();
 });
 
-/* boot: initial merge of transcript-render markers */
-loadOverview();
-setInterval(loadOverview, 5000);
+/* boot: initial load + visibility-aware polling. acPoll (base.html) is defined
+   in a script after the content block, so start it on DOMContentLoaded — it
+   runs loadOverview immediately, then every 5s while the tab is visible. */
+document.addEventListener('DOMContentLoaded', function(){
+  acPoll(loadOverview, 5000);
+});
 
 /* make transcript renderer treat pre-existing boot line as local */
 (function(){ var first = $('#dock-output').firstChild; if (first) first.setAttribute('data-local','1'); })();

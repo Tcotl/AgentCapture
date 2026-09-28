@@ -215,9 +215,12 @@ def _display_window(first: datetime, last: datetime) -> tuple[str, str, str]:
 
     Same day  -> 'MM-DD HH:MM → HH:MM'
     Other     -> 'MM-DD HH:MM → MM-DD HH:MM'
+
+    Displayed in the server-local timezone so operators read wall-clock
+    times instead of raw UTC (naive values are treated as UTC by convention).
     """
-    first_l = first.astimezone(timezone.utc) if first.tzinfo else first.replace(tzinfo=timezone.utc)
-    last_l = last.astimezone(timezone.utc) if last.tzinfo else last.replace(tzinfo=timezone.utc)
+    first_l = first.astimezone() if first.tzinfo else first.replace(tzinfo=timezone.utc).astimezone()
+    last_l = last.astimezone() if last.tzinfo else last.replace(tzinfo=timezone.utc).astimezone()
     same_day = first_l.date() == last_l.date()
     start = first_l.strftime("%m-%d %H:%M")
     end = last_l.strftime("%H:%M") if same_day else last_l.strftime("%m-%d %H:%M")

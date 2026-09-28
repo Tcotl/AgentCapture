@@ -335,17 +335,17 @@
 
 <div class="web-template-hero">
   <div class="web-template-kpi">
-    <span>Template Pages</span>
+    <span>模板页面</span>
     <strong>{{ items|length }}</strong>
     <p>已上传的 Web 蜜罐页面模板，可直接分配到节点。</p>
   </div>
   <div class="web-template-kpi">
-    <span>Deploy Nodes</span>
+    <span>可部署节点</span>
     <strong>{{ nodes|length }}</strong>
     <p>可承载 Web 应用蜜罐的受控节点。</p>
   </div>
   <div class="web-template-kpi">
-    <span>Management Scope</span>
+    <span>管理范围</span>
     <strong>Web</strong>
     <p>本页仅覆盖页面模板、入口路径和 Web 节点部署。</p>
   </div>
@@ -563,7 +563,7 @@
                 {% else %}
                 <span class="muted">暂无预览</span>
                 {% endif %}
-                <form method="post" action="/admin/templates/{{ item.id }}/delete">
+                <form method="post" action="/admin/templates/{{ item.id }}/delete" data-confirm="确认删除该模板？关联部署不受影响。">
                   <button class="danger btn-sm" type="submit">删除</button>
                 </form>
               </div>
@@ -778,18 +778,18 @@ function openDockerLogs(id) {
     .then(function (r) { return r.text(); })
     .then(function (t) {
       var pre = document.getElementById('docker-logs-pre') || document.createElement('pre');
-      // 展示在诱饵配置弹窗之外：复用 logs 内容弹窗
+      // 展示在诱饵配置弹窗之外：复用 logs 内容弹窗（遮罩点击 / Escape 关闭由 base.html 全局委托处理）
       var bd = document.getElementById('docker-logs-modal-bd');
       if (!bd) {
         bd = document.createElement('div');
         bd.id = 'docker-logs-modal-bd';
         bd.className = 'modal-backdrop';
-        bd.innerHTML = '<div class="modal" style="width:min(860px,92vw)"><div class="modal-header"><h3 class="modal-title">容器日志</h3><button class="modal-close" onclick="document.getElementById(\'docker-logs-modal-bd\').remove()">×</button></div><div class="modal-body"><pre style="max-height:60vh;overflow:auto;font-size:11.5px;color:#bbf7d0;white-space:pre-wrap" id="docker-logs-pre2"></pre></div></div>';
+        bd.setAttribute('data-modal-backdrop', '');
+        bd.innerHTML = '<div class="modal" style="width:min(860px,92vw)"><div class="modal-header"><h3 class="modal-title">容器日志</h3><button class="modal-close" onclick="acModal.close(\'docker-logs-modal-bd\')">×</button></div><div class="modal-body"><pre style="max-height:60vh;overflow:auto;font-size:11.5px;color:#bbf7d0;white-space:pre-wrap" id="docker-logs-pre2"></pre></div></div>';
         document.body.appendChild(bd);
-        bd.addEventListener('click', function (e) { if (e.target === bd) bd.remove(); });
       }
       bd.querySelector('#docker-logs-pre2').textContent = t || '(空)';
-      bd.hidden = false;
+      acModal.open('docker-logs-modal-bd');
     });
 }
 function ddFillPreset() {

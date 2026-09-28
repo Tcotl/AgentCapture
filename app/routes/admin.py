@@ -95,6 +95,10 @@ from app.services.deployed_server import register_deployed, unregister_deployed
 router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 
+from app.services.timefmt import register as register_timefmt  # noqa: E402
+
+register_timefmt(templates.env)
+
 
 def _signal_zh_filter(value):
     """Translate signal key(s) to Chinese label(s)."""
@@ -333,13 +337,13 @@ NAV_GROUPS = [
         "items": [
             ("蜜罐会话回放", "/admin/honeypot-sessions"),
             ("文件蜜饵下载记录", "/admin/payload-tracking"),
-            ("凭证蜜饵登陆记录", "/admin/credentials"),
+            ("凭证蜜饵登录记录", "/admin/credentials"),
             ("提示词注入触发记录", "/admin/agent-interactions"),
-            ("Jsonp反制成功记录", "/admin/recon-data"),
+            ("JSONP 反制成功记录", "/admin/recon-data"),
         ],
     },
     {
-        # 蜜罐管理 = 五个部署管理页；其余诱饵面/蜜饵配置统一归入「资源管理」。
+        # 蜜罐管理 = 五个部署管理页 + 节点；其余诱饵面/蜜饵配置统一归入「资源管理」。
         "title": "蜜罐管理",
         "items": [
             ("蜜罐部署", "/admin/honeypots"),
@@ -347,6 +351,7 @@ NAV_GROUPS = [
             ("MCP Server 蜜罐管理", "/admin/counter-offense/mcp"),
             ("嵌入式蜜罐管理", "/admin/internet-systems"),
             ("端口服务蜜罐管理", "/admin/services"),
+            ("节点管理", "/admin/nodes"),
         ],
     },
     {
@@ -355,7 +360,7 @@ NAV_GROUPS = [
             "蜜饵资产",
             ("蜜饵管理", "/admin/decoy-management"),
             ("提示词注入管理", "/admin/prompt-injection"),
-            ("Jsonp模版管理", "/admin/jsonp-templates"),
+            ("JSONP 模版管理", "/admin/jsonp-templates"),
             ("反制剧本", "/admin/playbooks"),
         ],
     },
@@ -372,9 +377,8 @@ NAV_GROUPS = [
             ("系统设置", "/admin/profile"),
             ("用户管理", "/admin/users"),
             ("第三方数源接入", "/admin/api-tokens"),
-            ("登陆日志", "/admin/login-logs"),
+            ("登录日志", "/admin/login-logs"),
             ("执行历史", "/admin/execution-history"),
-            ("节点管理", "/admin/nodes"),
         ],
     },
 ]
@@ -415,8 +419,8 @@ NAV_DESCRIPTIONS = {
     "/admin/big-screen": "值守展示与趋势大屏",
     "/admin/attacks": "攻击流量聚合与回溯",
     "/admin/attack-sources": "来源 IP 画像与行为聚类",
-    "/admin/credentials": "凭证蜜饵登陆记录",
-    "/admin/recon-data": "Jsonp 反制成功记录",
+    "/admin/credentials": "凭证蜜饵登录记录",
+    "/admin/recon-data": "JSONP 反制成功记录",
     "/admin/payload-tracking": "文件蜜饵下载与回调记录",
     "/admin/agent-interactions": "提示词注入触发记录",
     "/admin/nodes": "探针节点与运行状态",
@@ -425,7 +429,7 @@ NAV_DESCRIPTIONS = {
     "/admin/internet-systems": "嵌入式蜜罐管理：业务系统无损接入与灰度注入",
     "/admin/decoy-management": "蜜饵模板、分发路径与部署",
     "/admin/prompt-injection": "提示词注入模板与内容维护",
-    "/admin/jsonp-templates": "Jsonp 请求方法与回调模板",
+    "/admin/jsonp-templates": "JSONP 请求方法与回调模板",
     "/admin/counter-offense": "六个反制诱饵面总览与横向移动告警",
     "/admin/honeypots": "三类蜜罐部署总览：Web 应用（默认启用）/ 嵌入式 / 端口服务",
     "/admin/counter-offense/mcp": "MCP 工具服务蜜罐配置",
@@ -3141,7 +3145,7 @@ def _dashboard_context(db: Session) -> dict:
         "login_failures": "登录失败",
         "credential_attempts": "凭证蜜饵",
         "execution_count": "执行记录",
-        "recon_events": "Jsonp画像",
+        "recon_events": "JSONP 画像",
         "agent_interactions": "Agent 回显",
         "agent_blocks": "Agent 阻断",
         "payload_downloads": "文件蜜饵下载",
@@ -3310,12 +3314,12 @@ def _dashboard_context(db: Session) -> dict:
             + stats["summary"].get("payload_callbacks", 0)
             + stats["summary"].get("credential_attempts", 0),
             "metric_label": "线索",
-            "description": "把 Jsonp 反制成功记录、提示词注入触发记录、文件蜜饵下载和凭证蜜饵登陆组合成反制证据链。",
+            "description": "把 JSONP 反制成功记录、提示词注入触发记录、文件蜜饵下载和凭证蜜饵登录组合成反制证据链。",
             "links": [
-                {"label": "Jsonp反制成功记录", "href": "/admin/recon-data"},
+                {"label": "JSONP 反制成功记录", "href": "/admin/recon-data"},
                 {"label": "提示词注入触发记录", "href": "/admin/agent-interactions"},
                 {"label": "文件蜜饵下载记录", "href": "/admin/payload-tracking"},
-                {"label": "凭证蜜饵登陆记录", "href": "/admin/credentials"},
+                {"label": "凭证蜜饵登录记录", "href": "/admin/credentials"},
             ],
         },
         {
@@ -3325,7 +3329,7 @@ def _dashboard_context(db: Session) -> dict:
             "href": "/admin/nodes",
             "metric": stats["summary"].get("online_nodes", 0),
             "metric_label": "在线节点",
-            "description": "围绕节点、端口服务、Web 应用、蜜饵、提示词注入与 Jsonp 模版构建持续运营的蜜罐资产面。",
+            "description": "围绕节点、端口服务、Web 应用、蜜饵、提示词注入与 JSONP 模版构建持续运营的蜜罐资产面。",
             "links": [
                 {"label": "节点管理", "href": "/admin/nodes"},
                 {"label": "端口服务蜜罐管理", "href": "/admin/services"},
@@ -3333,7 +3337,7 @@ def _dashboard_context(db: Session) -> dict:
                 {"label": "嵌入式蜜罐管理", "href": "/admin/internet-systems"},
                 {"label": "蜜饵管理", "href": "/admin/decoy-management"},
                 {"label": "提示词注入管理", "href": "/admin/prompt-injection"},
-                {"label": "Jsonp模版管理", "href": "/admin/jsonp-templates"},
+                {"label": "JSONP 模版管理", "href": "/admin/jsonp-templates"},
             ],
         },
         {
@@ -3358,10 +3362,10 @@ def _dashboard_context(db: Session) -> dict:
             "metric": stats["summary"].get("total", 0)
             + stats["summary"].get("users_count", 0),
             "metric_label": "配置项",
-            "description": "收口展示执行历史、登陆日志、用户管理与个人资料设置。",
+            "description": "收口展示执行历史、登录日志、用户管理与个人资料设置。",
             "links": [
                 {"label": "执行历史", "href": "/admin/execution-history"},
-                {"label": "登陆日志", "href": "/admin/login-logs"},
+                {"label": "登录日志", "href": "/admin/login-logs"},
                 {"label": "用户管理", "href": "/admin/users"},
                 {"label": "系统设置", "href": "/admin/profile"},
             ],
@@ -3402,17 +3406,24 @@ def admin_attacks(
     date_to: str = "",
     source_ip: str = "",
     site_id: str = "",
+    page: int = 1,
+    per_page: int = 50,
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
-    items = aggregated_attacks(
+    all_items = aggregated_attacks(
         db,
-        limit=200,
+        limit=4000,
         date_from=date_from or None,
         date_to=date_to or None,
         source_ip=source_ip or None,
         site_id=site_id or None,
     )
+    total = len(all_items)
+    per_page = max(10, min(per_page, 200))
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    items = all_items[(page - 1) * per_page : page * per_page]
     from app.services.ip_geo import ip_info_map
 
     ip_info = ip_info_map([item["source_ip"] for item in items])
@@ -3420,6 +3431,12 @@ def admin_attacks(
 
     active_isolations = int(
         db.scalar(select(func.count()).select_from(IsolationEntry)) or 0
+    )
+    filter_qs = _qs(
+        date_from=date_from or None,
+        date_to=date_to or None,
+        source_ip=source_ip or None,
+        site_id=site_id or None,
     )
     return _render(
         request,
@@ -3436,13 +3453,13 @@ def admin_attacks(
                 "source_ip": source_ip,
                 "site_id": site_id,
             },
-            "export_href": "/admin/attacks/export.csv"
-            + _qs(
-                date_from=date_from or None,
-                date_to=date_to or None,
-                source_ip=source_ip or None,
-                site_id=site_id or None,
-            ),
+            "export_href": "/admin/attacks/export.csv" + filter_qs,
+            "pager": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "base_url": "/admin/attacks" + (filter_qs or ""),
+            },
         },
     )
 
@@ -3584,7 +3601,7 @@ def admin_attacks_clear(
         + _qs(
             saved=(
                 f"已清除 {total} 条历史数据：流量事件 {deleted_events}、"
-                f"凭证蜜饵登陆 {deleted_creds + deleted_logins}、蜜罐会话 {deleted_sessions}"
+                f"凭证蜜饵登录 {deleted_creds + deleted_logins}、蜜罐会话 {deleted_sessions}"
             )
         )
     )
@@ -3674,20 +3691,33 @@ def admin_attack_sources(
     date_to: str = "",
     source_ip: str = "",
     site_id: str = "",
+    page: int = 1,
+    per_page: int = 50,
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
-    items = aggregated_attack_sources(
+    all_items = aggregated_attack_sources(
         db,
-        limit=200,
+        limit=4000,
         date_from=date_from or None,
         date_to=date_to or None,
         source_ip=source_ip or None,
         site_id=site_id or None,
     )
+    total = len(all_items)
+    per_page = max(10, min(per_page, 200))
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    items = all_items[(page - 1) * per_page : page * per_page]
     from app.services.ip_geo import ip_info_map
 
     ip_info = ip_info_map([item["source_ip"] for item in items])
+    filter_qs = _qs(
+        date_from=date_from or None,
+        date_to=date_to or None,
+        source_ip=source_ip or None,
+        site_id=site_id or None,
+    )
     return _render(
         request,
         "admin/attack_sources.html",
@@ -3702,13 +3732,13 @@ def admin_attack_sources(
                 "source_ip": source_ip,
                 "site_id": site_id,
             },
-            "export_href": "/admin/attack-sources/export.csv"
-            + _qs(
-                date_from=date_from or None,
-                date_to=date_to or None,
-                source_ip=source_ip or None,
-                site_id=site_id or None,
-            ),
+            "export_href": "/admin/attack-sources/export.csv" + filter_qs,
+            "pager": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "base_url": "/admin/attack-sources" + (filter_qs or ""),
+            },
         },
     )
 
@@ -3785,12 +3815,26 @@ def admin_credentials(
     date_to: str = "",
     source_ip: str = "",
     node_name: str = "",
+    page: int = 1,
+    per_page: int = 50,
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
     context = credential_asset_context(
         db,
-        limit=200,
+        limit=4000,
+        date_from=date_from or None,
+        date_to=date_to or None,
+        source_ip=source_ip or None,
+        node_name=node_name or None,
+    )
+    all_items = context.get("items") or []
+    total = len(all_items)
+    per_page = max(10, min(per_page, 200))
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    context["items"] = all_items[(page - 1) * per_page : page * per_page]
+    filter_qs = _qs(
         date_from=date_from or None,
         date_to=date_to or None,
         source_ip=source_ip or None,
@@ -3800,7 +3844,7 @@ def admin_credentials(
         request,
         "admin/credentials.html",
         {
-            "title": "凭证蜜饵登陆记录",
+            "title": "凭证蜜饵登录记录",
             "current_user": user,
             "filters": {
                 "date_from": date_from,
@@ -3808,13 +3852,13 @@ def admin_credentials(
                 "source_ip": source_ip,
                 "node_name": node_name,
             },
-            "export_href": "/admin/credentials/export.csv"
-            + _qs(
-                date_from=date_from or None,
-                date_to=date_to or None,
-                source_ip=source_ip or None,
-                node_name=node_name or None,
-            ),
+            "export_href": "/admin/credentials/export.csv" + filter_qs,
+            "pager": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "base_url": "/admin/credentials" + (filter_qs or ""),
+            },
             **context,
         },
     )
@@ -4101,7 +4145,12 @@ def admin_services(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/admin/honeypot-sessions", response_class=HTMLResponse)
-def admin_honeypot_sessions(request: Request, db: Session = Depends(get_db)):
+def admin_honeypot_sessions(
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    db: Session = Depends(get_db),
+):
     user = _require_user(request, db)
     from datetime import datetime, timezone
 
@@ -4109,11 +4158,24 @@ def admin_honeypot_sessions(request: Request, db: Session = Depends(get_db)):
 
     source_ip = request.query_params.get("source_ip", "").strip()
     status = request.query_params.get("status", "").strip()
-    stmt = select(HoneypotSession).order_by(HoneypotSession.started_at.desc()).limit(200)
+    conditions = []
     if source_ip:
-        stmt = stmt.where(HoneypotSession.source_ip == source_ip)
+        conditions.append(HoneypotSession.source_ip == source_ip)
     if status in ("active", "closed"):
-        stmt = stmt.where(HoneypotSession.status == status)
+        conditions.append(HoneypotSession.status == status)
+    total = int(
+        db.scalar(select(func.count()).select_from(HoneypotSession).where(*conditions)) or 0
+    )
+    per_page = max(10, min(per_page, 200))
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    stmt = (
+        select(HoneypotSession)
+        .where(*conditions)
+        .order_by(HoneypotSession.started_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
     rows = db.scalars(stmt).all()
     now = datetime.now(timezone.utc)
     stats = {
@@ -4150,6 +4212,13 @@ def admin_honeypot_sessions(request: Request, db: Session = Depends(get_db)):
             "filter_source_ip": source_ip,
             "filter_status": status,
             "now": now,
+            "pager": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "base_url": "/admin/honeypot-sessions"
+                + _qs(source_ip=source_ip or None, status=status or None),
+            },
         },
     )
 
@@ -7041,19 +7110,47 @@ def admin_execution_history(
     actor_username: str = "",
     module: str = "",
     status: str = "",
+    page: int = 1,
+    per_page: int = 50,
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
+    from app.models.execution import ExecutionHistory
+
     start = _parse_admin_datetime(date_from)
     end = _parse_admin_datetime(date_to, end_of_day=True)
-    items = filter_execution_history(
-        db,
-        date_from=start,
-        date_to=end,
-        actor_username=actor_username,
-        module=module,
-        status=status,
-        limit=200,
+    conditions = []
+    if start:
+        conditions.append(ExecutionHistory.created_at >= start)
+    if end:
+        conditions.append(ExecutionHistory.created_at < end)
+    if actor_username:
+        conditions.append(ExecutionHistory.actor_username == actor_username)
+    if module:
+        conditions.append(ExecutionHistory.module == module)
+    if status:
+        conditions.append(ExecutionHistory.status == status)
+    total = int(
+        db.scalar(select(func.count()).select_from(ExecutionHistory).where(*conditions)) or 0
+    )
+    per_page = max(10, min(per_page, 200))
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    stmt = select(ExecutionHistory)
+    for cond in conditions:
+        stmt = stmt.where(cond)
+    stmt = (
+        stmt.order_by(desc(ExecutionHistory.created_at))
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
+    items = list(db.scalars(stmt).all())
+    filter_qs = _qs(
+        date_from=date_from or None,
+        date_to=date_to or None,
+        actor_username=actor_username or None,
+        module=module or None,
+        status=status or None,
     )
     return _render(
         request,
@@ -7069,14 +7166,13 @@ def admin_execution_history(
                 "module": module,
                 "status": status,
             },
-            "export_href": "/admin/execution-history/export.csv"
-            + _qs(
-                date_from=date_from or None,
-                date_to=date_to or None,
-                actor_username=actor_username or None,
-                module=module or None,
-                status=status or None,
-            ),
+            "export_href": "/admin/execution-history/export.csv" + filter_qs,
+            "pager": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "base_url": "/admin/execution-history" + (filter_qs or ""),
+            },
         },
     )
 
@@ -7127,20 +7223,37 @@ def admin_login_logs(
     username: str = "",
     login_status: str = "",
     ip_address: str = "",
+    page: int = 1,
+    per_page: int = 50,
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
     start = _parse_admin_datetime(date_from)
     end = _parse_admin_datetime(date_to, end_of_day=True)
-    items = filter_login_logs(
-        db,
-        date_from=start,
-        date_to=end,
-        username=username,
-        login_status=login_status,
-        ip_address=ip_address,
-        limit=200,
+    conditions = []
+    if start:
+        conditions.append(LoginLog.created_at >= start)
+    if end:
+        conditions.append(LoginLog.created_at < end)
+    if username:
+        conditions.append(LoginLog.username == username)
+    if login_status:
+        conditions.append(LoginLog.login_status == login_status)
+    if ip_address:
+        conditions.append(LoginLog.ip_address == ip_address)
+    total = int(db.scalar(select(func.count()).select_from(LoginLog).where(*conditions)) or 0)
+    per_page = max(10, min(per_page, 200))
+    pages = max(1, -(-total // per_page))
+    page = max(1, min(page, pages))
+    stmt = select(LoginLog)
+    for cond in conditions:
+        stmt = stmt.where(cond)
+    stmt = (
+        stmt.order_by(desc(LoginLog.created_at))
+        .offset((page - 1) * per_page)
+        .limit(per_page)
     )
+    items = list(db.scalars(stmt).all())
     stats = {
         "total": int(db.scalar(select(func.count()).select_from(LoginLog)) or 0),
         "success": int(
@@ -7156,6 +7269,13 @@ def admin_login_logs(
             or 0
         ),
     }
+    filter_qs = _qs(
+        date_from=date_from or None,
+        date_to=date_to or None,
+        username=username or None,
+        login_status=login_status or None,
+        ip_address=ip_address or None,
+    )
     return _render(
         request,
         "admin/login_logs.html",
@@ -7171,14 +7291,13 @@ def admin_login_logs(
                 "login_status": login_status,
                 "ip_address": ip_address,
             },
-            "export_href": "/admin/login-logs/export.csv"
-            + _qs(
-                date_from=date_from or None,
-                date_to=date_to or None,
-                username=username or None,
-                login_status=login_status or None,
-                ip_address=ip_address or None,
-            ),
+            "export_href": "/admin/login-logs/export.csv" + filter_qs,
+            "pager": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "base_url": "/admin/login-logs" + (filter_qs or ""),
+            },
         },
     )
 
@@ -7543,7 +7662,7 @@ def admin_recon_data(request: Request, db: Session = Depends(get_db)):
         .limit(200)
     ).all()
     return _render(
-        request, "admin/recon_data.html", {"title": "Jsonp反制成功记录", "items": items, "user": user}
+        request, "admin/recon_data.html", {"title": "JSONP 反制成功记录", "items": items, "user": user}
     )
 
 
@@ -8355,7 +8474,7 @@ def admin_jsonp_templates(request: Request, db: Session = Depends(get_db)):
     return _render(
         request,
         "admin/jsonp_templates.html",
-        {"title": "Jsonp模版管理", "current_user": user, "items": items, "summary": summary},
+        {"title": "JSONP 模版管理", "current_user": user, "items": items, "summary": summary},
     )
 
 
@@ -8495,8 +8614,8 @@ def delete_jsonp_template(template_id: int, request: Request, db: Session = Depe
         action="delete_jsonp_template",
         params={"template_id": template_id},
         return_to="/admin/jsonp-templates",
-        title=f"删除 Jsonp 模版：{item.name}",
-        description="删除后该 Jsonp 请求方法将不再作为可用回调模板，请输入管理员密码确认。",
+        title=f"删除 JSONP 模版：{item.name}",
+        description="删除后该 JSONP 请求方法将不再作为可用回调模板，请输入管理员密码确认。",
     )
 
 

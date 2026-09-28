@@ -101,7 +101,7 @@
       {% if is_recruited %}{{ badge('Portal 招募', 'success') }}{% else %}{{ badge('植入 Beacon', 'info') }}{% endif %}
       <span class="presence-meta" id="presence-meta">
         心跳间隔 <span class="c2-mono">{{ agent.poll_interval }}s</span> ·
-        最后心跳 <span class="c2-mono" id="last-seen">{{ agent.last_seen_at.strftime('%m-%d %H:%M:%S') }}</span>
+        最后心跳 <span class="c2-mono" id="last-seen">{{ agent.last_seen_at | dt('%m-%d %H:%M:%S') }}</span>
       </span>
       <span class="chip" id="auto-refresh-indicator" style="margin-left:auto">自动刷新: 开 (4s)</span>
     </div>
@@ -157,7 +157,7 @@
         <div class="side-kv"><span class="k">植入类型</span><span class="v">{{ agent.payload_type or 'implant' }}</span></div>
         {% if recruit_src %}<div class="side-kv"><span class="k">招募令牌</span><span class="v c2-mono" title="{{ recruit_src }}">{{ recruit_src[:14] }}…</span></div>{% endif %}
         {% if (agent.metadata_json or {}).get('agent_product') %}<div class="side-kv"><span class="k">指纹识别</span><span class="v">{{ (agent.metadata_json or {}).get('agent_product') }}</span></div>{% endif %}
-        <div class="side-kv"><span class="k">首次上线</span><span class="v c2-mono">{{ agent.first_seen_at.strftime('%m-%d %H:%M') }}</span></div>
+        <div class="side-kv"><span class="k">首次上线</span><span class="v c2-mono">{{ agent.first_seen_at | dt('%m-%d %H:%M') }}</span></div>
         <div class="side-kv"><span class="k">任务总数</span><span class="v c2-mono">{{ task_count }}</span></div>
       </div>
     </section>

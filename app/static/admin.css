@@ -1375,11 +1375,24 @@
           overflow: visible;
         }
         .layout { grid-template-columns: 1fr; }
-        .sidebar { position: relative; height: auto; min-height: auto; }
+        /* Sidebar becomes an off-canvas drawer instead of a full-page nav
+           wall — content stays first-paint at laptop widths. */
+        .sidebar {
+          position: fixed;
+          top: 0; left: 0; bottom: 0;
+          width: min(320px, 86vw);
+          height: 100vh;
+          z-index: 90;
+          transform: translateX(-102%);
+          transition: transform 220ms var(--ease-out);
+          overflow-y: auto;
+          box-shadow: 0 24px 80px rgba(2, 6, 23, 0.5);
+        }
+        html.nav-open .sidebar { transform: translateX(0); }
+        html.nav-open .nav-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(4, 8, 18, 0.55); }
+        html.nav-open body { overflow: hidden; }
         .main-shell { height: auto; min-height: 100vh; overflow: visible; }
         .workspace { min-height: 100vh; }
-        .nav-scroll { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-        .nav-home, .nav-group { margin: 0; padding: 0; border: 0; }
         .summary-grid, .dashboard-hero { grid-template-columns: 1fr; }
       }
       @media (max-width: 980px) {
@@ -1877,9 +1890,11 @@ td > .actions-inline, td > .jsonp-actions-row, td > .prompt-actions-row {
 td > pre { white-space: pre-wrap; }
 
 /* ---------------------------------------------------------------------------
- * MONOCHROME ALIGNMENT — align whole admin to the console's black/white SaaS
- * language (Poppins, white-gradient buttons, neutral cards). Appended last so
- * it wins over the earlier cyan tech layer.
+ * MONOCHROME ALIGNMENT — final visual layer (wins over the earlier cyan tech
+ * layer). Strata note: this file carries three historical layers (base blue
+ * SOC tokens :1, cyan HUD :~1553, this monochrome pass). Later rules win; new
+ * styling should extend THIS layer or the UI INFRASTRUCTURE block at EOF, and
+ * use tokens (--foreground/--card/...) instead of hardcoded colors.
  * ------------------------------------------------------------------------- */
 :root {
   --tech-cyan: #e5e7eb;
@@ -1892,7 +1907,7 @@ td > pre { white-space: pre-wrap; }
 }
 
 body {
-  font-family: "Poppins", "Fira Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Fira Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /* Panels & cards: plain monochrome, no corner brackets / scanlines */
@@ -1905,7 +1920,7 @@ body {
 
 /* Section titles: neutral tick instead of cyan glow bar */
 .panel-title {
-  font-family: "Poppins", "Fira Sans", sans-serif;
+  font-family: "Fira Sans", Inter, sans-serif;
   letter-spacing: -0.01em;
 }
 .panel-title::before {
@@ -1921,7 +1936,7 @@ body {
   border-radius: 14px;
 }
 .page-header::before { content: none; }
-.page-title { font-family: "Poppins", "Fira Sans", sans-serif; letter-spacing: -0.03em; }
+.page-title { font-family: "Fira Sans", Inter, sans-serif; letter-spacing: -0.03em; }
 .page-title-icon {
   border-radius: 10px;
   color: #e5e7eb;
@@ -1937,7 +1952,7 @@ th {
   background: rgba(14, 14, 14, 0.97);
   color: rgba(156, 163, 175, 0.8);
   border-bottom-color: rgba(255, 255, 255, 0.09);
-  font-family: "Poppins", "Fira Sans", sans-serif;
+  font-family: "Fira Code", ui-monospace, monospace;
   letter-spacing: 0.1em;
 }
 tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
@@ -2803,3 +2818,145 @@ th:hover .th-resizer::after { background: rgba(96, 165, 250, 0.55); }
         opacity: 0;
         pointer-events: none;
       }
+
+/* ===========================================================================
+   UI INFRASTRUCTURE — shared components added by the UX overhaul.
+   Deliberately last so these rules win over the legacy layers above.
+   =========================================================================== */
+
+/* ---- page banner (themed, replaces per-page inline styles) ---- */
+.page-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--warning);
+}
+.page-banner-body { flex: 1; min-width: 260px; }
+.page-banner-title { color: var(--warning); font-size: 13px; margin-bottom: 4px; }
+.page-banner-text { margin: 0; font-size: 12.5px; color: var(--muted-foreground); }
+.page-banner-text a { color: var(--info); }
+.page-banner-actions { display: flex; align-items: center; gap: 8px; }
+.page-banner-success { border-left-color: var(--success); }
+.page-banner-info { border-left-color: var(--info); }
+
+/* ---- toast notifications ---- */
+.ac-toast-host {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.ac-toast {
+  max-width: min(480px, 90vw);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--card-foreground);
+  background: var(--popover);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 16px 48px rgba(2, 6, 23, 0.35);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.ac-toast.is-in { opacity: 1; transform: translateY(0); }
+.ac-toast-success { border-color: rgba(52, 211, 153, 0.45); }
+.ac-toast-error { border-color: rgba(251, 113, 133, 0.55); color: var(--danger); }
+
+/* ---- pager ---- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.pager-summary { font-size: 12.5px; color: var(--muted-foreground); }
+.pager-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pager-links .chip { cursor: pointer; user-select: none; }
+.pager-links .chip.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.pager-ellipsis { color: var(--muted-foreground); padding: 0 2px; }
+
+/* ---- compact table density ---- */
+html.table-compact .table-wrap table th,
+html.table-compact .table-wrap table td { padding-top: 4px; padding-bottom: 4px; font-size: 12px; }
+html.table-compact .table-wrap table { line-height: 1.35; }
+
+/* ---- utility strip icon buttons ---- */
+.utility-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 150ms var(--ease-out), border-color 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+.utility-icon-btn:hover { color: var(--foreground); border-color: var(--border-strong); background: var(--accent); }
+.utility-icon-btn[aria-pressed="true"] { color: var(--theme-accent-foreground); background: var(--theme-accent); border-color: var(--theme-accent); }
+.utility-icon-btn svg { width: 15px; height: 15px; }
+
+/* ---- disabled chip & danger ghost button ---- */
+.chip.is-disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.btn-danger-ghost {
+  color: var(--danger);
+  border-color: rgba(251, 113, 133, 0.4);
+  background: transparent;
+}
+.btn-danger-ghost:hover { background: rgba(251, 113, 133, 0.1); border-color: var(--danger); }
+[data-theme="light"] .btn-danger-ghost { color: #be123c; }
+[data-theme="light"] .btn-danger-ghost:hover { background: rgba(190, 18, 60, 0.08); }
+
+/* ---- inline state dot (replaces ●/○ character indicators) ---- */
+.state-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+  background: var(--muted-foreground);
+  opacity: 0.5;
+}
+.state-dot.is-on { background: var(--success); opacity: 1; box-shadow: 0 0 6px rgba(52, 211, 153, 0.5); }
+
+/* ---- sel-x keyboard focus (native select stays in tab order) ---- */
+.sel-x:has(.sel-x-native:focus-visible) .sel-x-btn {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* ---- nav-open (hamburger) visibility — needs .utility-strip scope to win
+        over .utility-icon-btn's display:inline-flex ---- */
+.utility-strip .nav-open-btn { display: none; }
+@media (max-width: 1180px) {
+  .utility-strip .nav-open-btn { display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* ---- danger ghost: element+class specificity to beat button.secondary ---- */
+button.btn-danger-ghost,
+.btn-secondary.btn-danger-ghost,
+button.secondary.btn-danger-ghost {
+  color: var(--danger) !important;
+  border-color: rgba(251, 113, 133, 0.4) !important;
+  background: transparent !important;
+}
+button.secondary.btn-danger-ghost:hover { background: rgba(251, 113, 133, 0.1) !important; border-color: var(--danger) !important; }
+[data-theme="light"] button.secondary.btn-danger-ghost { color: #be123c !important; }
+[data-theme="light"] button.secondary.btn-danger-ghost:hover { background: rgba(190, 18, 60, 0.08); }

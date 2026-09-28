@@ -21,3 +21,4 @@ data/
 /design-system/
 .vercel
 .env*
+.vercel-token

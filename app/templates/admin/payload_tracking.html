@@ -14,7 +14,7 @@
         <tr>
           <td><a href="/admin/attack-sources/{{ item.source_ip }}"><code>{{ item.source_ip }}</code></a></td>
           <td>{% if item.event_type == 'payload_download' %}<span class="badge badge-info">下载</span>{% elif item.event_type == 'payload_callback' %}<span class="badge badge-danger">回调</span>{% endif %}</td>
-          <td>{{ item.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+          <td>{{ item.created_at | dt('%m-%d %H:%M:%S') }}</td>
           <td><code>{{ payload.get('payload_type', '-') }}</code></td>
           <td><code>{{ payload.get('filename', '-') }}</code></td>
           <td><code title="{{ payload.get('tracking_id', '') }}">{{ payload.get('tracking_id', '-')[:16] }}</code></td>

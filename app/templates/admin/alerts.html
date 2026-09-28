@@ -60,10 +60,8 @@
     </label>
     <label class="field-label"><span>值（IP 或 session_id）*</span><input name="value" required placeholder="203.0.113.7"></label>
     <label class="field-label"><span>原因</span><input name="reason" value="manual" placeholder="manual"></label>
-    <div style="display:flex;gap:10px;align-items:end;">
-      <label class="field-label" style="flex:1;"><span>TTL（分钟）</span><input name="ttl_minutes" type="number" min="1" value="60"></label>
-      <button type="submit" class="btn-sm" style="white-space:nowrap;">添加隔离</button>
-    </div>
+    <label class="field-label" style="min-width:120px;"><span>TTL（分钟）</span><input name="ttl_minutes" type="number" min="1" value="60"></label>
+    <button type="submit" class="btn-sm" style="white-space:nowrap;align-self:flex-end;">添加隔离</button>
   </form>
 </section>
 

@@ -49,7 +49,7 @@
             {% else %}<span class="text-muted">-</span>{% endif %}
           </td>
           <td><a href="/admin/sessions/{{ item.session_id }}"><code title="{{ item.session_id }}">{{ item.session_id[:12] }}...</code></a></td>
-          <td>{{ item.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+          <td>{{ item.created_at | dt('%m-%d %H:%M:%S') }}</td>
           <td>{% if item.event_type == 'agent_interaction' %}<span class="badge badge-danger">Agent 交互</span>{% elif item.event_type == 'agent_verification' %}<span class="badge badge-warning">合规验证</span>{% elif 'ai_agent_' in (item.signals_json|join(' ')) %}<span class="badge badge-info">Agent 检测</span>{% else %}<span class="badge badge-success">{{ item.event_type }}</span>{% endif %}</td>
           <td>{% set ns = namespace(found=0) %}{% for signal in (item.signals_json or []) %}{% if 'agent' in signal or 'injection' in signal or 'canary' in signal %}<span class="badge badge-warning" style="margin:1px">{{ signal|signal_zh }}</span>{% set ns.found = ns.found + 1 %}{% endif %}{% endfor %}{% if ns.found == 0 %}<span class="text-muted">-</span>{% endif %}</td>
           <td>

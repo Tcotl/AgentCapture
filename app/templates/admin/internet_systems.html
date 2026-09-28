@@ -157,7 +157,7 @@
               <div class="internet-policy-stack">
                 <span class="pill">{{ item.inject_policy }}</span>
                 <span class="pill">{{ item.decoy_policy }}</span>
-                <span class="muted">Jsonp：{{ item.jsonp_template_key or '未绑定' }}</span>
+                <span class="muted">JSONP：{{ item.jsonp_template_key or '未绑定' }}</span>
                 <span class="muted">风险处置：{{ item.risk_policy|decision_zh }}</span>
               </div>
             </td>
@@ -194,7 +194,7 @@
 <div class="internet-playbook">
   <div class="internet-step"><div class="internet-step-num">1</div><strong>旁路监测</strong><span>先接入访问日志、攻击流量和扫描器识别，不改业务响应、不注入脚本。</span></div>
   <div class="internet-step"><div class="internet-step-num">2</div><strong>反向代理</strong><span>按域名配置 upstream，默认放行到原业务；代理层故障时自动旁路或回切。</span></div>
-  <div class="internet-step"><div class="internet-step-num">3</div><strong>灰度蜜饵</strong><span>只在公开页、404、可疑请求或高风险会话注入蜜饵路径、Jsonp 画像和假接口。</span></div>
+  <div class="internet-step"><div class="internet-step-num">3</div><strong>灰度蜜饵</strong><span>只在公开页、404、可疑请求或高风险会话注入蜜饵路径、JSONP 画像和假接口。</span></div>
   <div class="internet-step"><div class="internet-step-num">4</div><strong>联动处置</strong><span>对确认攻击的来源再启用挑战、隔离或阻断，业务用户始终走原链路。</span></div>
 </div>
 
@@ -263,7 +263,7 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
         <div class="grid-4">
           <select name="inject_policy"><option>关闭注入</option><option selected>仅公开页面注入</option><option>高风险请求注入</option><option>全站灰度注入</option></select>
           <select name="decoy_policy"><option>仅记录</option><option selected>蜜饵路径 + 假接口</option><option>文件蜜饵 + 凭证蜜饵</option><option>全量策略</option></select>
-          <select name="jsonp_template_key"><option value="">不绑定 Jsonp 模版</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}">{{ tmpl.name }}</option>{% endfor %}</select>
+          <select name="jsonp_template_key"><option value="">不绑定 JSONP 模版</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}">{{ tmpl.name }}</option>{% endfor %}</select>
           <select name="risk_policy"><option value="observe">observe 观察</option><option value="challenge">challenge 挑战</option><option value="isolate">isolate 隔离</option><option value="block">block 阻断</option></select>
         </div>
         <div class="grid-2"><input name="tags_csv" placeholder="标签，如 生产,公网,OA"><select name="is_enabled"><option value="1">启用</option><option value="0">暂停</option></select></div>
@@ -298,7 +298,7 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
         <div class="grid-4">
           <select name="inject_policy"><option {% if item.inject_policy == '关闭注入' %}selected{% endif %}>关闭注入</option><option {% if item.inject_policy == '仅公开页面注入' %}selected{% endif %}>仅公开页面注入</option><option {% if item.inject_policy == '高风险请求注入' %}selected{% endif %}>高风险请求注入</option><option {% if item.inject_policy == '全站灰度注入' %}selected{% endif %}>全站灰度注入</option></select>
           <select name="decoy_policy"><option {% if item.decoy_policy == '仅记录' %}selected{% endif %}>仅记录</option><option {% if item.decoy_policy == '蜜饵路径 + 假接口' %}selected{% endif %}>蜜饵路径 + 假接口</option><option {% if item.decoy_policy == '文件蜜饵 + 凭证蜜饵' %}selected{% endif %}>文件蜜饵 + 凭证蜜饵</option><option {% if item.decoy_policy == '全量策略' %}selected{% endif %}>全量策略</option></select>
-          <select name="jsonp_template_key"><option value="">不绑定 Jsonp 模版</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}" {% if item.jsonp_template_key == tmpl.method_key %}selected{% endif %}>{{ tmpl.name }}</option>{% endfor %}</select>
+          <select name="jsonp_template_key"><option value="">不绑定 JSONP 模版</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}" {% if item.jsonp_template_key == tmpl.method_key %}selected{% endif %}>{{ tmpl.name }}</option>{% endfor %}</select>
           <select name="risk_policy"><option value="observe" {% if item.risk_policy == 'observe' %}selected{% endif %}>observe 观察</option><option value="challenge" {% if item.risk_policy == 'challenge' %}selected{% endif %}>challenge 挑战</option><option value="isolate" {% if item.risk_policy == 'isolate' %}selected{% endif %}>isolate 隔离</option><option value="block" {% if item.risk_policy == 'block' %}selected{% endif %}>block 阻断</option></select>
         </div>
         <div class="grid-2"><input name="tags_csv" value="{{ item.tags|join(',') }}" placeholder="标签"><select name="is_enabled"><option value="1" {% if item.is_enabled %}selected{% endif %}>启用</option><option value="0" {% if not item.is_enabled %}selected{% endif %}>暂停</option></select></div>

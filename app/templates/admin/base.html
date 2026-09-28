@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.9.8" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.9.9" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -17,6 +17,9 @@
           if (localStorage.getItem("ach:sidebar-collapsed") === "1") {
             document.documentElement.classList.add("sidebar-collapsed");
           }
+          if (localStorage.getItem("ach:table-compact") === "1") {
+            document.documentElement.classList.add("table-compact");
+          }
         } catch (e) {}
       })();
     </script>
@@ -24,7 +27,7 @@
   <body class="light">
     <div class="pm-admin-scale-shell">
       <div class="layout">
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar-nav">
           <div class="sidebar-header">
             <div class="brand">
               <svg
@@ -97,15 +100,22 @@
             {% endif %}
           </div>
         </aside>
+        <div class="nav-backdrop" id="nav-backdrop" hidden></div>
 
         <main class="main-shell">
           <div class="workspace">
             <div class="utility-strip">
+              <button type="button" class="utility-icon-btn nav-open-btn" id="nav-open" aria-label="打开导航菜单" aria-controls="sidebar-nav" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+              </button>
               <span class="utility-path">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}<span>/admin{% if active_path and active_path != '/admin' %} · {{ active_path }}{% endif %}</span></span>
               <div class="utility-right">
                 {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
                 {% if site_id %}<span class="chip">{{ site_id }}</span>{% endif %}
                 <span class="chip chip-live">Live</span>
+                <button type="button" class="utility-icon-btn" id="density-toggle" aria-label="切换表格紧凑模式" title="表格紧凑模式" aria-pressed="false">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18"/><path d="M3 10h18"/><path d="M3 15h18"/><path d="M3 20h18"/></svg>
+                </button>
                 <button type="button" class="theme-toggle" id="theme-toggle" aria-label="切换明暗主题" title="切换明暗主题">
                   <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                   <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -114,24 +124,35 @@
             </div>
             <div class="content">
               {% if admin_path_is_default and not admin_path_banner_dismissed and active_path != '/admin/profile' %}
-              <div class="panel page-banner" id="admin-path-banner" style="border-left:3px solid var(--warning,#fbbf24);display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-                <div style="flex:1;min-width:260px">
-                  <div class="panel-title" style="color:var(--warning,#fbbf24);font-size:13px;margin-bottom:4px">安全建议：自定义控制台访问路径</div>
-                  <p style="margin:0;font-size:12.5px;color:var(--muted-foreground)">
+              <div class="panel page-banner page-banner-warning" id="admin-path-banner" data-path-banner>
+                <div class="page-banner-body">
+                  <div class="panel-title page-banner-title">安全建议：自定义控制台访问路径</div>
+                  <p class="page-banner-text">
                     当前仍使用默认访问路径 <code>/{{ admin_access_path }}/</code>。部署完成后请尽快在
-                    <a href="/admin/profile" style="color:var(--info,#60a5fa)">系统设置 → 控制台安全路径</a>
+                    <a href="/admin/profile">系统设置 → 控制台安全路径</a>
                     中修改，避免控制台被扫描发现。
                   </p>
                 </div>
-                <a class="chip" href="/admin/profile" style="cursor:pointer">前往设置</a>
-                <button type="button" class="secondary btn-sm" id="dismiss-path-banner" style="cursor:pointer">本次登录不再提示</button>
+                <div class="page-banner-actions">
+                  <a class="chip" href="/admin/profile">前往设置</a>
+                  <button type="button" class="secondary btn-sm" id="dismiss-path-banner">不再提示</button>
+                </div>
               </div>
               <script>
                 (function () {
+                  var banner = document.getElementById('admin-path-banner');
+                  if (!banner) return;
+                  try {
+                    if (localStorage.getItem('ach:path-banner:dismissed') === '1') {
+                      banner.remove();
+                      return;
+                    }
+                  } catch (e) {}
                   var btn = document.getElementById('dismiss-path-banner');
                   if (!btn) return;
                   btn.addEventListener('click', function () {
-                    document.getElementById('admin-path-banner').style.display = 'none';
+                    try { localStorage.setItem('ach:path-banner:dismissed', '1'); } catch (e) {}
+                    banner.remove();
                     fetch('/api/admin/dismiss-path-banner', { method: 'POST' }).catch(function () {});
                   });
                 })();
@@ -524,6 +545,129 @@
         });
       }
 
+      /* ---- Shared UI utilities (toast / confirm / polling) ---- */
+      function showToast(message, type) {
+        var host = document.getElementById("ac-toast-host");
+        if (!host) {
+          host = document.createElement("div");
+          host.id = "ac-toast-host";
+          host.className = "ac-toast-host";
+          document.body.appendChild(host);
+        }
+        var item = document.createElement("div");
+        item.className = "ac-toast ac-toast-" + (type || "info");
+        item.setAttribute("role", type === "error" ? "alert" : "status");
+        item.textContent = message;
+        host.appendChild(item);
+        requestAnimationFrame(function () { item.classList.add("is-in"); });
+        setTimeout(function () {
+          item.classList.remove("is-in");
+          setTimeout(function () { item.remove(); }, 300);
+        }, type === "error" ? 6000 : 3200);
+      }
+
+      /* Pause-aware polling: fn runs immediately, then every intervalMs while
+         the tab is visible. Returns a handle; call .stop() to end it. */
+      function acPoll(fn, intervalMs) {
+        var timer = null;
+        var stopped = false;
+        function tick() {
+          if (stopped || document.hidden) return;
+          try { fn(); } catch (e) { /* keep polling */ }
+        }
+        function loop() {
+          if (stopped) return;
+          timer = setTimeout(function () { tick(); loop(); }, intervalMs);
+        }
+        function onVisible() { if (!document.hidden) tick(); }
+        document.addEventListener("visibilitychange", onVisible);
+        tick();
+        loop();
+        return {
+          stop: function () {
+            stopped = true;
+            if (timer) clearTimeout(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+          },
+        };
+      }
+
+      function initConfirmDelegation() {
+        document.addEventListener("submit", function (event) {
+          var form = event.target.closest("form[data-confirm]");
+          if (!form) return;
+          if (form.dataset.confirmed === "1") { form.dataset.confirmed = ""; return; }
+          event.preventDefault();
+          if (window.confirm(form.getAttribute("data-confirm"))) {
+            form.dataset.confirmed = "1";
+            form.submit();
+          }
+        });
+        document.addEventListener("click", function (event) {
+          var trigger = event.target.closest("[data-confirm]");
+          if (!trigger || trigger.tagName === "FORM") return;
+          if (trigger.tagName === "A" && !window.confirm(trigger.getAttribute("data-confirm"))) {
+            event.preventDefault();
+          }
+        });
+      }
+
+      function initDensityToggle() {
+        var btn = document.getElementById("density-toggle");
+        if (!btn) return;
+        var KEY = "ach:table-compact";
+        function apply(on) {
+          document.documentElement.classList.toggle("table-compact", on);
+          btn.setAttribute("aria-pressed", String(on));
+        }
+        var saved = null;
+        try { saved = localStorage.getItem(KEY); } catch (e) {}
+        if (saved === "1") apply(true);
+        btn.addEventListener("click", function () {
+          var on = !document.documentElement.classList.contains("table-compact");
+          apply(on);
+          try { localStorage.setItem(KEY, on ? "1" : "0"); } catch (e) {}
+        });
+      }
+
+      function initMobileNav() {
+        var openBtn = document.getElementById("nav-open");
+        var backdrop = document.getElementById("nav-backdrop");
+        if (!openBtn || !backdrop) return;
+        function setOpen(open) {
+          document.documentElement.classList.toggle("nav-open", open);
+          openBtn.setAttribute("aria-expanded", String(open));
+          backdrop.hidden = !open;
+        }
+        openBtn.addEventListener("click", function () {
+          setOpen(!document.documentElement.classList.contains("nav-open"));
+        });
+        backdrop.addEventListener("click", function () { setOpen(false); });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") setOpen(false);
+        });
+        document.querySelectorAll(".nav-scroll .nav-link").forEach(function (link) {
+          link.addEventListener("click", function () { setOpen(false); });
+        });
+      }
+
+      /* Programmatic modal API mirroring the [data-modal-open]/[data-modal-close]
+         delegation — pages with prefilled edit forms open dialogs from JS. */
+      var acModal = {
+        open: function (id) {
+          var backdrop = document.getElementById(id);
+          if (!backdrop) return;
+          backdrop.hidden = false;
+          document.body.style.overflow = "hidden";
+        },
+        close: function (id) {
+          var backdrop = document.getElementById(id);
+          if (!backdrop) return;
+          backdrop.hidden = true;
+          document.body.style.overflow = "";
+        },
+      };
+
       function initThemeToggle() {
       // ---- Global modal wiring: [data-modal-open] / [data-modal-close] ----
       document.addEventListener("click", (event) => {
@@ -651,6 +795,9 @@
         initFormSubmitGuard();
         initRecentFilterForms();
         initTableColumnResize();
+        initConfirmDelegation();
+        initDensityToggle();
+        initMobileNav();
       });
     </script>
     <script>
@@ -692,14 +839,24 @@
           sel.parentNode.insertBefore(wrap, sel);
           wrap.appendChild(sel);
           sel.classList.add("sel-x-native");
-          sel.tabIndex = -1;
+          // Keep the native select in the tab order so keyboard users can
+          // reach it; the visual button mirrors its value. Arrow keys change
+          // the selection natively and `change` re-syncs the button label.
           var btn = document.createElement("button");
           btn.type = "button";
           btn.className = "sel-x-btn";
+          btn.setAttribute("aria-hidden", "true");
+          btn.tabIndex = -1;
           btn.textContent = labelOf(sel);
           wrap.appendChild(btn);
           function sync() { btn.textContent = labelOf(sel); }
           sel.addEventListener("change", sync);
+          sel.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              btn.click();
+            }
+          });
           var form = sel.closest("form");
           if (form) form.addEventListener("reset", function () { setTimeout(sync, 0); });
           btn.addEventListener("click", function (ev) {

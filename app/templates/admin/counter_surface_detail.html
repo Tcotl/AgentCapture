@@ -104,6 +104,8 @@
           {% endif %}
         </td>
       </tr>
+      {% else %}
+      {{ empty_state('暂无模版', '当前条件下没有可显示的记录。', 4) }}
       {% endfor %}
       </tbody>
     </table>
@@ -144,7 +146,7 @@
       <tbody>
         {% for ev in evidence %}
         <tr>
-          <td><code>{{ ev.created_at.strftime('%m-%d %H:%M:%S') }}</code></td>
+          <td><code>{{ ev.created_at | dt('%m-%d %H:%M:%S') }}</code></td>
           <td>{{ badge(ev.event_type, 'info') }}</td>
           <td><code>{{ ev.source_ip }}</code></td>
           <td><code>{{ ev.path[:44] }}</code></td>

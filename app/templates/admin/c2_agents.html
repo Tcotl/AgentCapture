@@ -50,7 +50,7 @@
               {{ agent.username or '-' }}
               {% if agent.privileges == 'root' %}<span class="badge badge-danger" style="margin-left:4px">root</span>{% endif %}
             </td>
-            <td><span class="c2-mono">{{ agent.last_seen_at.strftime('%m-%d %H:%M:%S') }}</span></td>
+            <td><span class="c2-mono">{{ agent.last_seen_at | dt('%m-%d %H:%M:%S') }}</span></td>
             <td>
               {% if agent.status == 'active' %}{{ badge('在线', 'success') }}
               {% else %}{{ badge('离线', 'danger') }}{% endif %}

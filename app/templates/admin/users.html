@@ -17,7 +17,7 @@
           <td class="muted">{{ item.email or '—' }}</td>
           <td>{{ badge('管理员' if item.role == 'admin' else '操作员', 'warning' if item.role == 'admin' else 'info') }}</td>
           <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
-          <td class="muted"><code>{{ item.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if item.last_login_at else '—' }}</code></td>
+          <td class="muted"><code>{{ item.last_login_at | dt('%Y-%m-%d %H:%M:%S') if item.last_login_at else '—' }}</code></td>
           <td>
             <div class="actions-inline">
               <form method="post" action="/admin/users/{{ item.id }}/reset-password" style="margin:0;display:flex;gap:6px">

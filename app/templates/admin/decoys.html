@@ -285,7 +285,7 @@
         <td>{% if item.decoy_type == 'api_route' %}<code class="decoy-path">{{ item.route_path }}</code><div class="muted">{{ item.exposure_channel }}</div>{% else %}<span>{{ item.target_service_key }}</span><div class="muted">{{ item.username_dictionary }}</div>{% endif %}</td>
         <td><div class="decoy-chip-list">{% if item.bound_route_name %}<span class="decoy-chip">路由：{{ item.bound_route_name }}</span>{% endif %}{% if item.bound_credential_name %}<span class="decoy-chip">凭证：{{ item.bound_credential_name }}</span>{% endif %}{% if not item.bound_route_name and not item.bound_credential_name %}<span class="muted">未绑定</span>{% endif %}</div></td>
         <td><form method="post" action="/admin/decoys/templates/{{ item.id }}/deploy" class="decoy-deploy-form"><input type="hidden" name="return_to" value="/admin/decoy-management"><select name="node_id"><option value="">无节点</option>{% for node in nodes %}<option value="{{ node.id }}">{{ node.name }}</option>{% endfor %}</select><input name="deployed_host" placeholder="业务主机 / 系统"><button type="submit">生成</button></form></td>
-        <td><div class="actions-inline"><button type="button" class="secondary" onclick="openDecoyModal('decoy-edit-{{ item.id }}')">编辑</button><form method="post" action="/admin/decoys/templates/{{ item.id }}/delete"><input type="hidden" name="return_to" value="/admin/decoy-management"><button class="secondary" type="submit">删除</button></form></div></td>
+        <td><div class="actions-inline"><button type="button" class="secondary" onclick="openDecoyModal('decoy-edit-{{ item.id }}')">编辑</button><form method="post" action="/admin/decoys/templates/{{ item.id }}/delete" data-confirm="确认删除该蜜饵部署？删除后不可恢复。"><input type="hidden" name="return_to" value="/admin/decoy-management"><button class="secondary" type="submit">删除</button></form></div></td>
       </tr>
       {% else %}{{ empty_state('暂无蜜饵模板', '新增 API 路由、文件或凭证蜜饵后可生成部署记录。', 7, 'DC') }}{% endfor %}
     </tbody></table></div>
@@ -371,7 +371,7 @@
       {% for row in deployment_rows %}
         {% set item = row.item %}
         <tr>
-          <td>{{ item.created_at.strftime('%m-%d %H:%M:%S') if item.created_at else '—' }}</td>
+          <td>{{ item.created_at|dt('%m-%d %H:%M:%S') }}</td>
           <td><span class="decoy-chip">{{ row.type_label }}</span></td>
           <td>{{ item.status|status_zh }}</td>
           <td>{% if row.template %}<strong>{{ row.template.name }}</strong>{% endif %}<div class="decoy-deploy-cell"><code class="decoy-path">{{ item.fetch_path }}</code><span class="muted" title="{{ item.target_endpoint }}">{{ item.target_endpoint }}</span></div><div style="margin-top:6px"><a class="chip" href="/admin/decoys/deployments/{{ item.id }}/manifest.json">下载 manifest</a></div></td>
@@ -433,7 +433,7 @@
 <div class="decoy-pane" id="pane-credential">
   <form method="post" action="/admin/decoys/templates" class="stack">
     <input type="hidden" name="return_to" value="/admin/decoy-management"><input type="hidden" name="decoy_type" value="credential">
-    <div class="decoy-mini-help">选择端口服务或 Web 后台类型，系统生成可投放的假账号密码；后续登录记录会在“凭证蜜饵登陆记录”中聚合。</div>
+    <div class="decoy-mini-help">选择端口服务或 Web 后台类型，系统生成可投放的假账号密码；后续登录记录会在“凭证蜜饵登录记录”中聚合。</div>
     <div class="decoy-form-grid">
       <input name="name" placeholder="模板名称，如 VPN 运维账号" required>
       <select name="target_service_key" required>{% for svc in service_catalog %}<option value="{{ svc.service_key }}">{{ svc.name }} · {{ svc.default_port }}/{{ svc.protocols_json|join(',') }}</option>{% endfor %}<option value="web-admin">Web 后台</option></select>
@@ -462,7 +462,7 @@
 {% endcall %}
 
 {% for item in templates_list %}
-<div class="decoy-modal-backdrop" id="decoy-edit-{{ item.id }}" hidden onclick="closeDecoyModalOnBackdrop(event, 'decoy-edit-{{ item.id }}')">
+<div class="decoy-modal-backdrop" id="decoy-edit-{{ item.id }}" data-modal-backdrop hidden>
   <div class="decoy-modal" role="dialog" aria-modal="true" aria-labelledby="decoy-edit-title-{{ item.id }}">
     <div class="decoy-modal-header">
       <div><h2 class="decoy-modal-title" id="decoy-edit-title-{{ item.id }}">编辑蜜饵模板：{{ item.name }}</h2><div class="muted">{{ item.type_label }} · 调整投放位置、绑定链路与模板内容。</div></div>
@@ -500,14 +500,12 @@ document.querySelectorAll('.decoy-tab').forEach((tab) => {
     document.getElementById('pane-' + tab.dataset.pane)?.classList.add('active');
   });
 });
-function openDecoyModal(id){ const modal=document.getElementById(id); if(!modal) return; modal.hidden=false; document.body.style.overflow='hidden'; const first=modal.querySelector('input,select,textarea,button'); if(first) first.focus(); }
-function closeDecoyModal(id){ const modal=document.getElementById(id); if(!modal) return; modal.hidden=true; if(!document.querySelector('.decoy-modal-backdrop:not([hidden])')) document.body.style.overflow=''; }
-function closeDecoyModalOnBackdrop(event,id){ if(event.target && event.target.id===id) closeDecoyModal(id); }
-document.addEventListener('keydown', function(event){ if(event.key==='Escape') document.querySelectorAll('.decoy-modal-backdrop:not([hidden])').forEach(function(modal){ closeDecoyModal(modal.id); }); });
+function openDecoyModal(id){ acModal.open(id); const modal=document.getElementById(id); if(!modal) return; const first=modal.querySelector('input,select,textarea,button'); if(first) first.focus(); }
+function closeDecoyModal(id){ acModal.close(id); }
 </script>
 <script>
   (function () {
-    var paused = false, timer = null;
+    var paused = false;
     var dot = document.getElementById('dep-live-state');
     var btn = document.getElementById('dep-refresh-btn');
     function setState() {
@@ -516,7 +514,7 @@ document.addEventListener('keydown', function(event){ if(event.key==='Escape') d
       btn.textContent = paused ? '恢复刷新' : '暂停刷新';
     }
     function refresh() {
-      if (paused || document.hidden) return;
+      if (paused) return;
       fetch(location.href, { headers: { 'Accept': 'text/html' } })
         .then(function (r) { return r.text(); })
         .then(function (html) {
@@ -524,7 +522,9 @@ document.addEventListener('keydown', function(event){ if(event.key==='Escape') d
           var fresh = doc.getElementById('dep-table-wrap');
           var current = document.getElementById('dep-table-wrap');
           if (fresh && current) {
+            var scrollTop = current.scrollTop;
             current.innerHTML = fresh.innerHTML;
+            current.scrollTop = scrollTop;
             dot.style.color = 'var(--success, #34d399)';
           }
         })
@@ -536,7 +536,7 @@ document.addEventListener('keydown', function(event){ if(event.key==='Escape') d
       if (!paused) refresh();
     });
     setState();
-    timer = setInterval(refresh, 8000);
+    acPoll(refresh, 8000);
   })();
   </script>
 {% endblock %}

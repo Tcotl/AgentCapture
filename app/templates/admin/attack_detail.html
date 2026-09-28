@@ -17,13 +17,13 @@
   .chip {
     transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   }
-  .chip:hover { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+  .chip:hover { border-color: var(--border-strong); background: var(--accent); color: var(--accent-foreground); }
   .chip:active { transform: scale(0.97); }
 
   .ad-mono { font-family: "Fira Code", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
   .ad-risk {
     font-family: "Fira Code", ui-monospace, monospace;
-    font-weight: 700; color: #e5edf8; font-variant-numeric: tabular-nums;
+    font-weight: 700; color: var(--foreground); font-variant-numeric: tabular-nums;
   }
   .ad-risk.danger { color: #fda4af; text-shadow: 0 0 10px rgba(251, 113, 133, 0.35); }
   .ad-risk.warn { color: #fcd34d; text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
@@ -59,14 +59,14 @@
   .ad-evi-row:last-child { border-bottom: 0; }
   .ad-evi-name {
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: #d7e3f4;
+    color: var(--foreground);
     font-family: "Fira Code", ui-monospace, monospace;
     font-size: 11.5px;
   }
   .ad-evi-count {
     flex: 0 0 auto;
     font-family: "Fira Code", ui-monospace, monospace;
-    font-weight: 700; color: #e5edf8; font-variant-numeric: tabular-nums;
+    font-weight: 700; color: var(--foreground); font-variant-numeric: tabular-nums;
   }
 
   /* 时间线 pre 限高 */

@@ -32,6 +32,8 @@
             <button type="button" class="primary btn-sm" data-modal-open="api-tokens-create-modal" data-provider="{{ p.meta.key }}" style="cursor:pointer">接入 / 配置</button>
           </td>
         </tr>
+        {% else %}
+        {{ empty_state('暂无数源', '当前条件下没有可显示的记录。', 5) }}
         {% endfor %}
       </tbody>
     </table>
@@ -124,7 +126,7 @@
           <td><strong>{{ item.name }}</strong></td>
           <td><code>{{ item.token_prefix }}…</code></td>
           <td>{% for p in item.permissions_json %}{{ badge(p, 'info') }}{% endfor %}</td>
-          <td class="muted">{% if item.last_used_at %}<code>{{ item.last_used_at.strftime('%Y-%m-%d %H:%M:%S') }}</code>{% else %}—{% endif %}</td>
+          <td class="muted">{% if item.last_used_at %}<code>{{ item.last_used_at | dt('%Y-%m-%d %H:%M:%S') }}</code>{% else %}—{% endif %}</td>
           <td>
             <form method="post" action="/admin/api-tokens/{{ item.id }}/delete" style="margin:0">
               <button class="secondary btn-sm" type="submit">删除</button>

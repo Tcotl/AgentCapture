@@ -44,7 +44,7 @@
       <p style="margin:4px 0">· 三级链路：<code>GET /portal/api/content?ticket=</code> → <code>GET|POST /portal/api/client-register</code> → <code>POST /portal/api/client-heartbeat</code>（合并往返：签到 + 交结果 + 领任务）</p>
       <p style="margin:4px 0">· 端点位于 observe-only 前缀 <code>/portal/</code>，永不 challenge / isolate / block</p>
       <p style="margin:4px 0">· 收编归因：<code>recruit_src</code> = 会话蜜标令牌，C2 名册可回溯初始浏览会话</p>
-      <p style="margin:4px 0">· 配置读取走 5 秒 TTL 缓存；最近更新：<span id="pc-updated">{{ config.updated_at.strftime('%m-%d %H:%M') if config.updated_at else '-' }}</span>（{{ config.updated_by }}）</p>
+      <p style="margin:4px 0">· 配置读取走 5 秒 TTL 缓存；最近更新：<span id="pc-updated">{{ config.updated_at | dt('%m-%d %H:%M') if config.updated_at else '-' }}</span>（{{ config.updated_by }}）</p>
       <p style="margin:4px 0">· 统计自动刷新：10s <span class="chip" id="pc-stats-toggle" style="cursor:pointer;margin-left:4px">开</span></p>
     </div>
   </section>
