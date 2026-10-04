@@ -1,4 +1,4 @@
-{% from 'admin/_macros.html' import icon %}
+{% from 'admin/_macros.html' import icon with context %}
 <!doctype html>
 <html lang="zh-CN">
   <head>
@@ -48,7 +48,7 @@
                 <div class="brand-subtitle">Honeypot SaaS Console</div>
               </div>
             </div>
-            <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse" aria-label="收起/展开侧栏" title="收起/展开侧栏">
+            <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse" aria-label="{{ _('收起/展开侧栏') }}" title="{{ _('收起/展开侧栏') }}">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon-left"><path d="m15 18-6-6 6-6"/></svg>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon-right"><path d="m9 18 6-6-6-6"/></svg>
             </button>
@@ -57,7 +57,7 @@
           <div class="nav-home">
             <a href="/admin" class="nav-link">
               <span class="dot">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}</span>
-              <span>控制台首页</span>
+              <span>{{ _("控制台首页") }}</span>
             </a>
           </div>
           {% for group in nav_groups %}
@@ -92,8 +92,8 @@
                     <div class="profile-name">{{ current_user.username }}</div>
                   </div>
                 </div>
-                <a class="profile-settings" href="/admin/profile" aria-label="个人设置" title="个人设置">{{ icon(name='settings', class_name='ui-icon ui-icon-sm') }}</a>
-                <a class="profile-settings logout" href="/admin/logout" aria-label="退出登录" title="退出登录">
+                <a class="profile-settings" href="/admin/profile" aria-label="{{ _('个人设置') }}" title="{{ _('个人设置') }}">{{ icon(name='settings', class_name='ui-icon ui-icon-sm') }}</a>
+                <a class="profile-settings logout" href="/admin/logout" aria-label="{{ _('退出登录') }}" title="{{ _('退出登录') }}">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ui-icon ui-icon-sm"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
                 </a>
               </div>
@@ -105,7 +105,7 @@
         <main class="main-shell">
           <div class="workspace">
             <div class="utility-strip">
-              <button type="button" class="utility-icon-btn nav-open-btn" id="nav-open" aria-label="打开导航菜单" aria-controls="sidebar-nav" aria-expanded="false">
+              <button type="button" class="utility-icon-btn nav-open-btn" id="nav-open" aria-label="{{ _('打开导航菜单') }}" aria-controls="sidebar-nav" aria-expanded="false">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
               </button>
               <span class="utility-path">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}<span>/admin{% if active_path and active_path != '/admin' %} · {{ active_path }}{% endif %}</span></span>
@@ -113,10 +113,10 @@
                 {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
                 {% if site_id %}<span class="chip">{{ site_id }}</span>{% endif %}
                 <span class="chip chip-live">Live</span>
-                <button type="button" class="utility-icon-btn" id="density-toggle" aria-label="切换表格紧凑模式" title="表格紧凑模式" aria-pressed="false">
+                <button type="button" class="utility-icon-btn" id="density-toggle" aria-label="{{ _('切换表格紧凑模式') }}" title="{{ _('切换表格紧凑模式') }}" aria-pressed="false">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18"/><path d="M3 10h18"/><path d="M3 15h18"/><path d="M3 20h18"/></svg>
                 </button>
-                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="切换明暗主题" title="切换明暗主题">
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="{{ _('切换明暗主题') }}" title="{{ _('切换明暗主题') }}">
                   <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                   <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                 </button>
@@ -126,16 +126,16 @@
               {% if admin_path_is_default and not admin_path_banner_dismissed and active_path != '/admin/profile' %}
               <div class="panel page-banner page-banner-warning" id="admin-path-banner" data-path-banner>
                 <div class="page-banner-body">
-                  <div class="panel-title page-banner-title">安全建议：自定义控制台访问路径</div>
+                  <div class="panel-title page-banner-title">{{ _("安全建议：自定义控制台访问路径") }}</div>
                   <p class="page-banner-text">
-                    当前仍使用默认访问路径 <code>/{{ admin_access_path }}/</code>。部署完成后请尽快在
-                    <a href="/admin/profile">系统设置 → 控制台安全路径</a>
-                    中修改，避免控制台被扫描发现。
+                    {{ _("当前仍使用默认访问路径") }} <code>/{{ admin_access_path }}/</code>{{ _("。部署完成后请尽快在") }}
+                    <a href="/admin/profile">{{ _("系统设置 → 控制台安全路径") }}</a>
+                    {{ _("中修改，避免控制台被扫描发现。") }}
                   </p>
                 </div>
                 <div class="page-banner-actions">
-                  <a class="chip" href="/admin/profile">前往设置</a>
-                  <button type="button" class="secondary btn-sm" id="dismiss-path-banner">不再提示</button>
+                  <a class="chip" href="/admin/profile">{{ _("前往设置") }}</a>
+                  <button type="button" class="secondary btn-sm" id="dismiss-path-banner">{{ _("不再提示") }}</button>
                 </div>
               </div>
               <script>

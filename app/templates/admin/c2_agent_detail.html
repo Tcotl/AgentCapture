@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge with context %}
 {% block content %}
 <style>
 .c2-mono { font-family:"Fira Code", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
@@ -87,9 +87,9 @@
 #auto-refresh-indicator:hover { color:#67e8f9; border-color:rgba(34,211,238,.45); }
 </style>
 
-{{ page_header('C2', 'Agent 对话式控制台', (agent.hostname or agent.agent_id[:16]), [
+{{ page_header('C2', "_( 'Agent 对话式控制台' )", (agent.hostname or agent.agent_id[:16]), [
   agent.status|status_zh,
-  'Portal 招募' if is_recruited else '植入 Beacon',
+  "_( 'Portal 招募' )" if is_recruited else "_( '植入 Beacon' )",
   agent.privileges or 'user'
 ]) }}
 
@@ -103,7 +103,7 @@
         心跳间隔 <span class="c2-mono">{{ agent.poll_interval }}s</span> ·
         最后心跳 <span class="c2-mono" id="last-seen">{{ agent.last_seen_at | dt('%m-%d %H:%M:%S') }}</span>
       </span>
-      <span class="chip" id="auto-refresh-indicator" style="margin-left:auto">自动刷新: 开 (4s)</span>
+      <span class="chip" id="auto-refresh-indicator" style="margin-left:auto">{{ _('自动刷新: 开 (4s)') }}</span>
     </div>
 
     <div class="chat-log" id="chat-log">
@@ -111,7 +111,7 @@
       <div class="chat-exchange">
         <div class="chat-row agent"><div class="bubble">
           <div class="bubble-head"><span>SYSTEM</span></div>
-          <div class="bubble-body">会话已建立。下发的指令将进入队列，{{ '招募 Agent 会在下一次心跳（≤' ~ agent.poll_interval ~ 's）领取执行' if is_recruited else 'Beacon 会在下一次轮询（≤' ~ agent.poll_interval ~ 's）领取执行' }}，回传结果会实时出现在此处。</div>
+          <div class="bubble-body">会话已建立。下发的指令将进入队列，{{ "_( '招募 Agent 会在下一次心跳（≤' )" ~ agent.poll_interval ~ "_( 's）领取执行' )" if is_recruited else "_( 'Beacon 会在下一次轮询（≤' )" ~ agent.poll_interval ~ "_( 's）领取执行' )" }}，回传结果会实时出现在此处。</div>
         </div></div>
       </div>
       {% endif %}
@@ -119,7 +119,7 @@
 
     <div class="chat-presets" id="chat-presets">
       {% if is_recruited %}
-      <span class="preset-group">NL 预设</span>
+      <span class="preset-group">{{ _('NL 预设') }}</span>
       {% for t in nl_templates %}
       <span class="preset-chip nl" data-command="{{ t.command }}" data-type="{{ t.task_type }}">{{ t.label }}</span>
       {% endfor %}
@@ -132,39 +132,39 @@
       {% endfor %}
     </div>
 
-    <div class="composer-hint" id="composer-hint">Enter 发送 · Shift+Enter 换行 · 预设点击填入输入框，可改后再发</div>
+    <div class="composer-hint" id="composer-hint">{{ _('Enter 发送 · Shift+Enter 换行 · 预设点击填入输入框，可改后再发') }}</div>
     <div class="chat-composer">
       <select id="task-type" style="width:auto">
-        {% if is_recruited %}<option value="nl_instruct" selected>对话指令 (nl)</option>{% endif %}
-        <option value="cmd" {{ '' if is_recruited else 'selected' }}>Shell 命令 (cmd)</option>
-        <option value="read_file">读文件 (read_file)</option>
-        <option value="uninstall">卸载 Agent</option>
+        {% if is_recruited %}<option value="nl_instruct" selected>{{ _('对话指令 (nl)') }}</option>{% endif %}
+        <option value="cmd" {{ '' if is_recruited else 'selected' }}>{{ _( 'Shell 命令 (cmd)' ) }}</option>
+        <option value="read_file">{{ _('读文件 (read_file)') }}</option>
+        <option value="uninstall">{{ _('卸载 Agent') }}</option>
       </select>
-      <textarea id="chat-input" placeholder="{{ '用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…' if is_recruited else '输入要下发的 shell 命令，例如：whoami; uname -a' }}"></textarea>
-      <button type="button" class="primary" id="btn-send">发送指令</button>
+      <textarea id="chat-input" placeholder="{{ "_( '用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…' )" if is_recruited else "_( '输入要下发的 shell 命令，例如：whoami; uname -a' )" }}"></textarea>
+      <button type="button" class="primary" id="btn-send">{{ _('发送指令') }}</button>
     </div>
   </section>
 
   <aside style="display:flex;flex-direction:column;gap:14px">
     <section class="panel">
-      {{ section_header('端点信息', '') }}
+      {{ section_header("_( '端点信息' )", '') }}
       <div class="side-card">
-        <div class="side-kv"><span class="k">来源 IP</span><span class="v c2-mono">{{ agent.source_ip }}</span></div>
-        <div class="side-kv"><span class="k">主机名</span><span class="v">{{ agent.hostname or '-' }}</span></div>
-        <div class="side-kv"><span class="k">系统</span><span class="v">{{ (agent.os_name ~ ' ' ~ (agent.os_version or '')) if agent.os_name else '-' }}</span></div>
-        <div class="side-kv"><span class="k">用户 / 权限</span><span class="v">{{ agent.username or '-' }} · {{ agent.privileges or 'user' }}</span></div>
-        <div class="side-kv"><span class="k">架构</span><span class="v">{{ agent.arch or '-' }}</span></div>
-        <div class="side-kv"><span class="k">植入类型</span><span class="v">{{ agent.payload_type or 'implant' }}</span></div>
-        {% if recruit_src %}<div class="side-kv"><span class="k">招募令牌</span><span class="v c2-mono" title="{{ recruit_src }}">{{ recruit_src[:14] }}…</span></div>{% endif %}
-        {% if (agent.metadata_json or {}).get('agent_product') %}<div class="side-kv"><span class="k">指纹识别</span><span class="v">{{ (agent.metadata_json or {}).get('agent_product') }}</span></div>{% endif %}
-        <div class="side-kv"><span class="k">首次上线</span><span class="v c2-mono">{{ agent.first_seen_at | dt('%m-%d %H:%M') }}</span></div>
-        <div class="side-kv"><span class="k">任务总数</span><span class="v c2-mono">{{ task_count }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '来源 IP' ) }}</span><span class="v c2-mono">{{ agent.source_ip }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '主机名' ) }}</span><span class="v">{{ agent.hostname or '-' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '系统' ) }}</span><span class="v">{{ (agent.os_name ~ ' ' ~ (agent.os_version or '')) if agent.os_name else '-' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '用户 / 权限' ) }}</span><span class="v">{{ agent.username or '-' }} · {{ agent.privileges or 'user' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '架构' ) }}</span><span class="v">{{ agent.arch or '-' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '植入类型' ) }}</span><span class="v">{{ agent.payload_type or 'implant' }}</span></div>
+        {% if recruit_src %}<div class="side-kv"><span class="k">{{ _( '招募令牌' ) }}</span><span class="v c2-mono" title="{{ recruit_src }}">{{ recruit_src[:14] }}…</span></div>{% endif %}
+        {% if (agent.metadata_json or {}).get('agent_product') %}<div class="side-kv"><span class="k">{{ _( '指纹识别' ) }}</span><span class="v">{{ (agent.metadata_json or {}).get('agent_product') }}</span></div>{% endif %}
+        <div class="side-kv"><span class="k">{{ _( '首次上线' ) }}</span><span class="v c2-mono">{{ agent.first_seen_at | dt('%m-%d %H:%M') }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '任务总数' ) }}</span><span class="v c2-mono">{{ task_count }}</span></div>
       </div>
     </section>
 
     {% if type_stats %}
     <section class="panel">
-      {{ section_header('任务类型分布', '') }}
+      {{ section_header("_( '任务类型分布' )", '') }}
       <div class="side-card">
         {% for t, n in type_stats.items() %}
         <div class="side-kv"><span class="k">{{ t }}</span><span class="v c2-mono">{{ n }}</span></div>
@@ -174,10 +174,10 @@
     {% endif %}
 
     <section class="panel">
-      {{ section_header('危险操作', '') }}
+      {{ section_header("_( '危险操作' )", '') }}
       <div class="side-card">
-        <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" onsubmit="return confirm('确认删除该 Agent 及所有任务？不可撤销。')">
-          <button class="danger" type="submit" style="width:100%">删除 Agent</button>
+        <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" onsubmit="return confirm("_( '确认删除该 Agent 及所有任务？不可撤销。' )")">
+          <button class="danger" type="submit" style="width:100%">{{ _('删除 Agent') }}</button>
         </form>
       </div>
     </section>

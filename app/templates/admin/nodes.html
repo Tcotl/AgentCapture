@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, icon, service_tags, modal_dialog %}
+{% from 'admin/_macros.html' import page_header, section_header, icon, service_tags, modal_dialog with context %}
 {% block content %}
-{{ page_header('ND', '节点管理', '统一维护内置与远程节点、挂载模板、观察最近心跳，并为节点排入任务分发雏形。', ['心跳', '任务分发'],
-      actions='<button type="button" class="chip primary" data-modal-open="nodes-create-modal">＋ 新增节点</button>') }}
+{{ page_header('ND', _('节点管理'), _('统一维护内置与远程节点、挂载模板、观察最近心跳，并为节点排入任务分发雏形。'), [_('心跳'), _('任务分发')],
+      actions='<button type="button" class="chip primary" data-modal-open="nodes-create-modal">' ~ _('＋ 新增节点') ~ '</button>') }}
 <style>
   /* ---------- Server-management-table 风格：行卡片清单 ---------- */
   .nd-list-head {
@@ -120,31 +120,31 @@
 <section class="panel">
   {% set online_count = nodes|selectattr('node.status', 'equalto', 'online')|list|length %}
   <div class="nd-list-head">
-    <div class="nd-list-title">节点清单</div>
+    <div class="nd-list-title">{{ _('节点清单') }}</div>
     <div style="display:flex;gap:10px;align-items:center">
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);cursor:pointer">
-        <input type="checkbox" class="bulk-select-all" style="cursor:pointer">全选
+        <input type="checkbox" class="bulk-select-all" style="cursor:pointer">{{ _('全选') }}
       </label>
-      <form method="post" action="/admin/nodes/bulk-delete" data-confirm="确认删除选中的 {n} 个节点？内置节点不受影响，不可撤销。" class="bulk-del-form">
+      <form method="post" action="/admin/nodes/bulk-delete" data-confirm="{{ _('确认删除选中的 {n} 个节点？内置节点不受影响，不可撤销。') }}" class="bulk-del-form">
         <input type="hidden" name="ids" value="">
-        <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+        <button type="button" class="danger btn-sm bulk-del-btn">{{ _('批量删除') }}</button>
       </form>
-      <div class="nd-list-count">{{ nodes|length }} 个节点 · {{ online_count }} 在线</div>
+      <div class="nd-list-count">{{ nodes|length }} {{ _('个节点') }} · {{ online_count }} {{ _('在线') }}</div>
     </div>
   </div>
   <div class="nd-cols">
-    <span>NO</span><span>节点</span><span>监听 / 回连</span><span>最近心跳</span><span>待办任务</span><span>状态</span>
+    <span>NO</span><span>{{ _('节点') }}</span><span>{{ _('监听 / 回连') }}</span><span>{{ _('最近心跳') }}</span><span>{{ _('待办任务') }}</span><span>{{ _('状态') }}</span>
   </div>
   {% for item in nodes %}
     {% set node = item.node %}
     {% set segs = [item.pending_count, 10]|min %}
     <div class="nd-row is-{{ node.status }}">
-      <span class="nd-idx"><input type="checkbox" class="bulk-check" value="{{ node.id }}" style="cursor:pointer" {% if node.is_builtin %}disabled title="内置节点不可删除"{% endif %}> {{ '%02d' % loop.index }}</span>
+      <span class="nd-idx"><input type="checkbox" class="bulk-check" value="{{ node.id }}" style="cursor:pointer" {% if node.is_builtin %}disabled title="{{ _('内置节点不可删除') }}"{% endif %}> {{ '%02d' % loop.index }}</span>
       <div class="nd-name">
         <span class="nd-os">{{ icon(name='server', class_name='ui-icon ui-icon-sm') }}</span>
         <span class="nd-name-text">
           <a class="nd-name-main" href="/admin/nodes/{{ node.id }}">{{ node.name }}</a>
-          <span class="nd-name-sub"><code>{{ node.node_type }}</code>{% if node.is_builtin %} <span class="pill">内置</span>{% endif %}</span>
+          <span class="nd-name-sub"><code>{{ node.node_type }}</code>{% if node.is_builtin %} <span class="pill">{{ _('内置') }}</span>{% endif %}</span>
         </span>
       </div>
       <div class="nd-addr">
@@ -152,7 +152,7 @@
         <code>{{ node.callback_address }}</code>
       </div>
       <div class="nd-heart">
-        {% if item.latest_heartbeat %}{{ item.latest_heartbeat.created_at | dt('%Y-%m-%d %H:%M') }}{% else %}<span class="muted">暂无心跳</span>{% endif %}
+        {% if item.latest_heartbeat %}{{ item.latest_heartbeat.created_at | dt('%Y-%m-%d %H:%M') }}{% else %}<span class="muted">{{ _('暂无心跳') }}</span>{% endif %}
       </div>
       <div class="nd-meter">
         <span class="nd-segs">{% for i in range(10) %}<i class="{% if i < segs %}on{% if node.status != 'online' %} warn{% endif %}{% endif %}"></i>{% endfor %}</span>
@@ -162,37 +162,37 @@
       <div class="nd-actions">
         <form method="post" action="/admin/nodes/{{ node.id }}/template">
           <select name="template_id">{% for t in templates_list %}<option value="{{ t.id }}" {% if node.template_id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select>
-          <button type="submit" class="secondary">应用模板</button>
+          <button type="submit" class="secondary">{{ _('应用模板') }}</button>
         </form>
         <form method="post" action="/admin/nodes/{{ node.id }}/status">
-          <select name="status_value"><option value="online" {% if node.status == 'online' %}selected{% endif %}>在线</option><option value="paused" {% if node.status == 'paused' %}selected{% endif %}>暂停</option><option value="offline" {% if node.status == 'offline' %}selected{% endif %}>离线</option></select>
-          <button type="submit" class="secondary">更新状态</button>
+          <select name="status_value"><option value="online" {% if node.status == 'online' %}selected{% endif %}>{{ _('在线') }}</option><option value="paused" {% if node.status == 'paused' %}selected{% endif %}>{{ _('暂停') }}</option><option value="offline" {% if node.status == 'offline' %}selected{% endif %}>{{ _('离线') }}</option></select>
+          <button type="submit" class="secondary">{{ _('更新状态') }}</button>
         </form>
         <span class="nd-actions-spacer"></span>
         <span class="nd-services">{{ service_tags(node.deployed_services_json, service_name_map) }}</span>
-        <a class="chip primary" href="/admin/nodes/{{ node.id }}">节点详情</a>
+        <a class="chip primary" href="/admin/nodes/{{ node.id }}">{{ _('节点详情') }}</a>
         {% if not node.is_builtin %}
-          <form method="post" action="/admin/nodes/{{ node.id }}/delete"><button class="danger" type="submit">删除</button></form>
+          <form method="post" action="/admin/nodes/{{ node.id }}/delete"><button class="danger" type="submit">{{ _('删除') }}</button></form>
         {% endif %}
       </div>
     </div>
   {% else %}
     <div class="empty-state">
       <div class="empty-icon">ND</div>
-      <div class="empty-title">暂无节点</div>
-      <div class="empty-description">添加节点后可在此分配模板与查看心跳。</div>
+      <div class="empty-title">{{ _('暂无节点') }}</div>
+      <div class="empty-description">{{ _('添加节点后可在此分配模板与查看心跳。') }}</div>
     </div>
   {% endfor %}
 </section>
 
-{% call modal_dialog('nodes-create-modal', '新增节点', '用于对接内置或远程节点，承载蜜罐服务与任务分发') %}
+{% call modal_dialog('nodes-create-modal', _('新增节点'), _('用于对接内置或远程节点，承载蜜罐服务与任务分发')) %}
 <form method="post" action="/admin/nodes" class="stack">
-  <div class="grid-2"><input name="name" placeholder="节点名称" required><select name="node_type"><option value="remote">远程节点</option><option value="embedded">内置节点</option></select></div>
-  <div class="grid-2"><input name="listen_address" placeholder="监听地址" value="127.0.0.1" required><input name="callback_address" placeholder="回连地址" value="127.0.0.1" required></div>
-  <select name="template_id"><option value="">不指定模板</option>{% for item in templates_list %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select>
+  <div class="grid-2"><input name="name" placeholder="{{ _('节点名称') }}" required><select name="node_type"><option value="remote">{{ _('远程节点') }}</option><option value="embedded">{{ _('内置节点') }}</option></select></div>
+  <div class="grid-2"><input name="listen_address" placeholder="{{ _('监听地址') }}" value="127.0.0.1" required><input name="callback_address" placeholder="{{ _('回连地址') }}" value="127.0.0.1" required></div>
+  <select name="template_id"><option value="">{{ _('不指定模板') }}</option>{% for item in templates_list %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select>
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>取消</button>
-    <button type="submit">新增节点</button>
+    <button type="button" class="secondary" data-modal-close>{{ _('取消') }}</button>
+    <button type="submit">{{ _('新增节点') }}</button>
   </div>
 </form>
 {% endcall %}
@@ -205,7 +205,7 @@
   var bulkBtn = document.querySelector('.bulk-del-btn');
   if (bulkBtn) bulkBtn.addEventListener('click', function () {
     var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
-    if (!checked.length) { alert('请先勾选要删除的节点'); return; }
+    if (!checked.length) { alert('{{ _('请先勾选要删除的节点') }}'); return; }
     var form = bulkBtn.closest('form');
     if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
     form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');

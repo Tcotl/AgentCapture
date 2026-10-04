@@ -493,6 +493,7 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
         nav_groups.append({"title": group["title"], "links": rendered_items})
     if "current_user" not in context and "user" in context:
         context["current_user"] = context["user"]
+    from app.services.i18n import gettext_for
     from app.services.system_settings import (
         DEFAULT_ADMIN_ACCESS_PATH,
         get_admin_access_path,
@@ -500,16 +501,39 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
 
     admin_access_path = get_admin_access_path()
     path_banner_dismissed = bool(request.session.get("admin_path_banner_dismissed"))
+    # UI language follows the operator's profile preference (System Settings);
+    # before login, fall back to the ach:lang cookie so the login page can
+    # honor a previously chosen language.
+    lang = (
+        getattr(context.get("current_user"), "preferred_language", None)
+        or request.cookies.get("ach:lang")
+        or "zh"
+    )
+    _ = gettext_for(lang)
     full_context = {
         "request": request,
-        "nav_groups": nav_groups,
+        "nav_groups": [
+            {
+                "title": _(group["title"]),
+                "links": [
+                    {**item, "label": _(item["label"]), "description": _(item["description"])}
+                    for item in group["links"]
+                ],
+            }
+            for group in nav_groups
+        ],
         "active_path": active_path,
         "site_id": get_settings().site_id,
         "admin_access_path": admin_access_path,
         "admin_path_is_default": admin_access_path == DEFAULT_ADMIN_ACCESS_PATH,
         "admin_path_banner_dismissed": path_banner_dismissed,
+        "lang": lang,
+        "_": _,
         **context,
     }
+    title = full_context.get("title")
+    if isinstance(title, str):
+        full_context["title"] = _(title)
     return templates.TemplateResponse(request, template_name, full_context)
 
 
@@ -7614,7 +7638,12 @@ def update_profile(
         target_type="user",
         target_ref=user.username,
     )
-    return _redirect("/admin/profile")
+    # Mirror the choice into a cookie so the login page follows it after logout.
+    response = _redirect("/admin/profile")
+    response.set_cookie(
+        "ach:lang", preferred_language, max_age=3600 * 24 * 365, samesite="lax"
+    )
+    return response
 
 
 @router.post("/admin/profile/change-password")

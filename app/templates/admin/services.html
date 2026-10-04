@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
 <style>
   .sv-deck { display: flex; flex-direction: column; gap: 16px; }
@@ -88,19 +88,19 @@
   }
 </style>
 
-{{ page_header('SV', title or '端口服务蜜罐管理', '管理端口服务型蜜罐，支持 SSH / MySQL / Redis / FTP / ElasticSearch 真实协议仿真。', ['协议仿真', '端口', '凭据捕获', '反制剧本'],
-      actions='<button type="button" class="chip primary" data-modal-open="services-create-modal">＋ 新增端口服务蜜罐</button>') }}
+{{ page_header('SV', title or "_( '端口服务蜜罐管理' )", "_( '管理端口服务型蜜罐，支持 SSH / MySQL / Redis / FTP / ElasticSearch 真实协议仿真。' )", ["_( '协议仿真' )", "_( '端口' )", "_( '凭据捕获' )", "_( '反制剧本' )"],
+      actions='<button type="button" class="chip primary" data-modal-open="services-create-modal">' ~ "_( '＋ 新增端口服务蜜罐' )" ~ '</button>') }}
 
 <div class="panel" style="margin-bottom:14px;padding:12px 16px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:wrap;text-align:left">
-  <span class="muted" style="font-size:12.5px">操作一览 · 反制剧本：</span>
+  <span class="muted" style="font-size:12.5px">{{ _( '操作一览 · 反制剧本：' ) }}</span>
   <form method="post" action="/admin/services/playbook/apply" style="display:inline-flex;gap:8px;align-items:center;margin:0">
     <select name="playbook_id" style="width:auto;min-width:200px">
-      <option value="">选择反制剧本…</option>
+      <option value="">{{ _( '选择反制剧本…' ) }}</option>
       {% for pb in playbooks %}<option value="{{ pb.id }}">{{ pb.name }}</option>{% endfor %}
     </select>
-    <button type="submit" class="primary btn-sm">一键应用</button>
+    <button type="submit" class="primary btn-sm">{{ _( '一键应用' ) }}</button>
   </form>
-  <a class="chip" href="/admin/playbooks" style="cursor:pointer;text-decoration:none">剧本详情 →</a>
+  <a class="chip" href="/admin/playbooks" style="cursor:pointer;text-decoration:none">{{ _( '剧本详情 →' ) }}</a>
 </div>
 
 {% if applied %}
@@ -119,32 +119,32 @@
     <div class="sv-status-id">
       <span class="sv-live-dot"></span>
       <div>
-        <div class="sv-status-title">SERVICE GRID · 协议仿真矩阵</div>
+        <div class="sv-status-title">{{ _( 'SERVICE GRID · 协议仿真矩阵' ) }}</div>
         <div class="sv-status-sub">AgentCapture // Port Honeypot Ops — Emulation Engines Ready</div>
       </div>
     </div>
     <div class="sv-readouts">
-      <div class="sv-readout"><b>{{ items|length }}</b><span>已注册服务</span></div>
-      <div class="sv-readout"><b class="up">{{ running|length }}</b><span>监听中</span></div>
-      <div class="sv-readout"><b>{{ supported|length }}</b><span>仿真引擎</span></div>
-      <div class="sv-readout"><b>5</b><span>协议类型</span></div>
+      <div class="sv-readout"><b>{{ items|length }}</b><span>{{ _( '已注册服务' ) }}</span></div>
+      <div class="sv-readout"><b class="up">{{ running|length }}</b><span>{{ _( '监听中' ) }}</span></div>
+      <div class="sv-readout"><b>{{ supported|length }}</b><span>{{ _( '仿真引擎' ) }}</span></div>
+      <div class="sv-readout"><b>5</b><span>{{ _( '协议类型' ) }}</span></div>
     </div>
   </section>
 
     <section class="panel">
-      {{ section_header('端口服务蜜罐清单', '启动/停止协议仿真引擎，查看运行状态') }}
+      {{ section_header("_( '端口服务蜜罐清单' )", "_( '启动/停止协议仿真引擎，查看运行状态' )") }}
       <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
-        <form method="post" action="/admin/services/bulk-delete" data-confirm="确认删除选中的 {n} 项服务？不可撤销。" class="bulk-del-form">
+        <form method="post" action="/admin/services/bulk-delete" data-confirm="{{ _('确认删除选中的 {n} 项服务？不可撤销。') }}" class="bulk-del-form">
           <input type="hidden" name="ids" value="">
-          <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+          <button type="button" class="danger btn-sm bulk-del-btn">{{ _( '批量删除' ) }}</button>
         </form>
-        <span class="muted" style="font-size:11px">勾选条目后批量移除</span>
+        <span class="muted" style="font-size:11px">{{ _( '勾选条目后批量移除' ) }}</span>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th><th>Key</th><th>名称</th><th>分类</th><th>协议</th><th>端口</th><th>状态</th><th>操作</th>
+              <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th><th>Key</th><th>{{ _( '名称' ) }}</th><th>{{ _( '分类' ) }}</th><th>{{ _( '协议' ) }}</th><th>{{ _( '端口' ) }}</th><th>{{ _( '状态' ) }}</th><th>{{ _( '操作' ) }}</th>
             </tr>
           </thead>
           <tbody>
@@ -158,18 +158,18 @@
               <td class="sv-port-cell"><code>{{ item.default_port }}</code></td>
               <td>
                 {% if item.service_key in running %}
-                  {{ badge('运行中 :' ~ running[item.service_key], 'success') }}
+                  {{ badge("_( '运行中 :' )" ~ running[item.service_key], 'success') }}
                 {% elif item.status == 'running' %}
-                  {{ badge('异常', 'warning') }}
+                  {{ badge("_( '异常' )", 'warning') }}
                 {% else %}
-                  {{ badge('已停止', 'default') }}
+                  {{ badge("_( '已停止' )", 'default') }}
                 {% endif %}
                 {% if listening is defined %}
                 {% set port_up = listening.get(item.service_key, false) %}
                 {% if item.service_key in running and not port_up %}
-                  {{ badge('端口未监听', 'danger') }}
+                  {{ badge("_( '端口未监听' )", 'danger') }}
                 {% elif item.service_key not in running and port_up %}
-                  {{ badge('端口被其他进程占用', 'warning') }}
+                  {{ badge("_( '端口被其他进程占用' )", 'warning') }}
                 {% endif %}
                 {% endif %}
               </td>
@@ -178,24 +178,24 @@
                   {% if item.service_key in supported %}
                     {% if item.service_key in running %}
                       <form method="post" action="/admin/services/{{ item.id }}/stop" style="margin:0">
-                        <button class="secondary btn-sm" type="submit">停止</button>
+                        <button class="secondary btn-sm" type="submit">{{ _( '停止' ) }}</button>
                       </form>
                     {% else %}
                       <form method="post" action="/admin/services/{{ item.id }}/start" style="margin:0">
-                        <button class="primary btn-sm" type="submit">启动</button>
+                        <button class="primary btn-sm" type="submit">{{ _( '启动' ) }}</button>
                       </form>
                     {% endif %}
                   {% else %}
-                    <span class="muted">暂无仿真引擎</span>
+                    <span class="muted">{{ _( '暂无仿真引擎' ) }}</span>
                   {% endif %}
-                  <form method="post" action="/admin/services/{{ item.id }}/delete" style="margin:0" onsubmit="return confirm('确认删除该服务?')">
-                    <button class="secondary btn-sm" type="submit">删除</button>
+                  <form method="post" action="/admin/services/{{ item.id }}/delete" style="margin:0" onsubmit="return confirm("_( '确认删除该服务?' )")">
+                    <button class="secondary btn-sm" type="submit">{{ _( '删除' ) }}</button>
                   </form>
                 </div>
               </td>
             </tr>
             {% else %}
-            {{ empty_state('暂无服务', '新增服务后会在这里显示。', 8, 'SV') }}
+            {{ empty_state("_( '暂无服务' )", "_( '新增服务后会在这里显示。' )", 8, 'SV') }}
             {% endfor %}
           </tbody>
         </table>
@@ -221,21 +221,21 @@
 </script>
 </div>
 
-{% call modal_dialog('services-create-modal', '新增端口服务蜜罐', '录入 service_key、分类、协议、端口与描述') %}
+{% call modal_dialog('services-create-modal', "_( '新增端口服务蜜罐' )", "_( '录入 service_key、分类、协议、端口与描述' )") %}
 <form method="post" action="/admin/services" class="stack">
-  <p class="sv-form-eyebrow">REG.NEW // 身份标识</p>
+  <p class="sv-form-eyebrow">{{ _( 'REG.NEW // 身份标识' ) }}</p>
   <div class="grid-4">
-    <label class="field-label"><span>service_key *</span><input name="service_key" placeholder="如 ssh" required></label>
-    <label class="field-label"><span>显示名称 *</span><input name="name" placeholder="如 SSH" required></label>
-    <label class="field-label"><span>分类 *</span><input name="category" placeholder="如 remote-access" required></label>
-    <label class="field-label"><span>默认端口 *</span><input name="default_port" type="number" placeholder="如 22" required></label>
+    <label class="field-label"><span>service_key *</span><input name="service_key" placeholder="{{ _('如 ssh') }}" required></label>
+    <label class="field-label"><span>{{ _( '显示名称 *' ) }}</span><input name="name" placeholder="{{ _('如 SSH') }}" required></label>
+    <label class="field-label"><span>{{ _( '分类 *' ) }}</span><input name="category" placeholder="{{ _('如 remote-access') }}" required></label>
+    <label class="field-label"><span>{{ _( '默认端口 *' ) }}</span><input name="default_port" type="number" placeholder="{{ _('如 22') }}" required></label>
   </div>
-  <p class="sv-form-eyebrow">REG.CFG // 协议与描述</p>
+  <p class="sv-form-eyebrow">{{ _( 'REG.CFG // 协议与描述' ) }}</p>
   <div class="grid-2">
-    <label class="field-label"><span>协议（逗号分隔）*</span><input name="protocols_csv" placeholder="如 tcp,http" required></label>
-    <label class="field-label"><span>预览路径（可选）</span><input name="preview_path" placeholder="如 /admin"></label>
+    <label class="field-label"><span>{{ _( '协议（逗号分隔）*' ) }}</span><input name="protocols_csv" placeholder="{{ _('如 tcp,http') }}" required></label>
+    <label class="field-label"><span>{{ _( '预览路径（可选）' ) }}</span><input name="preview_path" placeholder="{{ _('如 /admin') }}"></label>
   </div>
-  <label class="field-label"><span>描述</span><textarea name="description" placeholder="服务的用途说明"></textarea></label>
+  <label class="field-label"><span>{{ _( '描述' ) }}</span><textarea name="description" placeholder="{{ _('服务的用途说明') }}"></textarea></label>
   <div class="sv-engine-strip">
     <span class="sv-engine-tag">SSH</span>
     <span class="sv-engine-tag">MySQL</span>
@@ -244,8 +244,8 @@
     <span class="sv-engine-tag">ElasticSearch</span>
   </div>
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>取消</button>
-    <button type="submit">新增服务</button>
+    <button type="button" class="secondary" data-modal-close>{{ _( '取消' ) }}</button>
+    <button type="submit">{{ _( '新增服务' ) }}</button>
   </div>
 </form>
 {% endcall %}

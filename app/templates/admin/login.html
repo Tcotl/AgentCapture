@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AgentCapture · 登录</title>
+<title>{{ _('AgentCapture · 登录') }}</title>
 <style>
   :root {
     --line: rgba(96, 165, 250, 0.28);
@@ -178,38 +178,38 @@
         <img src="/static/agentcapture-logo.svg" alt="">
         <div>
           <div class="en">AgentCapture</div>
-          <div class="zh">蜜罐系统</div>
+          <div class="zh">{{ _('蜜罐系统') }}</div>
         </div>
       </div>
-      <div class="card-tagline">智能捕获 · 威胁感知 · 纵深防御</div>
+      <div class="card-tagline">{{ _('智能捕获 · 威胁感知 · 纵深防御') }}</div>
 
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
       <form method="post" action="">
         <div class="field">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <input name="username" autocomplete="username" placeholder="请输入用户名" required />
+          <input name="username" autocomplete="username" placeholder="{{ _('请输入用户名') }}" required />
         </div>
         <div class="field">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <input id="pw" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required />
-          <button type="button" class="eye" id="eye" aria-label="显示或隐藏密码">
+          <input id="pw" name="password" type="password" autocomplete="current-password" placeholder="{{ _('请输入密码') }}" required />
+          <button type="button" class="eye" id="eye" aria-label="{{ _('显示或隐藏密码') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
         <div class="aux">
-          <label><input type="checkbox" name="remember"> 记住账号</label>
-          <a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">了解 AgentCapture ↗</a>
+          <label><input type="checkbox" name="remember"> {{ _('记住账号') }}</label>
+          <a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">{{ _('了解 AgentCapture ↗') }}</a>
         </div>
-        <button type="submit" class="login">登 录</button>
+        <button type="submit" class="login">{{ _('登 录') }}</button>
       </form>
-      <div class="tenant">默认租户：<code>{{ site_id }}</code> · 受控沙箱后台</div>
+      <div class="tenant">{{ _('默认租户：') }}<code>{{ site_id }}</code> {{ _('· 受控沙箱后台') }}</div>
     </div>
   </section>
 </main>
 
 <footer>
-  <span>开源项目&nbsp;&nbsp;<a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">github.com/Tcotl/AgentCapture</a></span>
-  <span class="foot-right">以蜜罐之名 · 记录每一次威胁</span>
+  <span>{{ _('开源项目&nbsp;&nbsp;') }}<a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">github.com/Tcotl/AgentCapture</a></span>
+  <span class="foot-right">{{ _('以蜜罐之名 · 记录每一次威胁') }}</span>
 </footer>
 
 <script>

@@ -1,31 +1,31 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge with context %}
 {% block content %}
-{{ page_header('C2', '对话式 C2 管理', 'Agent 注册、在线监控、对话式任务下发与批量操作。超过 5 分钟无心跳自动标记离线。', ['Agent 注册', '批量操作']) }}
+{{ page_header('C2', _('对话式 C2 管理'), _('Agent 注册、在线监控、对话式任务下发与批量操作。超过 5 分钟无心跳自动标记离线。'), [_('Agent 注册'), _('批量操作')]) }}
 
 <div class="cards">
-  {{ metric_card('Agent 总数', stats.total) }}
-  {{ metric_card('在线', stats.active, 'success') }}
-  {{ metric_card('离线', stats.offline, 'danger') }}
-  {{ metric_card('总任务', stats.total_tasks) }}
-  {{ metric_card('已完成', stats.completed_tasks, 'success') }}
+  {{ metric_card(_('Agent 总数'), stats.total) }}
+  {{ metric_card(_('在线'), stats.active, 'success') }}
+  {{ metric_card(_('离线'), stats.offline, 'danger') }}
+  {{ metric_card(_('总任务'), stats.total_tasks) }}
+  {{ metric_card(_('已完成'), stats.completed_tasks, 'success') }}
 </div>
 
 <form method="post" action="/admin/c2/bulk-cmd" id="bulk-form" style="margin-top:14px">
   <input type="hidden" name="agent_ids" id="bulk-agent-ids" />
   <section class="panel">
-    {{ section_header('Agent 列表', '点击「进入控制」打开对话式控制台，可下发自然语言指令或 Shell 命令') }}
+    {{ section_header(_('Agent 列表'), _('点击「进入控制」打开对话式控制台，可下发自然语言指令或 Shell 命令')) }}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <span class="chip filter-chip active" data-filter="all" style="cursor:pointer">全部</span>
-      <span class="chip filter-chip" data-filter="recruited" style="cursor:pointer">Portal 招募</span>
-      <span class="chip filter-chip" data-filter="implant" style="cursor:pointer">植入 Beacon</span>
+      <span class="chip filter-chip active" data-filter="all" style="cursor:pointer">{{ _('全部') }}</span>
+      <span class="chip filter-chip" data-filter="recruited" style="cursor:pointer">{{ _('Portal 招募') }}</span>
+      <span class="chip filter-chip" data-filter="implant" style="cursor:pointer">{{ _('植入 Beacon') }}</span>
     </div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th style="width:40px"><input type="checkbox" id="select-all"></th>
-            <th>Agent ID</th><th>来源</th><th>IP</th><th>主机名</th><th>系统</th><th>用户</th><th>最后心跳</th><th>状态</th><th>操作</th>
+            <th>Agent ID</th><th>{{ _('来源') }}</th><th>IP</th><th>{{ _('主机名') }}</th><th>{{ _('系统') }}</th><th>{{ _('用户') }}</th><th>{{ _('最后心跳') }}</th><th>{{ _('状态') }}</th><th>{{ _('操作') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -35,12 +35,12 @@
             <td><a href="/admin/c2/agents/{{ agent.agent_id }}"><code>{{ agent.agent_id[:12] }}...</code></a></td>
             <td>
               {% if (agent.metadata_json or {}).get('recruit_src') or (agent.metadata_json or {}).get('recruited_via') %}
-              {{ badge('Portal 招募', 'success') }}
+              {{ badge(_('Portal 招募'), 'success') }}
               {% else %}
-              {{ badge('植入', 'info') }}
+              {{ badge(_('植入'), 'info') }}
               {% endif %}
               {% if (agent.metadata_json or {}).get('agent_product') %}
-              <span class="badge badge-warning" style="margin-left:4px;cursor:default" title="指纹识别: {{ (agent.metadata_json or {}).get('agent_product') }}">{{ (agent.metadata_json or {}).get('agent_product') }}</span>
+              <span class="badge badge-warning" style="margin-left:4px;cursor:default" title="{{ _('指纹识别') }}: {{ (agent.metadata_json or {}).get('agent_product') }}">{{ (agent.metadata_json or {}).get('agent_product') }}</span>
               {% endif %}
             </td>
             <td><code>{{ agent.source_ip }}</code></td>
@@ -52,21 +52,21 @@
             </td>
             <td><span class="c2-mono">{{ agent.last_seen_at | dt('%m-%d %H:%M:%S') }}</span></td>
             <td>
-              {% if agent.status == 'active' %}{{ badge('在线', 'success') }}
-              {% else %}{{ badge('离线', 'danger') }}{% endif %}
+              {% if agent.status == 'active' %}{{ badge(_('在线'), 'success') }}
+              {% else %}{{ badge(_('离线'), 'danger') }}{% endif %}
             </td>
             <td>
               <div class="actions-inline">
-                <a class="chip primary" href="/admin/c2/agents/{{ agent.agent_id }}">进入控制</a>
-                <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" style="margin:0" onsubmit="return confirm('确认删除?')">
-                  <button class="secondary btn-sm" type="submit">删除</button>
+                <a class="chip primary" href="/admin/c2/agents/{{ agent.agent_id }}">{{ _('进入控制') }}</a>
+                <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" style="margin:0" onsubmit="return confirm('{{ _('确认删除?') }}')">
+                  <button class="secondary btn-sm" type="submit">{{ _('删除') }}</button>
                 </form>
               </div>
             </td>
           </tr>
           {% endfor %}
           {% if not agents %}
-          {{ empty_state('暂无注册 Agent', 'AI Agent 被 Portal 功能性伪装收编后将出现在此处（来源=Portal 招募）；植入 Beacon 执行后也会自动注册。', 10, 'C2') }}
+          {{ empty_state(_('暂无注册 Agent'), _('AI Agent 被 Portal 功能性伪装收编后将出现在此处（来源=Portal 招募）；植入 Beacon 执行后也会自动注册。'), 10, 'C2') }}
           {% endif %}
         </tbody>
       </table>
@@ -76,13 +76,13 @@
   <div class="panel" style="margin-top:10px">
     <div class="bulk-action-bar">
       <select name="task_type" class="auto-width">
-        <option value="cmd">执行命令</option>
-        <option value="read_file">读文件</option>
-        <option value="uninstall">卸载 Agent</option>
+        <option value="cmd">{{ _('执行命令') }}</option>
+        <option value="read_file">{{ _('读文件') }}</option>
+        <option value="uninstall">{{ _('卸载 Agent') }}</option>
       </select>
-      <input type="text" name="command" placeholder="批量命令 (如: whoami)" style="flex:1;min-width:200px">
-      <button type="submit" class="primary" id="btn-bulk-exec" data-confirm-empty="请先勾选要操作的 Agent">批量执行</button>
-      <button type="button" class="danger" id="btn-bulk-delete" data-confirm-empty="请先勾选要删除的 Agent" data-confirm-pattern="确认删除选中的 {n} 个 Agent?">批量删除</button>
+      <input type="text" name="command" placeholder="{{ _('批量命令 (如: whoami)') }}" style="flex:1;min-width:200px">
+      <button type="submit" class="primary" id="btn-bulk-exec" data-confirm-empty="{{ _('请先勾选要操作的 Agent') }}">{{ _('批量执行') }}</button>
+      <button type="button" class="danger" id="btn-bulk-delete" data-confirm-empty="{{ _('请先勾选要删除的 Agent') }}" data-confirm-pattern="{{ _('确认删除选中的 {n} 个 Agent?') }}">{{ _('批量删除') }}</button>
     </div>
   </div>
 </form>

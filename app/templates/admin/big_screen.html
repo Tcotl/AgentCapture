@@ -7,11 +7,11 @@
 {% set total_nodes = node_summary.node_count or online_nodes or 1 %}
 {% set online_ratio = (((online_nodes / total_nodes) * 100) if total_nodes else 0)|round(0, 'floor') %}
 {% set chain_items = [
-  {'label': '扫描感知', 'value': chain.scan},
-  {'label': '攻击行为', 'value': chain.attack},
-  {'label': '登录尝试', 'value': chain.login_attempt},
-  {'label': '高危登录', 'value': chain.high_risk_login},
-  {'label': '失陷线索', 'value': chain.compromise_hint},
+  {'label': "_( '扫描感知' )", 'value': chain.scan},
+  {'label': "_( '攻击行为' )", 'value': chain.attack},
+  {'label': "_( '登录尝试' )", 'value': chain.login_attempt},
+  {'label': "_( '高危登录' )", 'value': chain.high_risk_login},
+  {'label': "_( '失陷线索' )", 'value': chain.compromise_hint},
 ] %}
 {% set chain_max = chain_items|map(attribute='value')|max or 1 %}
 <style>
@@ -443,26 +443,26 @@
       <img src="/static/agentcapture-logo.svg" alt="AgentCapture">
       <div>
         <div class="bs-title">AGENTCAPTURE</div>
-        <div class="bs-subtitle">Honeypot Situation Deck · 诱捕态势</div>
+        <div class="bs-subtitle">{{ _('Honeypot Situation Deck · 诱捕态势') }}</div>
       </div>
     </div>
-    <nav class="bs-tabs" aria-label="态势视图导航">
-      <button type="button" class="bs-tab" data-screen-target="overview">诱捕总览</button>
-      <button type="button" class="bs-tab" data-screen-target="sources">攻击来源追踪</button>
-      <button type="button" class="bs-tab" data-screen-target="nodes">蜜罐节点承压</button>
+    <nav class="bs-tabs" aria-label="{{ _('态势视图导航') }}">
+      <button type="button" class="bs-tab" data-screen-target="overview">{{ _('诱捕总览') }}</button>
+      <button type="button" class="bs-tab" data-screen-target="sources">{{ _('攻击来源追踪') }}</button>
+      <button type="button" class="bs-tab" data-screen-target="nodes">{{ _('蜜罐节点承压') }}</button>
     </nav>
     <div class="bs-header-right">
       <div class="bs-controls">
-        <button type="button" class="bs-ctl" id="smart-refresh-toggle">自动刷新：关</button>
-        <button type="button" class="bs-ctl" id="smart-rotate-toggle">轮播：关</button>
+        <button type="button" class="bs-ctl" id="smart-refresh-toggle">{{ _('自动刷新：关') }}</button>
+        <button type="button" class="bs-ctl" id="smart-rotate-toggle">{{ _('轮播：关') }}</button>
         <select id="smart-rotate-interval" class="bs-ctl">
           <option value="15" {% if rotate_interval == '15' %}selected{% endif %}>15s</option>
           <option value="30" {% if rotate_interval == '30' %}selected{% endif %}>30s</option>
           <option value="60" {% if rotate_interval == '60' %}selected{% endif %}>60s</option>
         </select>
-        <button type="button" class="bs-ctl" id="smart-fullscreen-btn">全屏</button>
-        <button type="button" class="bs-ctl" id="smart-wakelock-btn">常亮</button>
-        <a class="bs-ctl bs-ctl-link" href="/admin">返回后台</a>
+        <button type="button" class="bs-ctl" id="smart-fullscreen-btn">{{ _('全屏') }}</button>
+        <button type="button" class="bs-ctl" id="smart-wakelock-btn">{{ _('常亮') }}</button>
+        <a class="bs-ctl bs-ctl-link" href="/admin">{{ _('返回后台') }}</a>
       </div>
       <div class="bs-clock">
         <strong id="smart-big-clock">--:--:--</strong>
@@ -476,13 +476,13 @@
     <div class="bs-col">
       <section class="bs-panel" style="flex: 0 0 auto;">
         <header class="bs-panel-head">
-          <div class="bs-panel-title">诱捕态势</div>
+          <div class="bs-panel-title">{{ _('诱捕态势') }}</div>
           <div class="bs-panel-sub">TRAP // OVERVIEW</div>
         </header>
         <div class="bs-panel-body">
           <div class="bs-overview">
             <div class="bs-ring">
-              <svg viewBox="0 0 184 184" aria-label="高危占比">
+              <svg viewBox="0 0 184 184" aria-label="{{ _('高危占比') }}">
                 <circle cx="92" cy="92" r="76" stroke="rgba(255,255,255,.1)" stroke-width="10"></circle>
                 <circle cx="92" cy="92" r="63" stroke="rgba(56,189,248,.08)" stroke-width="2" stroke-dasharray="2 8"></circle>
                 <circle cx="92" cy="92" r="76" stroke="rgba(34,211,238,.95)" stroke-width="10" stroke-dasharray="{{ (risk_ratio * 4.774)|round(0, 'floor') }} 999"></circle>
@@ -490,18 +490,18 @@
               </svg>
               <div class="bs-ring-center">
                 <strong>{{ risk_ratio }}</strong>
-                <span>高危命中 / %</span>
+                <span>{{ _('高危命中 / %') }}</span>
                 <em>{% if risk_ratio >= 60 %}高压预警{% elif risk_ratio >= 30 %}持续观察{% else %}整体可控{% endif %}</em>
               </div>
             </div>
             <div class="bs-kpis">
-              <div class="bs-kpi"><label>诱捕事件</label><strong class="c-cyan">{{ total_events }}</strong></div>
-              <div class="bs-kpi"><label>蜜罐节点</label><strong class="c-green">{{ online_nodes }}/{{ total_nodes }}</strong></div>
-              <div class="bs-kpi"><label>高危攻击</label><strong class="c-red">{{ high_risk }}</strong></div>
-              <div class="bs-kpi"><label>攻击来源</label><strong class="c-amber">{{ stats.summary.unique_ips }}</strong></div>
+              <div class="bs-kpi"><label>{{ _('诱捕事件') }}</label><strong class="c-cyan">{{ total_events }}</strong></div>
+              <div class="bs-kpi"><label>{{ _('蜜罐节点') }}</label><strong class="c-green">{{ online_nodes }}/{{ total_nodes }}</strong></div>
+              <div class="bs-kpi"><label>{{ _('高危攻击') }}</label><strong class="c-red">{{ high_risk }}</strong></div>
+              <div class="bs-kpi"><label>{{ _('攻击来源') }}</label><strong class="c-amber">{{ stats.summary.unique_ips }}</strong></div>
               <div class="bs-kpi-lines">
-                <div class="bs-kpi-line"><span>反制处置 · BLOCK/ISOLATE</span><strong>{{ stats.summary.agent_blocks }}</strong></div>
-                <div class="bs-kpi-line"><span>凭据诱捕 · CRED HIT</span><strong>{{ stats.summary.credential_attempts }}</strong></div>
+                <div class="bs-kpi-line"><span>{{ _('反制处置 · BLOCK/ISOLATE') }}</span><strong>{{ stats.summary.agent_blocks }}</strong></div>
+                <div class="bs-kpi-line"><span>{{ _('凭据诱捕 · CRED HIT') }}</span><strong>{{ stats.summary.credential_attempts }}</strong></div>
               </div>
             </div>
           </div>
@@ -510,7 +510,7 @@
 
       <section class="bs-panel" style="flex: 0 0 240px;">
         <header class="bs-panel-head">
-          <div class="bs-panel-title">诱捕趋势</div>
+          <div class="bs-panel-title">{{ _('诱捕趋势') }}</div>
           <div class="bs-panel-sub">TREND // 7D</div>
         </header>
         <div class="bs-panel-body">
@@ -520,7 +520,7 @@
 
       <section class="bs-panel" style="flex: 1 1 auto;">
         <header class="bs-panel-head">
-          <div class="bs-panel-title">高危会话</div>
+          <div class="bs-panel-title">{{ _('高危会话') }}</div>
           <div class="bs-panel-sub">RISK // FEED · {{ top_attacks|length }}</div>
         </header>
         <div class="bs-panel-body">
@@ -538,7 +538,7 @@
                   </div>
                 {% endfor %}
               {% endfor %}
-              {% if not threat_feed %}<div class="bs-empty">暂无诱捕样本</div>{% endif %}
+              {% if not threat_feed %}<div class="bs-empty">{{ _('暂无诱捕样本') }}</div>{% endif %}
             </div>
           </div>
         </div>
@@ -549,10 +549,10 @@
     <div class="bs-col">
       <section class="bs-panel" style="flex: 1 1 auto;">
         <div class="bs-bigstats">
-          <div class="bs-bigstat"><label>诱捕事件 · EVENTS</label><strong class="c-cyan" id="smart-center-total">{{ total_events }}</strong><span id="smart-center-kicker">累计采集事件</span></div>
-          <div class="bs-bigstat"><label>反制处置 · COUNTER</label><strong id="smart-center-blocks">{{ stats.summary.agent_blocks }}</strong><span>阻断 / 隔离 / 质询</span></div>
-          <div class="bs-bigstat"><label>高危命中 · HIGH-RISK</label><strong class="c-red" id="smart-center-risk">{{ high_risk }}</strong><span>风险分 ≥ 70</span></div>
-          <div class="bs-bigstat"><label>独立来源 · SOURCES</label><strong class="c-amber">{{ stats.summary.unique_ips }}</strong><span>轮播间隔 <b id="smart-interval-label">{{ rotate_interval }}s</b></span></div>
+          <div class="bs-bigstat"><label>{{ _('诱捕事件 · EVENTS') }}</label><strong class="c-cyan" id="smart-center-total">{{ total_events }}</strong><span id="smart-center-kicker">{{ _('累计采集事件') }}</span></div>
+          <div class="bs-bigstat"><label>{{ _('反制处置 · COUNTER') }}</label><strong id="smart-center-blocks">{{ stats.summary.agent_blocks }}</strong><span>{{ _('阻断 / 隔离 / 质询') }}</span></div>
+          <div class="bs-bigstat"><label>{{ _('高危命中 · HIGH-RISK') }}</label><strong class="c-red" id="smart-center-risk">{{ high_risk }}</strong><span>{{ _('风险分 ≥ 70') }}</span></div>
+          <div class="bs-bigstat"><label>{{ _('独立来源 · SOURCES') }}</label><strong class="c-amber">{{ stats.summary.unique_ips }}</strong><span>{{ _('轮播间隔') }} <b id="smart-interval-label">{{ rotate_interval }}s</b></span></div>
         </div>
         <div class="bs-map-wrap">
           <div class="bs-globe" id="bs-globe"></div>
@@ -561,23 +561,23 @@
           </div>
           <div class="bs-map-canvas" id="smart-heat-canvas" style="display:none"></div>
           <div class="bs-map-toolbar">
-            <div class="bs-map-mode"><span id="smart-screen-label">诱捕总览</span> · <span id="smart-analysis-sub">[SRC] 来源与触发排行</span></div>
+            <div class="bs-map-mode"><span id="smart-screen-label">{{ _('诱捕总览') }}</span> · <span id="smart-analysis-sub">{{ _('[SRC] 来源与触发排行') }}</span></div>
             <div class="bs-map-toggle">
-              <button type="button" class="bs-ctl is-active" data-map-mode="3d">3D 地球</button>
-              <button type="button" class="bs-ctl" data-map-mode="2d">平面地图</button>
+              <button type="button" class="bs-ctl is-active" data-map-mode="3d">{{ _('3D 地球') }}</button>
+              <button type="button" class="bs-ctl" data-map-mode="2d">{{ _('平面地图') }}</button>
             </div>
           </div>
           <div class="bs-map-badges">
-            <div class="bs-map-badge">高频来源<strong>{{ top_sources[0].source_ip if top_sources else '无' }}</strong></div>
-            <div class="bs-map-badge">高频路径<strong>{{ top_paths[0][0] if top_paths else '/' }}</strong></div>
+            <div class="bs-map-badge">{{ _('高频来源') }}<strong>{{ top_sources[0].source_ip if top_sources else '无' }}</strong></div>
+            <div class="bs-map-badge">{{ _('高频路径') }}<strong>{{ top_paths[0][0] if top_paths else '/' }}</strong></div>
           </div>
-          <div class="bs-map-legend"><span style="color:var(--bs-headline)">活跃区</span><span style="color:var(--bs-amber)">高压区</span><span style="color:var(--bs-red)">高危区</span><span>· 示意分布</span></div>
+          <div class="bs-map-legend"><span style="color:var(--bs-headline)">{{ _('活跃区') }}</span><span style="color:var(--bs-amber)">{{ _('高压区') }}</span><span style="color:var(--bs-red)">{{ _('高危区') }}</span><span>{{ _('· 示意分布') }}</span></div>
         </div>
       </section>
 
       <section class="bs-panel" style="flex: 0 0 210px;">
         <header class="bs-panel-head">
-          <div class="bs-panel-title">高频路径 · 宿主负载</div>
+          <div class="bs-panel-title">{{ _('高频路径 · 宿主负载') }}</div>
           <div class="bs-panel-sub">PATHS // HOST</div>
         </header>
         <div class="bs-panel-body" style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:22px;">
@@ -590,7 +590,7 @@
                 <span class="bs-chain-val">{{ count }}</span>
               </div>
             {% else %}
-              <div class="bs-empty">暂无路径数据</div>
+              <div class="bs-empty">{{ _('暂无路径数据') }}</div>
             {% endfor %}
           </div>
           <div class="bs-chain">
@@ -600,12 +600,12 @@
               <span class="bs-chain-val">{{ stats.system.cpu_percent|round(1) }}%</span>
             </div>
             <div class="bs-chain-row">
-              <span class="bs-chain-name">内存</span>
+              <span class="bs-chain-name">{{ _('内存') }}</span>
               <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ stats.system.memory_percent|round(0, 'floor') }}%"></div></div>
               <span class="bs-chain-val">{{ stats.system.memory_percent|round(1) }}%</span>
             </div>
             <div class="bs-chain-row">
-              <span class="bs-chain-name">磁盘</span>
+              <span class="bs-chain-name">{{ _('磁盘') }}</span>
               <div class="bs-chain-track"><div class="bs-chain-fill" style="width: {{ stats.system.disk_percent|round(0, 'floor') }}%"></div></div>
               <span class="bs-chain-val">{{ stats.system.disk_percent|round(1) }}%</span>
             </div>
@@ -618,7 +618,7 @@
     <div class="bs-col">
       <section class="bs-panel" style="flex: 1 1 auto;">
         <header class="bs-panel-head">
-          <div class="bs-panel-title">攻击解析</div>
+          <div class="bs-panel-title">{{ _('攻击解析') }}</div>
           <div class="bs-panel-sub">ANALYSIS</div>
         </header>
         <div class="bs-panel-body">
@@ -630,7 +630,7 @@
 
       <section class="bs-panel" style="flex: 0 0 240px;">
         <header class="bs-panel-head">
-          <div class="bs-panel-title">威胁链路</div>
+          <div class="bs-panel-title">{{ _('威胁链路') }}</div>
           <div class="bs-panel-sub">CHAIN // KILL-CHAIN</div>
         </header>
         <div class="bs-panel-body">
@@ -653,7 +653,7 @@
     <span id="smart-screen-track" style="display:none">
       <span data-track="overview"></span><span data-track="sources"></span><span data-track="nodes"></span>
     </span>
-    <span>面向蜜罐节点、诱捕事件、凭据命中与反制处置的实时态势面板</span>
+    <span>{{ _('面向蜜罐节点、诱捕事件、凭据命中与反制处置的实时态势面板') }}</span>
   </div>
 </div>
 

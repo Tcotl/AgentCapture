@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
-{{ page_header('AL', '告警配置', '以 SaaS 后台方式统一维护通知渠道、告警阈值与策略映射，让威胁事件能进入清晰的通知闭环。', ['通知配置', '告警策略'],
-      actions='<button type="button" class="chip primary" data-modal-open="channel-create-modal">＋ 新增通知配置</button>') }}
+{{ page_header('AL', "_( '告警配置' )", "_( '以 SaaS 后台方式统一维护通知渠道、告警阈值与策略映射，让威胁事件能进入清晰的通知闭环。' )", ["_( '通知配置' )", "_( '告警策略' )"],
+      actions='<button type="button" class="chip primary" data-modal-open="channel-create-modal">' ~ "_( '＋ 新增通知配置' )" ~ '</button>') }}
 
 {% if error %}
 <div class="panel page-banner error">
@@ -13,15 +13,15 @@
 <div class="panel page-banner">
   <div class="panel-header" style="align-items:center;">
     <div>
-      <h3 class="panel-title">当前模式</h3>
+      <h3 class="panel-title">{{ _('当前模式') }}</h3>
       <p class="panel-subtitle" style="margin-top:4px;">
         ALERTS_ENABLED = <code>{{ alerts_enabled }}</code>
         {% if alerts_enabled %}
-          <span class="badge badge-success" style="margin-left:6px">真实投递</span>
-          <span class="muted" style="margin-left:6px">满足策略的事件将发送到所配置的 channel</span>
+          <span class="badge badge-success" style="margin-left:6px">{{ _('真实投递') }}</span>
+          <span class="muted" style="margin-left:6px">{{ _('满足策略的事件将发送到所配置的 channel') }}</span>
         {% else %}
-          <span class="badge badge-warning" style="margin-left:6px">干跑模式</span>
-          <span class="muted" style="margin-left:6px">仅日志记录，不发送真实通知；在 <code>.env</code> 中设置 <code>ALERTS_ENABLED=true</code> 并重启后生效</span>
+          <span class="badge badge-warning" style="margin-left:6px">{{ _('干跑模式') }}</span>
+          <span class="muted" style="margin-left:6px">{{ _('仅日志记录，不发送真实通知；在') }} <code>.env</code> {{ _('中设置') }} <code>ALERTS_ENABLED=true</code> {{ _('并重启后生效') }}</span>
         {% endif %}
       </p>
     </div>
@@ -29,10 +29,10 @@
 </div>
 
 <section class="panel" style="margin-bottom: 20px;">
-  {{ section_header('主动隔离', 'isolate 判定、canary 回显命中与手动隔离的持久名单（TTL 内对这些来源直接短路）') }}
+  {{ section_header("_( '主动隔离' )", "_( 'isolate 判定、canary 回显命中与手动隔离的持久名单（TTL 内对这些来源直接短路）' )") }}
   <div class="table-wrap" style="margin-top:12px;">
     <table>
-      <thead><tr><th>类型</th><th>值</th><th>原因</th><th>创建方</th><th>生效至</th><th>操作</th></tr></thead>
+      <thead><tr><th>{{ _('类型') }}</th><th>{{ _('值') }}</th><th>{{ _('原因') }}</th><th>{{ _('创建方') }}</th><th>{{ _('生效至') }}</th><th>{{ _('操作') }}</th></tr></thead>
       <tbody>
         {% for entry in isolations %}
         <tr>
@@ -44,29 +44,29 @@
           <td>{{ entry.expires_at.strftime('%m-%d %H:%M') if entry.expires_at else '—' }}</td>
           <td>
             <form method="post" action="/admin/isolation/{{ entry.id }}/revoke" style="margin:0;">
-              <button class="secondary btn-sm" type="submit">解除</button>
+              <button class="secondary btn-sm" type="submit">{{ _('解除') }}</button>
             </form>
           </td>
         </tr>
         {% else %}
-        {{ empty_state('暂无活动隔离', '当风险引擎给出 isolate 判定、捕获到 canary 回显或手动添加隔离时显示在这里。', 6, 'AL') }}
+        {{ empty_state("_( '暂无活动隔离' )", "_( '当风险引擎给出 isolate 判定、捕获到 canary 回显或手动添加隔离时显示在这里。' )", 6, 'AL') }}
         {% endfor %}
       </tbody>
     </table>
   </div>
   <form method="post" action="/admin/isolation" class="grid-4" style="margin-top:14px; gap:10px; align-items:end;">
-    <label class="field-label"><span>类型</span>
+    <label class="field-label"><span>{{ _('类型') }}</span>
       <select name="kind"><option value="ip">IP</option><option value="session">Session</option></select>
     </label>
-    <label class="field-label"><span>值（IP 或 session_id）*</span><input name="value" required placeholder="203.0.113.7"></label>
-    <label class="field-label"><span>原因</span><input name="reason" value="manual" placeholder="manual"></label>
-    <label class="field-label" style="min-width:120px;"><span>TTL（分钟）</span><input name="ttl_minutes" type="number" min="1" value="60"></label>
-    <button type="submit" class="btn-sm" style="white-space:nowrap;align-self:flex-end;">添加隔离</button>
+    <label class="field-label"><span>{{ _('值（IP 或 session_id）*') }}</span><input name="value" required placeholder="203.0.113.7"></label>
+    <label class="field-label"><span>{{ _('原因') }}</span><input name="reason" value="manual" placeholder="manual"></label>
+    <label class="field-label" style="min-width:120px;"><span>{{ _('TTL（分钟）') }}</span><input name="ttl_minutes" type="number" min="1" value="60"></label>
+    <button type="submit" class="btn-sm" style="white-space:nowrap;align-self:flex-end;">{{ _('添加隔离') }}</button>
   </form>
 </section>
 
 <section class="panel" style="margin-bottom: 20px;">
-  {{ section_header('统一日志外发 · Syslog（AI SOC 接入）', '将全部蜜罐事件以标准 syslog（RFC5424 / RFC3164，UDP/TCP）外发到 AI SOC 平台的采集器；消息体为单行 JSON 统一数据接口，含事件类型、决策、风险、信号与来源。') }}
+  {{ section_header("_( '统一日志外发 · Syslog（AI SOC 接入）' )", "_( '将全部蜜罐事件以标准 syslog（RFC5424 / RFC3164，UDP/TCP）外发到 AI SOC 平台的采集器；消息体为单行 JSON 统一数据接口，含事件类型、决策、风险、信号与来源。' )") }}
   <div class="panel" style="margin-bottom:14px;padding:14px 16px">
     <form method="post" action="/admin/alerts/syslog" class="stack" style="max-width:760px">
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
@@ -74,37 +74,37 @@
         启用 syslog 外发（低于最小风险阈值的事件不外发）
       </label>
       <div class="grid-2">
-        <label class="field-label"><span>Syslog 服务器地址</span>
-          <input name="host" value="{{ syslog.host }}" placeholder="例如 soc-collector.corp.lan"></label>
-        <label class="field-label"><span>端口</span>
+        <label class="field-label"><span>{{ _('Syslog 服务器地址') }}</span>
+          <input name="host" value="{{ syslog.host }}" placeholder="_( '例如 soc-collector.corp.lan' )"></label>
+        <label class="field-label"><span>{{ _('端口') }}</span>
           <input type="number" name="port" value="{{ syslog.port }}" placeholder="514"></label>
-        <label class="field-label"><span>协议</span>
+        <label class="field-label"><span>{{ _('协议') }}</span>
           <select name="proto">
             <option value="udp" {% if syslog.proto == 'udp' %}selected{% endif %}>UDP</option>
             <option value="tcp" {% if syslog.proto == 'tcp' %}selected{% endif %}>TCP</option>
           </select></label>
-        <label class="field-label"><span>消息格式</span>
+        <label class="field-label"><span>{{ _('消息格式') }}</span>
           <select name="fmt">
             <option value="rfc5424" {% if syslog.format == 'rfc5424' %}selected{% endif %}>RFC 5424</option>
             <option value="rfc3164" {% if syslog.format == 'rfc3164' %}selected{% endif %}>RFC 3164</option>
           </select></label>
         <label class="field-label"><span>Facility（local0 = 16）</span>
           <input type="number" name="facility" value="{{ syslog.facility }}" min="0" max="23"></label>
-        <label class="field-label"><span>最小风险阈值</span>
+        <label class="field-label"><span>{{ _('最小风险阈值') }}</span>
           <input type="number" name="min_risk" value="{{ syslog.min_risk }}" min="0" max="100"></label>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button type="submit" class="primary btn-sm">保存 syslog 配置</button>
+        <button type="submit" class="primary btn-sm">{{ _('保存 syslog 配置') }}</button>
         <span class="muted" style="font-size:12px">已发送 {{ syslog_counters.sent }} · 错误 {{ syslog_counters.errors }} · 丢弃 {{ syslog_counters.dropped }}</span>
       </div>
     </form>
     <div style="border-top:1px solid rgba(96,165,250,.12);margin-top:12px;padding-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button type="button" class="secondary btn-sm" id="syslog-test" style="cursor:pointer">发送测试消息</button>
-      <span id="syslog-test-status" class="muted" style="font-size:12px">向已配置的 syslog 服务器发送一条测试事件</span>
+      <button type="button" class="secondary btn-sm" id="syslog-test" style="cursor:pointer">{{ _('发送测试消息') }}</button>
+      <span id="syslog-test-status" class="muted" style="font-size:12px">{{ _('向已配置的 syslog 服务器发送一条测试事件') }}</span>
     </div>
   </div>
 
-  {{ section_header('通知配置', '维护 webhook、钉钉、飞书、email 等通知参数') }}
+  {{ section_header("_( '通知配置' )", "_( '维护 webhook、钉钉、飞书、email 等通知参数' )") }}
 
     <details style="margin-bottom: 12px;">
       <summary class="field-help-toggle">
@@ -112,16 +112,16 @@
         渠道类型说明（点击展开）
       </summary>
       <div class="field-help-body">
-        <p><strong>webhook</strong> — 任意 HTTP(S) 接收端点。POST JSON 包含 <code>event</code>/<code>channel</code>/<code>timestamp</code> 字段。可用 <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a> 验证。</p>
-        <p><strong>钉钉机器人</strong> — 群设置 → 智能群助手 → 添加机器人 → 自定义机器人 → 复制 webhook URL（含 access_token）。签名可选：机器人"安全设置"里勾选"加签"后得到 <code>SEC...</code> 密钥。</p>
-        <p><strong>飞书机器人</strong> — 群设置 → 群机器人 → 添加机器人 → 自定义机器人 → 复制 webhook URL。签名可选：机器人"安全设置"里勾选"签名校验"。</p>
-        <p><strong>SMTP email</strong> — 自备邮件服务。常用端口 25（无 TLS）、465（SMTPS）、587（STARTTLS）。</p>
+        <p><strong>webhook</strong> {{ _('— 任意 HTTP(S) 接收端点。POST JSON 包含') }} <code>event</code>/<code>channel</code>/<code>timestamp</code> {{ _('字段。可用') }} <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a> {{ _('验证。') }}</p>
+        <p><strong>{{ _('钉钉机器人') }}</strong> {{ _('— 群设置 → 智能群助手 → 添加机器人 → 自定义机器人 → 复制 webhook URL（含 access_token）。签名可选：机器人\"安全设置\"里勾选\"加签\"后得到') }} <code>SEC...</code> {{ _('密钥。') }}</p>
+        <p><strong>{{ _('飞书机器人') }}</strong> {{ _('— 群设置 → 群机器人 → 添加机器人 → 自定义机器人 → 复制 webhook URL。签名可选：机器人\"安全设置\"里勾选\"签名校验\"。') }}</p>
+        <p><strong>SMTP email</strong> {{ _('— 自备邮件服务。常用端口 25（无 TLS）、465（SMTPS）、587（STARTTLS）。') }}</p>
       </div>
     </details>
 
     <div class="table-wrap" style="margin-top:16px;">
       <table>
-        <thead><tr><th>名称</th><th>类型</th><th>配置详情</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>{{ _('名称') }}</th><th>{{ _('类型') }}</th><th>{{ _('配置详情') }}</th><th>{{ _('状态') }}</th><th>{{ _('操作') }}</th></tr></thead>
         <tbody>
           {% for item in channels %}
           <tr{% if edit_channel_id and edit_channel_id == item.id %} class="row-edit-selected"{% endif %}>
@@ -147,7 +147,7 @@
                 {% if item.config_json.get('password') %}<br><small class="muted">password: ●●●●●●●●</small>{% endif %}
                 <br><small class="muted">from: {{ item.config_json.get('from_addr', '—') }}</small>
                 <br><small class="muted">to: {{ (item.config_json.get('to_addrs') or []) | join(', ') }}</small>
-                {% if item.config_json.get('use_tls') is not none %}<br><small class="muted">TLS: {{ '是' if item.config_json.use_tls in [true, 'true', 'True'] else '否' }}</small>{% endif %}
+                {% if item.config_json.get('use_tls') is not none %}<br><small class="muted">TLS: {{ "_( '是' )" if item.config_json.use_tls in [true, 'true', 'True'] else "_( '否' )" }}</small>{% endif %}
               {% else %}
                 <pre>{{ item.config_json }}</pre>
               {% endif %}
@@ -157,14 +157,14 @@
               <div class="actions-inline">
                 <form method="post" action="/admin/alerts/test" style="margin: 0;">
                   <input type="hidden" name="channel_id" value="{{ item.id }}">
-                  <button class="secondary btn-sm" type="submit" title="同步测试发送">测试</button>
+                  <button class="secondary btn-sm" type="submit" title="{{ _('同步测试发送') }}">{{ _('测试') }}</button>
                 </form>
-                <a class="chip" href="?edit_channel={{ item.id }}">编辑</a>
+                <a class="chip" href="?edit_channel={{ item.id }}">{{ _( '编辑' ) }}</a>
                 <form method="post" action="/admin/alerts/channels/{{ item.id }}/toggle" style="margin: 0;">
-                  <button class="secondary btn-sm" type="submit">{{ "启用" if not item.is_active else "停用" }}</button>
+                  <button class="secondary btn-sm" type="submit">{{ "_( '启用' )" if not item.is_active else "_( '停用' )" }}</button>
                 </form>
                 <form method="post" action="/admin/alerts/channels/{{ item.id }}/delete" style="margin: 0;">
-                  <button class="secondary btn-sm" type="submit">删除</button>
+                  <button class="secondary btn-sm" type="submit">{{ _('删除') }}</button>
                 </form>
               </div>
             </td>
@@ -174,22 +174,22 @@
             <form method="post" action="/admin/alerts/channels/{{ item.id }}/patch" class="stack edit-form-inline">
               <h4 class="edit-form-title">编辑 channel：{{ item.name }}</h4>
               <div class="grid-2">
-                <label class="field-label"><span>名称 *</span><input name="name" value="{{ item.name }}" required></label>
-                <label class="field-label"><span>描述</span><input name="description" value="{{ item.description or '' }}" placeholder="可选"></label>
+                <label class="field-label"><span>{{ _( '名称 *' ) }}</span><input name="name" value="{{ item.name }}" required></label>
+                <label class="field-label"><span>{{ _( '描述' ) }}</span><input name="description" value="{{ item.description or '' }}" placeholder="{{ _('可选') }}"></label>
               </div>
-              <label class="field-label"><span>config_json（整体替换）</span>
+              <label class="field-label"><span>{{ _('config_json（整体替换）') }}</span>
                 <textarea name="config_json" rows="4">{{ item.config_json | tojson(indent=2) }}</textarea>
               </label>
-              <label class="checkbox-row"><input type="checkbox" name="is_active" {% if item.is_active %}checked{% endif %}> 启用此 channel</label>
+              <label class="checkbox-row"><input type="checkbox" name="is_active" {% if item.is_active %}checked{% endif %}> {{ _('启用此 channel') }}</label>
               <div class="grid-2" style="max-width: 320px;">
-                <button type="submit">保存</button>
-                <button type="button" class="secondary" onclick="location.href='/admin/alerts'">取消</button>
+                <button type="submit">{{ _('保存') }}</button>
+                <button type="button" class="secondary" onclick="location.href='/admin/alerts'">{{ _('取消') }}</button>
               </div>
             </form>
           </td></tr>
           {% endif %}
           {% else %}
-          {{ empty_state('暂无通知配置', '新增通知配置后会显示在这里。', 5, 'AL') }}
+          {{ empty_state("_( '暂无通知配置' )", "_( '新增通知配置后会显示在这里。' )", 5, 'AL') }}
           {% endfor %}
         </tbody>
       </table>
@@ -197,20 +197,20 @@
   </section>
 
   <section class="panel" style="margin-bottom: 20px;">
-    {{ section_header('告警策略', '定义事件范围、阈值与通知配置映射') }}
+    {{ section_header("_( '告警策略' )", "_( '定义事件范围、阈值与通知配置映射' )") }}
     <form method="post" action="/admin/alerts/policies" class="grid-4" style="gap:10px;align-items:end;">
-      <label class="field-label"><span>策略名称 *</span><input name="name" placeholder="如 高危凭据告警" required></label>
-      <label class="field-label"><span>事件范围</span>
+      <label class="field-label"><span>{{ _('策略名称 *') }}</span><input name="name" placeholder="{{ _('如 高危凭据告警') }}" required></label>
+      <label class="field-label"><span>{{ _('事件范围') }}</span>
         <select name="event_scope" required>
-          <option value="threat">threat — 风险事件</option>
-          <option value="credential">credential — 凭据诱饵</option>
-          <option value="system">system — 系统级事件</option>
+          <option value="threat">{{ _('threat — 风险事件') }}</option>
+          <option value="credential">{{ _('credential — 凭据诱饵') }}</option>
+          <option value="system">{{ _('system — 系统级事件') }}</option>
         </select>
       </label>
-      <label class="field-label"><span>最小风险分</span><input type="number" name="min_risk_score" value="45" required></label>
+      <label class="field-label"><span>{{ _('最小风险分') }}</span><input type="number" name="min_risk_score" value="45" required></label>
       <div style="display:flex;gap:10px;align-items:end;">
-        <label class="field-label" style="flex:1;"><span>通知配置（逗号分隔）</span><input name="channels_csv" placeholder="如 soc-webhook,slack" required></label>
-        <button type="submit" class="btn-sm" style="white-space:nowrap;">新增策略</button>
+        <label class="field-label" style="flex:1;"><span>{{ _('通知配置（逗号分隔）') }}</span><input name="channels_csv" placeholder="{{ _('如 soc-webhook,slack') }}" required></label>
+        <button type="submit" class="btn-sm" style="white-space:nowrap;">{{ _('新增策略') }}</button>
       </div>
       {% if channels %}
       <div class="muted" style="font-size: 12px; grid-column: 1 / -1;">
@@ -221,7 +221,7 @@
 
     <div class="table-wrap" style="margin-top:16px;">
       <table>
-        <thead><tr><th>名称</th><th>范围</th><th>阈值</th><th>通知</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>{{ _('名称') }}</th><th>{{ _('范围') }}</th><th>{{ _('阈值') }}</th><th>{{ _('通知') }}</th><th>{{ _('状态') }}</th><th>{{ _('操作') }}</th></tr></thead>
         <tbody>
           {% for item in policies %}
           <tr{% if edit_policy_id and edit_policy_id == item.id %} class="row-edit-selected"{% endif %}>
@@ -232,12 +232,12 @@
             <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'warning') }}{% endif %}</td>
             <td>
               <div class="actions-inline">
-                <a class="chip" href="?edit_policy={{ item.id }}">编辑</a>
+                <a class="chip" href="?edit_policy={{ item.id }}">{{ _( '编辑' ) }}</a>
                 <form method="post" action="/admin/alerts/policies/{{ item.id }}/toggle" style="margin: 0;">
-                  <button class="secondary btn-sm" type="submit">{{ "启用" if not item.is_active else "停用" }}</button>
+                  <button class="secondary btn-sm" type="submit">{{ "_( '启用' )" if not item.is_active else "_( '停用' )" }}</button>
                 </form>
                 <form method="post" action="/admin/alerts/policies/{{ item.id }}/delete" style="margin: 0;">
-                  <button class="secondary btn-sm" type="submit">删除</button>
+                  <button class="secondary btn-sm" type="submit">{{ _('删除') }}</button>
                 </form>
               </div>
             </td>
@@ -247,8 +247,8 @@
             <form method="post" action="/admin/alerts/policies/{{ item.id }}/patch" class="stack edit-form-inline">
               <h4 class="edit-form-title">编辑 policy：{{ item.name }}</h4>
               <div class="grid-2">
-                <label class="field-label"><span>名称 *</span><input name="name" value="{{ item.name }}" required></label>
-                <label class="field-label"><span>事件范围</span>
+                <label class="field-label"><span>{{ _( '名称 *' ) }}</span><input name="name" value="{{ item.name }}" required></label>
+                <label class="field-label"><span>{{ _('事件范围') }}</span>
                   <select name="event_scope" required>
                     <option value="threat" {% if item.event_scope == 'threat' %}selected{% endif %}>threat</option>
                     <option value="credential" {% if item.event_scope == 'credential' %}selected{% endif %}>credential</option>
@@ -257,8 +257,8 @@
                 </label>
               </div>
               <div class="grid-2">
-                <label class="field-label"><span>最小风险分</span><input type="number" name="min_risk_score" value="{{ item.min_risk_score }}" required></label>
-                <label class="field-label"><span>通知配置（逗号分隔）</span><input name="channels_csv" value="{{ item.delivery_channels_json | join(',') }}" required></label>
+                <label class="field-label"><span>{{ _( '最小风险分' ) }}</span><input type="number" name="min_risk_score" value="{{ item.min_risk_score }}" required></label>
+                <label class="field-label"><span>{{ _( '通知配置（逗号分隔）' ) }}</span><input name="channels_csv" value="{{ item.delivery_channels_json | join(',') }}" required></label>
               </div>
               {% if channels %}
               <div class="muted" style="font-size: 12px;">
@@ -266,14 +266,14 @@
               </div>
               {% endif %}
               <div class="grid-2" style="max-width: 320px;">
-                <button type="submit">保存</button>
-                <button type="button" class="secondary" onclick="location.href='/admin/alerts'">取消</button>
+                <button type="submit">{{ _('保存') }}</button>
+                <button type="button" class="secondary" onclick="location.href='/admin/alerts'">{{ _('取消') }}</button>
               </div>
             </form>
           </td></tr>
           {% endif %}
           {% else %}
-          {{ empty_state('暂无告警策略', '新增告警策略后会显示在这里。', 6, 'AL') }}
+          {{ empty_state("_( '暂无告警策略' )", "_( '新增告警策略后会显示在这里。' )", 6, 'AL') }}
           {% endfor %}
         </tbody>
       </table>
@@ -282,23 +282,23 @@
 
 {% if test_result is defined %}
 <section class="panel" style="margin-bottom: 20px; border-left: 3px solid var(--info, #60a5fa);">
-  {{ section_header('测试结果', '点击「测试」后通道的同步发送返回') }}
+  {{ section_header("_( '测试结果' )", "_( '点击「测试」后通道的同步发送返回' )") }}
   <pre style="margin:8px 0 0; font-size: 12px; max-height: 300px; overflow:auto;">{{ test_result }}</pre>
 </section>
 {% endif %}
 
-{% call modal_dialog('channel-create-modal', '新增通知配置', '维护 webhook、钉钉、飞书、email 等通知渠道参数。') %}
+{% call modal_dialog('channel-create-modal', "_( '新增通知配置' )", "_( '维护 webhook、钉钉、飞书、email 等通知渠道参数。' )") %}
 <form method="post" action="/admin/alerts/channels" class="stack" id="channel-create-form">
   <div class="grid-2">
-    <label class="field-label"><span>名称</span><input name="name" placeholder="唯一标识（如 soc-webhook）" required></label>
-    <label class="field-label"><span>描述</span><input name="description" placeholder="可选"></label>
+    <label class="field-label"><span>{{ _('名称') }}</span><input name="name" placeholder="{{ _('唯一标识（如 soc-webhook）') }}" required></label>
+    <label class="field-label"><span>{{ _('描述') }}</span><input name="description" placeholder="{{ _('可选') }}"></label>
   </div>
   <label class="field-label">
-    <span>渠道类型</span>
+    <span>{{ _('渠道类型') }}</span>
     <select name="channel_type" id="channel-type-select" required>
       <option value="webhook">webhook</option>
-      <option value="dingtalk">钉钉机器人</option>
-      <option value="feishu">飞书机器人</option>
+      <option value="dingtalk">{{ _('钉钉机器人') }}</option>
+      <option value="feishu">{{ _('飞书机器人') }}</option>
       <option value="email">SMTP email</option>
     </select>
   </label>
@@ -307,19 +307,19 @@
   {# ---- webhook fields ---- #}
   <div class="channel-fields" data-type="webhook">
     <label class="field-label"><span>URL *</span><input data-config-key="url" placeholder="https://example.com/webhook"></label>
-    <label class="field-label"><span>请求头（JSON，可选）</span><input data-config-key="headers" placeholder='{"X-Token": "abc"}'></label>
-    <label class="field-label"><span>超时秒数（默认 5）</span><input data-config-key="timeout" type="number" min="1" max="60" placeholder="5"></label>
+    <label class="field-label"><span>{{ _('请求头（JSON，可选）') }}</span><input data-config-key="headers" placeholder='{"X-Token": "abc"}'></label>
+    <label class="field-label"><span>{{ _('超时秒数（默认 5）') }}</span><input data-config-key="timeout" type="number" min="1" max="60" placeholder="5"></label>
   </div>
 
   {# ---- dingtalk fields ---- #}
   <div class="channel-fields" data-type="dingtalk" style="display: none;">
     <label class="field-label"><span>Webhook URL *</span><input data-config-key="webhook_url" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..."></label>
-    <label class="field-label"><span>加签密钥（可选）</span><input data-config-key="sign_secret" type="password" placeholder="SEC..."></label>
+    <label class="field-label"><span>{{ _('加签密钥（可选）') }}</span><input data-config-key="sign_secret" type="password" placeholder="SEC..."></label>
     <div class="grid-2">
-      <label class="field-label"><span>@ 所有人</span>
-        <select data-config-key="at_all"><option value="false">否</option><option value="true">是</option></select>
+      <label class="field-label"><span>{{ _('@ 所有人') }}</span>
+        <select data-config-key="at_all"><option value="false">{{ _('否') }}</option><option value="true">{{ _('是') }}</option></select>
       </label>
-      <label class="field-label"><span>@ 手机号（逗号分隔）</span>
+      <label class="field-label"><span>{{ _('@ 手机号（逗号分隔）') }}</span>
         <input data-config-key="at_mobiles" placeholder="13800138000,13900139000">
       </label>
     </div>
@@ -328,33 +328,33 @@
   {# ---- feishu fields ---- #}
   <div class="channel-fields" data-type="feishu" style="display: none;">
     <label class="field-label"><span>Webhook URL *</span><input data-config-key="webhook_url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."></label>
-    <label class="field-label"><span>签名密钥（可选）</span><input data-config-key="sign_secret" type="password" placeholder="..."></label>
-    <label class="field-label"><span>@ 用户 open_id（逗号分隔）</span><input data-config-key="at_user_ids" placeholder="ou_xxx,ou_yyy"></label>
+    <label class="field-label"><span>{{ _('签名密钥（可选）') }}</span><input data-config-key="sign_secret" type="password" placeholder="..."></label>
+    <label class="field-label"><span>{{ _('@ 用户 open_id（逗号分隔）') }}</span><input data-config-key="at_user_ids" placeholder="ou_xxx,ou_yyy"></label>
   </div>
 
   {# ---- smtp fields ---- #}
   <div class="channel-fields" data-type="email" style="display: none;">
     <div class="grid-2">
-      <label class="field-label"><span>SMTP 主机 *</span><input data-config-key="host" placeholder="smtp.example.com"></label>
-      <label class="field-label"><span>端口 *</span><input data-config-key="port" type="number" placeholder="465"></label>
+      <label class="field-label"><span>{{ _('SMTP 主机 *') }}</span><input data-config-key="host" placeholder="smtp.example.com"></label>
+      <label class="field-label"><span>{{ _('端口 *') }}</span><input data-config-key="port" type="number" placeholder="465"></label>
     </div>
     <div class="grid-2">
-      <label class="field-label"><span>用户名（可选）</span><input data-config-key="username" placeholder="user@example.com"></label>
-      <label class="field-label"><span>密码（可选）</span><input data-config-key="password" type="password" placeholder="app-password"></label>
+      <label class="field-label"><span>{{ _('用户名（可选）') }}</span><input data-config-key="username" placeholder="user@example.com"></label>
+      <label class="field-label"><span>{{ _('密码（可选）') }}</span><input data-config-key="password" type="password" placeholder="app-password"></label>
     </div>
-    <label class="field-label"><span>发件人地址 *</span><input data-config-key="from_addr" placeholder="alerts@example.com"></label>
-    <label class="field-label"><span>收件人（逗号分隔）*</span><input data-config-key="to_addrs" placeholder="soc@example.com,oncall@example.com"></label>
+    <label class="field-label"><span>{{ _('发件人地址 *') }}</span><input data-config-key="from_addr" placeholder="alerts@example.com"></label>
+    <label class="field-label"><span>{{ _('收件人（逗号分隔）*') }}</span><input data-config-key="to_addrs" placeholder="soc@example.com,oncall@example.com"></label>
     <div class="grid-2">
-      <label class="field-label"><span>使用 TLS</span>
-        <select data-config-key="use_tls"><option value="true">是 (SSL/TLS)</option><option value="false">否 (STARTTLS / 明文)</option></select>
+      <label class="field-label"><span>{{ _('使用 TLS') }}</span>
+        <select data-config-key="use_tls"><option value="true">{{ _('是 (SSL/TLS)') }}</option><option value="false">{{ _('否 (STARTTLS / 明文)') }}</option></select>
       </label>
-      <label class="field-label"><span>主题模板（可选）</span><input data-config-key="subject_template" placeholder="[AgentCapture] {event_type}: {summary}"></label>
+      <label class="field-label"><span>{{ _('主题模板（可选）') }}</span><input data-config-key="subject_template" placeholder="[AgentCapture] {event_type}: {summary}"></label>
     </div>
   </div>
 
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>取消</button>
-    <button type="submit">新增通知配置</button>
+    <button type="button" class="secondary" data-modal-close>{{ _('取消') }}</button>
+    <button type="submit">{{ _('新增通知配置') }}</button>
   </div>
 </form>
 {% endcall %}

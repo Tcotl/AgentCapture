@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, pagination %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, pagination with context %}
 {% block content %}
 <style>
   /* 数据密集页：解除 .content 全局 1720px 上限，让聚合表格随窗口铺满 */
@@ -121,7 +121,7 @@
   }
 </style>
 
-{{ page_header('AT', '攻击流量', '按来源 IP、站点与会话聚合攻击流量，并从这里进入攻击详情页与会话画像页。', ['聚合视图']) }}
+{{ page_header('AT', "_( '攻击流量' )", "_( '按来源 IP、站点与会话聚合攻击流量，并从这里进入攻击详情页与会话画像页。' )", ["_( '聚合视图' )"]) }}
 
 {% set at_ns = namespace(hits=0, peak=0, ips=[]) %}
 {% for item in items %}
@@ -135,15 +135,15 @@
     <div class="at-status-id">
       <span class="at-live-dot"></span>
       <div>
-        <div class="at-status-title">攻击流量监控</div>
-        <div class="at-status-sub">来源 IP × 站点 × 会话聚合矩阵</div>
+        <div class="at-status-title">{{ _('攻击流量监控') }}</div>
+        <div class="at-status-sub">{{ _('来源 IP × 站点 × 会话聚合矩阵') }}</div>
       </div>
     </div>
     <div class="at-readouts">
-      <div class="at-readout"><b>{{ pager.total }}</b><span>聚合会话</span></div>
-      <div class="at-readout"><b>{{ at_ns.ips|length }}</b><span>独立来源</span></div>
-      <div class="at-readout"><b>{{ at_ns.hits }}</b><span>累计命中</span></div>
-      <div class="at-readout"><b class="{% if at_ns.peak >= 70 %}danger{% elif at_ns.peak >= 45 %}warn{% endif %}">{{ at_ns.peak }}</b><span>峰值风险</span></div>
+      <div class="at-readout"><b>{{ pager.total }}</b><span>{{ _( '聚合会话' ) }}</span></div>
+      <div class="at-readout"><b>{{ at_ns.ips|length }}</b><span>{{ _( '独立来源' ) }}</span></div>
+      <div class="at-readout"><b>{{ at_ns.hits }}</b><span>{{ _( '累计命中' ) }}</span></div>
+      <div class="at-readout"><b class="{% if at_ns.peak >= 70 %}danger{% elif at_ns.peak >= 45 %}warn{% endif %}">{{ at_ns.peak }}</b><span>{{ _( '峰值风险' ) }}</span></div>
     </div>
   </section>
 
@@ -155,34 +155,34 @@
     {% endif %}
     {% if active_isolations %}
     <div class="panel page-banner" style="border-left:3px solid var(--warning,#f59e0b)">
-      <p class="panel-subtitle" style="margin:0">⚠ 当前有 <strong>{{ active_isolations }}</strong> 条活动隔离——被隔离来源的访问会收到伪装的「503 维护中」页面（属正常反制行为，不是平台故障）。可在 <a href="/admin/alerts">告警配置 → 主动隔离</a> 中查看/解除。</p>
+      <p class="panel-subtitle" style="margin:0">{{ _( '⚠ 当前有' ) }} <strong>{{ active_isolations }}</strong> {{ _( '条活动隔离——被隔离来源的访问会收到伪装的「503 维护中」页面（属正常反制行为，不是平台故障）。可在' ) }} <a href="/admin/alerts">{{ _( '告警配置 → 主动隔离' ) }}</a> {{ _( '中查看/解除。' ) }}</p>
     </div>
     {% endif %}
     <section class="panel">
-      {{ section_header('筛选', '按时间窗 / 来源 IP / 站点收窄聚合结果') }}
+      {{ section_header("_( '筛选' )", "_( '按时间窗 / 来源 IP / 站点收窄聚合结果' )") }}
       <form method="get" action="/admin/attacks" class="at-filter" data-recent-filter-key="admin-attacks">
         <label class="at-field">
-          <span class="at-field-label">起始日期</span>
+          <span class="at-field-label">{{ _('起始日期') }}</span>
           <input type="date" name="date_from" value="{{ filters.date_from }}" />
         </label>
         <label class="at-field">
-          <span class="at-field-label">结束日期</span>
+          <span class="at-field-label">{{ _('结束日期') }}</span>
           <input type="date" name="date_to" value="{{ filters.date_to }}" />
         </label>
         <label class="at-field">
-          <span class="at-field-label">来源 IP</span>
-          <input type="text" name="source_ip" value="{{ filters.source_ip }}" placeholder="来源 IP" />
+          <span class="at-field-label">{{ _('来源 IP') }}</span>
+          <input type="text" name="source_ip" value="{{ filters.source_ip }}" placeholder="_( '来源 IP' )" />
         </label>
         <label class="at-field">
-          <span class="at-field-label">站点节点</span>
-          <input type="text" name="site_id" value="{{ filters.site_id }}" placeholder="站点 / 节点" />
+          <span class="at-field-label">{{ _('站点节点') }}</span>
+          <input type="text" name="site_id" value="{{ filters.site_id }}" placeholder="_( '站点 / 节点' )" />
         </label>
         <div class="actions-inline at-filter-actions">
-          <button type="submit" class="primary" style="width:auto">应用筛选</button>
-          <button type="button" class="secondary" style="width:auto" data-filter-action="restore">恢复最近使用</button>
+          <button type="submit" class="primary" style="width:auto">{{ _('应用筛选') }}</button>
+          <button type="button" class="secondary" style="width:auto" data-filter-action="restore">{{ _('恢复最近使用') }}</button>
           <a class="chip" href="/admin/attacks" data-filter-action="clear"
-             style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">重置</a>
-          <button type="button" class="secondary btn-danger-ghost" style="width:auto" id="btn-clear-events">清除历史流量</button>
+             style="width:auto;height:42px !important;padding:0 16px !important;font-size:13px !important;border-radius:10px !important">{{ _('重置') }}</a>
+          <button type="button" class="secondary btn-danger-ghost" style="width:auto" id="btn-clear-events">{{ _('清除历史流量') }}</button>
         </div>
         <span class="recent-filter-status" data-recent-status></span>
       </form>
@@ -226,13 +226,13 @@
     </section>
 
     <section class="panel">
-      {{ section_header('攻击聚合视图', '聚合维度：来源 IP + 站点 + 会话', '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+      {{ section_header("_( '攻击聚合视图' )", "_( '聚合维度：来源 IP + 站点 + 会话' )", '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
       <div class="table-wrap compact at-table">
         <table>
           <colgroup>
             <col style="width: 12%"><col style="width: 15%"><col style="width: 5%"><col style="width: 14%"><col style="width: 16%"><col style="width: 6%"><col style="width: 5%"><col style="width: 17%"><col style="width: 10%">
           </colgroup>
-          <thead><tr><th>来源</th><th>会话</th><th class="numeric">次数</th><th>时间窗</th><th>热点路径</th><th>决策</th><th class="numeric">风险</th><th class="cell-prose">信号</th><th>动作</th></tr></thead>
+          <thead><tr><th>{{ _('来源') }}</th><th>{{ _('会话') }}</th><th class="numeric">{{ _('次数') }}</th><th>{{ _('时间窗') }}</th><th>{{ _('热点路径') }}</th><th>{{ _('决策') }}</th><th class="numeric">{{ _('风险') }}</th><th class="cell-prose">{{ _('信号') }}</th><th>{{ _('动作') }}</th></tr></thead>
           <tbody>
             {% for item in items %}
               <tr>
@@ -250,9 +250,9 @@
                 <td><span class="badge badge-{{ 'danger' if item.top_decision == '阻断' else ('warning' if item.top_decision in ['隔离', '挑战', '质询'] else 'info') }}">{{ item.top_decision }}</span></td>
                 <td class="numeric"><span class="at-risk {% if item.risk_score_max >= 70 %}danger{% elif item.risk_score_max >= 45 %}warn{% endif %}">{{ item.risk_score_max }}</span></td>
                 <td class="cell-prose"><span class="at-signal-wrap" title="{{ item.top_signals|join('，') }}">{{ item.top_signals|join('，') if item.top_signals else '-' }}</span></td>
-                <td><div class="actions-inline"><a class="chip primary" href="/admin/attacks/{{ item.session_id }}">详情</a><a class="chip" href="/admin/sessions/{{ item.session_id }}">画像</a></div></td>
+                <td><div class="actions-inline"><a class="chip primary" href="/admin/attacks/{{ item.session_id }}">{{ _( '详情' ) }}</a><a class="chip" href="/admin/sessions/{{ item.session_id }}">{{ _( '画像' ) }}</a></div></td>
               </tr>
-            {% else %}{{ empty_state('暂无攻击聚合记录', '公开访问流量尚未触发可聚合的攻击事件。', 9, 'AT') }}{% endfor %}
+            {% else %}{{ empty_state("_( '暂无攻击聚合记录' )", "_( '公开访问流量尚未触发可聚合的攻击事件。' )", 9, 'AT') }}{% endfor %}
           </tbody>
         </table>
       </div>

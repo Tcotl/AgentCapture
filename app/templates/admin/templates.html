@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog with context %}
 {% block content %}
-{{ page_header('TP', title or 'Web应用蜜罐管理', '只管理 Web 应用蜜罐的模板页面上传与节点部署，把仿真登录页、管理后台、业务入口等页面沉淀为可复用部署单元。', ['默认蜜罐', 'Web 应用', '节点部署'],
-      actions='<button type="button" class="chip primary" data-modal-open="clone-modal">＋ 克隆站点</button><button type="button" class="chip primary" data-modal-open="upload-modal">＋ 上传模板</button>') }}
+{{ page_header('TP', title or "_( 'Web应用蜜罐管理' )", "_( '只管理 Web 应用蜜罐的模板页面上传与节点部署，把仿真登录页、管理后台、业务入口等页面沉淀为可复用部署单元。' )", ["_( '默认蜜罐' )", "_( 'Web 应用' )", "_( '节点部署' )"],
+      actions='<button type="button" class="chip primary" data-modal-open="clone-modal">' ~ "_( '＋ 克隆站点' )" ~ '</button>' ~ '<button type="button" class="chip primary" data-modal-open="upload-modal">' ~ "_( '＋ 上传模板' )" ~ '</button>') }}
 
 {% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
 {% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
@@ -10,33 +10,33 @@
 <section class="panel" style="margin-bottom:16px">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="pill">默认蜜罐</span>
+      <span class="pill">{{ _( '默认蜜罐' ) }}</span>
       <strong style="font-size:15px">{{ default_honeypot.name }}</strong>
       <code style="font-size:12px;color:var(--muted-foreground)">0.0.0.0:{{ default_honeypot.port }}</code>
       {% if default_honeypot.running %}
-      <span class="badge badge-success">运行中</span>
+      <span class="badge badge-success">{{ _( '运行中' ) }}</span>
       {% else %}
-      <span class="badge badge-warning">已停止</span>
+      <span class="badge badge-warning">{{ _( '已停止' ) }}</span>
       {% endif %}
       {% if default_honeypot.enabled %}
-      <span class="badge badge-info">门面启用</span>
+      <span class="badge badge-info">{{ _( '门面启用' ) }}</span>
       {% else %}
-      <span class="badge badge-danger">门面已关闭（404）</span>
+      <span class="badge badge-danger">{{ _( '门面已关闭（404）' ) }}</span>
       {% endif %}
       <span class="muted" style="font-size:12px">24h 命中 {{ default_honeypot.stats.get('hits_24h', 0) }} 次</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <a class="chip" href="/admin/templates/default-honeypot" style="cursor:pointer;text-decoration:none">进入配置</a>
-      <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开蜜罐站点</a>
+      <a class="chip" href="/admin/templates/default-honeypot" style="cursor:pointer;text-decoration:none">{{ _( '进入配置' ) }}</a>
+      <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">{{ _( '打开蜜罐站点' ) }}</a>
       {% if default_honeypot.running %}
       <form method="post" action="/admin/templates/honeypot/stop" style="margin:0">
         <input type="hidden" name="next" value="/admin/templates">
-        <button type="submit" class="secondary btn-sm">停止蜜罐</button>
+        <button type="submit" class="secondary btn-sm">{{ _( '停止蜜罐' ) }}</button>
       </form>
       {% else %}
       <form method="post" action="/admin/templates/honeypot/start" style="margin:0">
         <input type="hidden" name="next" value="/admin/templates">
-        <button type="submit" class="primary btn-sm">启动蜜罐</button>
+        <button type="submit" class="primary btn-sm">{{ _( '启动蜜罐' ) }}</button>
       </form>
       {% endif %}
     </div>
@@ -335,101 +335,101 @@
 
 <div class="web-template-hero">
   <div class="web-template-kpi">
-    <span>模板页面</span>
+    <span>{{ _( '模板页面' ) }}</span>
     <strong>{{ items|length }}</strong>
-    <p>已上传的 Web 蜜罐页面模板，可直接分配到节点。</p>
+    <p>{{ _( '已上传的 Web 蜜罐页面模板，可直接分配到节点。' ) }}</p>
   </div>
   <div class="web-template-kpi">
-    <span>可部署节点</span>
+    <span>{{ _( '可部署节点' ) }}</span>
     <strong>{{ nodes|length }}</strong>
-    <p>可承载 Web 应用蜜罐的受控节点。</p>
+    <p>{{ _( '可承载 Web 应用蜜罐的受控节点。' ) }}</p>
   </div>
   <div class="web-template-kpi">
-    <span>管理范围</span>
+    <span>{{ _( '管理范围' ) }}</span>
     <strong>Web</strong>
-    <p>本页仅覆盖页面模板、入口路径和 Web 节点部署。</p>
+    <p>{{ _( '本页仅覆盖页面模板、入口路径和 Web 节点部署。' ) }}</p>
   </div>
 </div>
 
-{% call modal_dialog('clone-modal', '一键克隆站点为模板', '输入需克隆的互联网系统 URL，系统使用中文 UA / Accept-Language 渲染页面并抓取前端资源，保存为可重复部署的 Web 应用蜜罐模板。', wide=true) %} '输入需克隆的互联网系统 URL，系统使用中文 UA / Accept-Language 渲染页面并抓取前端资源，保存为可重复部署的 Web 应用蜜罐模板') }}
+{% call modal_dialog('clone-modal', "_( '一键克隆站点为模板' )", "_( '输入需克隆的互联网系统 URL，系统使用中文 UA / Accept-Language 渲染页面并抓取前端资源，保存为可重复部署的 Web 应用蜜罐模板。' )", wide=true) %}
   <form id="clone-form" class="stack">
     <div class="clone-row">
-      <input name="clone_url" type="text" placeholder="https://target.example.com/login 或 target.example.com/login" required>
-      <input name="name" placeholder="模板名称（留空则自动取域名）">
+      <input name="clone_url" type="text" placeholder="{{ _('https://target.example.com/login 或 target.example.com/login') }}" required>
+      <input name="name" placeholder="{{ _('模板名称（留空则自动取域名）') }}">
     </div>
     <div class="clone-row">
       <select name="web_stack">
-        <option value="管理后台">管理后台</option>
-        <option value="OA 登录">OA 登录</option>
-        <option value="云控制台">云控制台</option>
-        <option value="API 文档">API 文档</option>
-        <option value="业务门户">业务门户</option>
-        <option value="自定义页面" selected>自定义页面</option>
+        <option value="管理后台">{{ _( '管理后台' ) }}</option>
+        <option value="OA 登录">{{ _( 'OA 登录' ) }}</option>
+        <option value="云控制台">{{ _( '云控制台' ) }}</option>
+        <option value="API 文档">{{ _( 'API 文档' ) }}</option>
+        <option value="业务门户">{{ _( '业务门户' ) }}</option>
+        <option value="自定义页面" selected>{{ _( '自定义页面' ) }}</option>
       </select>
-      <input name="entry_path" value="/" placeholder="入口路径，如 /login">
+      <input name="entry_path" value="/" placeholder="{{ _('入口路径，如 /login') }}">
     </div>
-    <textarea name="description" placeholder="描述页面用途、仿真业务或采集点（留空则自动填写来源 URL）"></textarea>
+    <textarea name="description" placeholder="{{ _('描述页面用途、仿真业务或采集点（留空则自动填写来源 URL）') }}"></textarea>
     <div class="clone-row">
       <label class="clone-field-label">
-        <span>语言请求头</span>
+        <span>{{ _( '语言请求头' ) }}</span>
         <select name="clone_accept_language">
           <option value="{{ clone_default_accept_language }}" selected>中文优先 · {{ clone_default_accept_language }}</option>
-          <option value="zh-CN,zh;q=0.95">仅中文 · zh-CN</option>
-          <option value="zh-TW,zh;q=0.95,en;q=0.35">繁体中文 · zh-TW</option>
-          <option value="en-US,en;q=0.9">英文 · en-US</option>
+          <option value="zh-CN,zh;q=0.95">{{ _( '仅中文 · zh-CN' ) }}</option>
+          <option value="zh-TW,zh;q=0.95,en;q=0.35">{{ _( '繁体中文 · zh-TW' ) }}</option>
+          <option value="en-US,en;q=0.9">{{ _( '英文 · en-US' ) }}</option>
         </select>
       </label>
       <label class="clone-field-label">
-        <span>渲染等待</span>
-        <input type="number" name="clone_render_wait" value="8" min="2" max="20" placeholder="秒">
+        <span>{{ _( '渲染等待' ) }}</span>
+        <input type="number" name="clone_render_wait" value="8" min="2" max="20" placeholder="{{ _('秒') }}">
       </label>
-      <label class="clone-field-label" title="默认保留原站加载时自动弹出的对话框（如客户端下载提示），与真实站点一致；勾选后克隆为无弹窗的纯净快照">
-        <span>关闭加载弹窗</span>
+      <label class="clone-field-label" title="{{ _('默认保留原站加载时自动弹出的对话框（如客户端下载提示），与真实站点一致；勾选后克隆为无弹窗的纯净快照') }}">
+        <span>{{ _( '关闭加载弹窗' ) }}</span>
         <select name="dismiss_popups">
-          <option value="" selected>保留（默认 · 与原站一致）</option>
-          <option value="on">关闭（纯净快照）</option>
+          <option value="" selected>{{ _( '保留（默认 · 与原站一致）' ) }}</option>
+          <option value="on">{{ _( '关闭（纯净快照）' ) }}</option>
         </select>
       </label>
     </div>
     <label class="clone-field-label">
-      <span>User-Agent（用于控制桌面/移动端与部分站点语言版本）</span>
+      <span>{{ _( 'User-Agent（用于控制桌面/移动端与部分站点语言版本）' ) }}</span>
       <textarea class="clone-ua-input" name="clone_user_agent" spellcheck="false">{{ clone_default_user_agent }}</textarea>
     </label>
     <div class="clone-row">
       <label class="clone-field-label">
-        <span>触发后跳转动作</span>
+        <span>{{ _( '触发后跳转动作' ) }}</span>
         <select name="redirect_action" id="redirect-action-select">
-          <option value="fake_error" selected>模拟登录失败（诱导反复尝试）</option>
-          <option value="warning">警告页面（拦截并提示）</option>
-          <option value="original">原站点跳转（跳到真实系统）</option>
-          <option value="custom">自定义 URL 跳转</option>
+          <option value="fake_error" selected>{{ _( '模拟登录失败（诱导反复尝试）' ) }}</option>
+          <option value="warning">{{ _( '警告页面（拦截并提示）' ) }}</option>
+          <option value="original">{{ _( '原站点跳转（跳到真实系统）' ) }}</option>
+          <option value="custom">{{ _( '自定义 URL 跳转' ) }}</option>
         </select>
       </label>
       <label class="clone-field-label" id="redirect-url-label" style="display:none;">
-        <span>自定义跳转 URL</span>
+        <span>{{ _( '自定义跳转 URL' ) }}</span>
         <input name="redirect_url" type="text" placeholder="https://example.com/safe-page" value="">
       </label>
     </div>
     <div class="clone-help">
-      <strong>触发后跳转：</strong>攻击者提交登录凭证后，页面可执行四种动作之一 —— <strong>模拟登录失败</strong>（提示密码错误并清空密码框，诱导攻击者反复尝试以收割更多凭据）、<strong>警告页面</strong>（显示拦截提示，凭证已记录）、<strong>原站点跳转</strong>（跳转到克隆源 URL）、<strong>自定义 URL 跳转</strong>（跳转到指定地址）。
+      <strong>{{ _( '触发后跳转：' ) }}</strong>{{ _( '攻击者提交登录凭证后，页面可执行四种动作之一 ——' ) }} <strong>{{ _( '模拟登录失败' ) }}</strong>{{ _( '（提示密码错误并清空密码框，诱导攻击者反复尝试以收割更多凭据）、' ) }}<strong>{{ _( '警告页面' ) }}</strong>{{ _( '（显示拦截提示，凭证已记录）、' ) }}<strong>{{ _( '原站点跳转' ) }}</strong>{{ _( '（跳转到克隆源 URL）、' ) }}<strong>{{ _( '自定义 URL 跳转' ) }}</strong>（跳转到指定地址）。
     </div>
     <div class="clone-help">
-      <strong>克隆范围：</strong>默认以 zh-CN 语言环境、桌面 Chrome UA 渲染页面，并额外重写 JS / CSS 内的资源路径；仅克隆前端静态资源，不执行业务逻辑、不递归抓取整站。若目标站点根据 UA 输出移动端或英文版，可在这里切换 UA 与语言请求头后重新克隆。
+      <strong>{{ _( '克隆范围：' ) }}</strong>默认以 zh-CN 语言环境、桌面 Chrome UA 渲染页面，并额外重写 JS / CSS 内的资源路径；仅克隆前端静态资源，不执行业务逻辑、不递归抓取整站。若目标站点根据 UA 输出移动端或英文版，可在这里切换 UA 与语言请求头后重新克隆。
     </div>
-    <button type="submit" id="clone-btn">克隆并创建模板</button>
+    <button type="submit" id="clone-btn">{{ _( '克隆并创建模板' ) }}</button>
   </form>
 
   <!-- 进度条（克隆期间显示） -->
   <div id="clone-progress" style="display:none; margin-top:14px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <span id="clone-stage" style="color:#dbeafe; font-size:13px; font-weight:600;">准备中…</span>
+      <span id="clone-stage" style="color:#dbeafe; font-size:13px; font-weight:600;">{{ _( '准备中…' ) }}</span>
       <span id="clone-percent" style="color:#60a5fa; font-family:'Fira Code',monospace; font-size:13px;">0%</span>
     </div>
     <div style="height:6px; border-radius:3px; background:rgba(96,165,250,0.12); overflow:hidden;">
       <div id="clone-bar" style="height:100%; width:0%; border-radius:3px; background:linear-gradient(90deg,#3b82f6,#60a5fa); transition:width .4s ease;"></div>
     </div>
     <div style="margin-top:8px; text-align:right;">
-      <button type="button" id="clone-cancel-btn" class="secondary" style="font-size:12px; padding:4px 12px;">取消</button>
+      <button type="button" id="clone-cancel-btn" class="secondary" style="font-size:12px; padding:4px 12px;">{{ _( '取消' ) }}</button>
     </div>
   </div>
 
@@ -441,7 +441,7 @@
     <span>克隆成功 — 模板「{{ clone_name }}」已创建，抓取 {{ clone_assets }} 个资源（{{ clone_kb }} KB）。</span>
     {% if clone_template_id %}
     <span class="clone-msg-actions">
-      <a class="btn-preview" href="/admin/templates/{{ clone_template_id }}/preview" target="_blank">立即浏览</a>
+      <a class="btn-preview" href="/admin/templates/{{ clone_template_id }}/preview" target="_blank">{{ _( '立即浏览' ) }}</a>
     </span>
     {% endif %}
   </div>
@@ -452,34 +452,34 @@
 </section>
 
 {% endcall %}
-{% call modal_dialog('upload-modal', '上传 Web 应用蜜罐模板', '上传仿真页面或静态页面包，并定义入口路径与页面类型。') %} '上传仿真页面或静态页面包，并定义入口路径与页面类型') }}
+{% call modal_dialog('upload-modal', "_( '上传 Web 应用蜜罐模板' )", "_( '上传仿真页面或静态页面包，并定义入口路径与页面类型。' )") %}
     <form method="post" action="/admin/templates" enctype="multipart/form-data" class="stack">
       <div class="grid-2">
-        <input name="name" placeholder="模板名称，如 仿真OA登录页" required>
+        <input name="name" placeholder="{{ _('模板名称，如 仿真OA登录页') }}" required>
         <select name="web_stack" required>
-          <option value="管理后台">管理后台</option>
-          <option value="OA 登录">OA 登录</option>
-          <option value="云控制台">云控制台</option>
-          <option value="API 文档">API 文档</option>
-          <option value="业务门户">业务门户</option>
-          <option value="自定义页面">自定义页面</option>
+          <option value="管理后台">{{ _( '管理后台' ) }}</option>
+          <option value="OA 登录">{{ _( 'OA 登录' ) }}</option>
+          <option value="云控制台">{{ _( '云控制台' ) }}</option>
+          <option value="API 文档">{{ _( 'API 文档' ) }}</option>
+          <option value="业务门户">{{ _( '业务门户' ) }}</option>
+          <option value="自定义页面">{{ _( '自定义页面' ) }}</option>
         </select>
       </div>
       <div class="grid-2">
-        <input name="entry_path" value="/" placeholder="入口路径，如 /login" required>
-        <input name="deploy_mode" value="静态页面仿真" placeholder="部署方式">
+        <input name="entry_path" value="/" placeholder="{{ _('入口路径，如 /login') }}" required>
+        <input name="deploy_mode" value="静态页面仿真" placeholder="{{ _('部署方式') }}">
       </div>
       <div class="upload-drop">
-        <div class="muted">模板页面上传：支持 HTML、静态资源压缩包或页面配置文件。</div>
+        <div class="muted">{{ _( '模板页面上传：支持 HTML、静态资源压缩包或页面配置文件。' ) }}</div>
         <input type="file" name="template_file" accept=".html,.htm,.zip,.tar,.gz,.tgz,.json,.txt">
       </div>
-      <textarea name="description" placeholder="描述页面用途、仿真业务、采集点或触发条件"></textarea>
-      <button type="submit">上传并创建模板</button>
+      <textarea name="description" placeholder="{{ _('描述页面用途、仿真业务、采集点或触发条件') }}"></textarea>
+      <button type="submit">{{ _( '上传并创建模板' ) }}</button>
     </form>
 {% endcall %}
 
   <section class="panel">
-    {{ section_header('Web 应用蜜罐部署', '启用模板后立即在指定节点的指定端口生效；停用可重新启用而不丢失配置') }}
+    {{ section_header("_( 'Web 应用蜜罐部署' )", "_( '启用模板后立即在指定节点的指定端口生效；停用可重新启用而不丢失配置' )") }}
     {% if deploy_ok %}
     <div class="clone-msg clone-msg-ok">部署成功 — 模板「{{ deploy_name }}」已下发至节点「{{ deploy_node }}」，监听 :{{ deploy_port }}{{ deploy_route }}</div>
     {% endif %}
@@ -493,23 +493,23 @@
     <div class="clone-msg clone-msg-ok">已停用 — 模板「{{ disable_name }}」已从 {{ disable_count }} 个部署中移除，仍保留配置记录。</div>
     {% endif %}
     <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
-      <form method="post" action="/admin/templates/bulk-delete" data-confirm="确认删除选中的 {n} 个模板？已部署的实例会一并移除，不可撤销。" class="bulk-del-form">
+      <form method="post" action="/admin/templates/bulk-delete" data-confirm="{{ _('确认删除选中的 {n} 个模板？已部署的实例会一并移除，不可撤销。') }}" class="bulk-del-form">
         <input type="hidden" name="ids" value="">
-        <button type="button" class="danger btn-sm bulk-del-btn">批量删除</button>
+        <button type="button" class="danger btn-sm bulk-del-btn">{{ _( '批量删除' ) }}</button>
       </form>
-      <span class="muted" style="font-size:11px">勾选模板后批量移除</span>
+      <span class="muted" style="font-size:11px">{{ _( '勾选模板后批量移除' ) }}</span>
     </div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th style="width:36px"><input type="checkbox" class="bulk-select-all" style="cursor:pointer"></th>
-            <th class="cell-prose">模板</th>
-            <th>Web 类型</th>
-            <th>入口路径</th>
-            <th>上传页面</th>
-            <th>启用到节点</th>
-            <th>操作</th>
+            <th class="cell-prose">{{ _( '模板' ) }}</th>
+            <th>{{ _( 'Web 类型' ) }}</th>
+            <th>{{ _( '入口路径' ) }}</th>
+            <th>{{ _( '上传页面' ) }}</th>
+            <th>{{ _( '启用到节点' ) }}</th>
+            <th>{{ _( '操作' ) }}</th>
           </tr>
         </thead>
         <tbody>
@@ -519,9 +519,9 @@
             <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
             <td class="template-name-cell cell-prose">
               <strong>{{ item.name }}</strong>
-              <div class="template-meta-line" title="{{ item.description or '' }}">{{ item.description or '暂无描述' }}</div>
+              <div class="template-meta-line" title="{{ item.description or '' }}">{{ item.description or "_( '暂无描述' )" }}</div>
               <div class="template-meta-line tpl-meta-compact"
-                   title="{% if item.clone_source_url %}来源：{{ item.clone_source_url }}{% endif %} · 语言：{{ item.clone_accept_language or '-' }} · 创建：{{ item.created_at }}">{% if item.created_by_clone %}<span class="clone-source-badge">URL 克隆</span> {% endif %}{{ item.created_at }}</div>
+                   title="{% if item.clone_source_url %}来源：{{ item.clone_source_url }}{% endif %} · 语言：{{ item.clone_accept_language or '-' }} · 创建：{{ item.created_at }}">{% if item.created_by_clone %}<span class="clone-source-badge">{{ _( 'URL 克隆' ) }}</span> {% endif %}{{ item.created_at }}</div>
             </td>
             <td><span class="pill">{{ item.web_stack }}</span></td>
             <td><code>{{ item.entry_path }}</code></td>
@@ -532,24 +532,24 @@
                 <div class="template-meta-line">资源：{{ item.clone_asset_count }} 个{% if item.clone_total_kb is not none %} · {{ item.clone_total_kb }} KB{% endif %}</div>
                 {% endif %}
               {% else %}
-                <span class="muted">未上传文件</span>
+                <span class="muted">{{ _( '未上传文件' ) }}</span>
               {% endif %}
             </td>
             <td>
               <div class="actions-inline deploy-actions">
                 <form method="post" action="/admin/templates/{{ item.id }}/enable" class="deploy-form" style="margin:0">
-                  <select name="node_id" {% if not nodes %}disabled{% endif %} title="部署节点">
+                  <select name="node_id" {% if not nodes %}disabled{% endif %} title="{{ _('部署节点') }}">
                     {% for node in nodes %}
                     <option value="{{ node.id }}">{{ node.name }}</option>
                     {% endfor %}
                   </select>
-                  <input type="number" name="deploy_port" value="8080" min="1" max="65535" placeholder="端口" title="部署端口">
-                  <input type="text" name="deploy_route" value="{{ item.entry_path }}" placeholder="/path" title="入口路径">
-                  <button type="submit" {% if not nodes %}disabled{% endif %} class="primary btn-sm">启用</button>
+                  <input type="number" name="deploy_port" value="8080" min="1" max="65535" placeholder="{{ _('端口') }}" title="{{ _('部署端口') }}">
+                  <input type="text" name="deploy_route" value="{{ item.entry_path }}" placeholder="/path" title="_( '入口路径' )">
+                  <button type="submit" {% if not nodes %}disabled{% endif %} class="primary btn-sm">{{ _( '启用' ) }}</button>
                 </form>
                 {% if is_enabled %}
                 <form method="post" action="/admin/templates/{{ item.id }}/disable" style="margin:0">
-                  <button type="submit" class="secondary btn-sm">停用</button>
+                  <button type="submit" class="secondary btn-sm">{{ _( '停用' ) }}</button>
                 </form>
                 {% endif %}
               </div>
@@ -557,20 +557,20 @@
             <td>
               <div class="actions-inline">
                 {% if is_enabled %}
-                <a class="btn-preview" href="{{ deployed_urls[item.id] }}" target="_blank">浏览部署</a>
+                <a class="btn-preview" href="{{ deployed_urls[item.id] }}" target="_blank">{{ _( '浏览部署' ) }}</a>
                 {% elif item.artifact_path %}
-                <a class="btn-preview" href="/admin/templates/{{ item.id }}/preview" target="_blank">浏览模板</a>
+                <a class="btn-preview" href="/admin/templates/{{ item.id }}/preview" target="_blank">{{ _( '浏览模板' ) }}</a>
                 {% else %}
-                <span class="muted">暂无预览</span>
+                <span class="muted">{{ _( '暂无预览' ) }}</span>
                 {% endif %}
-                <form method="post" action="/admin/templates/{{ item.id }}/delete" data-confirm="确认删除该模板？关联部署不受影响。">
-                  <button class="danger btn-sm" type="submit">删除</button>
+                <form method="post" action="/admin/templates/{{ item.id }}/delete" data-confirm="_( '确认删除该模板？关联部署不受影响。' )">
+                  <button class="danger btn-sm" type="submit">{{ _( '删除' ) }}</button>
                 </form>
               </div>
             </td>
           </tr>
           {% else %}
-          {{ empty_state('暂无 Web 应用蜜罐模板', '上传模板页面后会显示在这里，并可一键部署到节点。', 7, 'TP') }}
+          {{ empty_state("_( '暂无 Web 应用蜜罐模板' )", "_( '上传模板页面后会显示在这里，并可一键部署到节点。' )", 7, 'TP') }}
           {% endfor %}
         </tbody>
       </table>
@@ -578,7 +578,7 @@
   </section>
 
   <section class="panel">
-    {{ section_header('已部署模板管理', '查看和管理已下发到节点的 Web 应用蜜罐模板') }}
+    {{ section_header("_( '已部署模板管理' )", "_( '查看和管理已下发到节点的 Web 应用蜜罐模板' )") }}
     {% if undeploy_ok %}
     <div class="clone-msg clone-msg-ok">已卸载 — 节点「{{ undeploy_node }}」上的模板已移除。</div>
     {% endif %}
@@ -586,33 +586,33 @@
       <table>
         <thead>
           <tr>
-            <th>节点</th>
-            <th>模板</th>
-            <th>Web 类型</th>
-            <th>监听端口</th>
-            <th>路由地址</th>
-            <th>状态</th>
-            <th>操作</th>
+            <th>{{ _( '节点' ) }}</th>
+            <th>{{ _( '模板' ) }}</th>
+            <th>{{ _( 'Web 类型' ) }}</th>
+            <th>{{ _( '监听端口' ) }}</th>
+            <th>{{ _( '路由地址' ) }}</th>
+            <th>{{ _( '状态' ) }}</th>
+            <th>{{ _( '操作' ) }}</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong style="color:#f8fbff">内置节点</strong></td>
-            <td><span class="pill">ThinkPHP Web 蜜罐（默认）</span></td>
-            <td><span class="pill">ThinkPHP 仿真门面</span></td>
+            <td><strong style="color:#f8fbff">{{ _( '内置节点' ) }}</strong></td>
+            <td><span class="pill">{{ _( 'ThinkPHP Web 蜜罐（默认）' ) }}</span></td>
+            <td><span class="pill">{{ _( 'ThinkPHP 仿真门面' ) }}</span></td>
             <td><code>0.0.0.0:{{ default_honeypot.port }}</code></td>
             <td><code>/</code></td>
             <td>
               {% if default_honeypot.running %}
-              <span class="pill" style="background:rgba(52,211,153,0.13);border-color:rgba(52,211,153,0.24);color:#bbf7d0">运行中</span>
+              <span class="pill" style="background:rgba(52,211,153,0.13);border-color:rgba(52,211,153,0.24);color:#bbf7d0">{{ _( '运行中' ) }}</span>
               {% else %}
-              <span class="pill" style="background:rgba(251,113,133,0.10);border-color:rgba(251,113,133,0.24);color:#fecdd3">已停止</span>
+              <span class="pill" style="background:rgba(251,113,133,0.10);border-color:rgba(251,113,133,0.24);color:#fecdd3">{{ _( '已停止' ) }}</span>
               {% endif %}
             </td>
             <td>
               <div class="actions-inline">
-                <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">打开站点</a>
-                <a class="chip" href="/admin/templates/default-honeypot" style="cursor:pointer;text-decoration:none">配置</a>
+                <a class="chip" href="#" data-honeypot-open data-path="/" target="_blank" style="cursor:pointer;text-decoration:none">{{ _( '打开站点' ) }}</a>
+                <a class="chip" href="/admin/templates/default-honeypot" style="cursor:pointer;text-decoration:none">{{ _( '配置' ) }}</a>
               </div>
             </td>
           </tr>
@@ -629,21 +629,21 @@
             <td><code>{{ d.deploy_route }}</code></td>
             <td>
               {% if d.node_status == 'online' %}
-                <span class="pill" style="background:rgba(52,211,153,0.13);border-color:rgba(52,211,153,0.24);color:#bbf7d0">在线</span>
+                <span class="pill" style="background:rgba(52,211,153,0.13);border-color:rgba(52,211,153,0.24);color:#bbf7d0">{{ _( '在线' ) }}</span>
               {% else %}
-                <span class="pill" style="background:rgba(251,113,133,0.10);border-color:rgba(251,113,133,0.24);color:#fecdd3">离线</span>
+                <span class="pill" style="background:rgba(251,113,133,0.10);border-color:rgba(251,113,133,0.24);color:#fecdd3">{{ _( '离线' ) }}</span>
               {% endif %}
             </td>
             <td>
               <div class="actions-inline">
                 {% if d.template_id %}
-                <a class="btn-preview subtle" href="/admin/templates/{{ d.template_id }}/preview" target="_blank">预览</a>
+                <a class="btn-preview subtle" href="/admin/templates/{{ d.template_id }}/preview" target="_blank">{{ _( '预览' ) }}</a>
                 <form method="post" action="/admin/templates/{{ d.template_id }}/disable" style="margin:0">
-                  <button class="secondary btn-sm" type="submit">停用</button>
+                  <button class="secondary btn-sm" type="submit">{{ _( '停用' ) }}</button>
                 </form>
                 {% endif %}
                 <form method="post" action="/admin/templates/{{ d.node_id }}/undeploy" style="margin:0">
-                  <button class="danger btn-sm" type="submit">卸载</button>
+                  <button class="danger btn-sm" type="submit">{{ _( '卸载' ) }}</button>
                 </form>
               </div>
             </td>
@@ -655,7 +655,7 @@
   </section>
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header('Docker 镜像蜜罐', '上传 docker save 导出的镜像包并部署为 Web 蜜罐容器——所有流量经诱饵代理进入容器，可注入 API 欺骗路由与蜜饵信号。', '<span class="chip" style="cursor:default">' + ('Docker 就绪' if docker_ok else 'Docker 不可用') + '</span>') }}
+  {{ section_header("_( 'Docker 镜像蜜罐' )", "_( '上传 docker save 导出的镜像包并部署为 Web 蜜罐容器——所有流量经诱饵代理进入容器，可注入 API 欺骗路由与蜜饵信号。' )", '<span class="chip" style="cursor:default">' + ('Docker 就绪' if docker_ok else 'Docker 不可用') + '</span>') }}
   {% if docker_err %}<div class="clone-msg clone-msg-err" style="margin-bottom:10px">{{ docker_err }}</div>{% endif %}
   {% if docker_ok_msg %}<div class="clone-msg clone-msg-ok" style="margin-bottom:10px">{{ docker_ok_msg }}</div>{% endif %}
 
@@ -665,12 +665,12 @@
   </div>
   {% else %}
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-    <button type="button" class="chip primary" data-modal-open="docker-upload-modal">↑ 上传镜像包</button>
-    <button type="button" class="chip primary" data-modal-open="docker-deploy-modal">＋ 部署蜜罐容器</button>
-    <button type="button" class="chip" onclick="location.reload()" style="cursor:pointer">刷新状态</button>
+    <button type="button" class="chip primary" data-modal-open="docker-upload-modal">{{ _( '↑ 上传镜像包' ) }}</button>
+    <button type="button" class="chip primary" data-modal-open="docker-deploy-modal">{{ _( '＋ 部署蜜罐容器' ) }}</button>
+    <button type="button" class="chip" onclick="location.reload()" style="cursor:pointer">{{ _( '刷新状态' ) }}</button>
   </div>
   <div class="table-wrap compact"><table>
-    <thead><tr><th>名称</th><th>镜像</th><th>容器端口</th><th>对外端口</th><th>诱饵路由</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>{{ _( '名称' ) }}</th><th>{{ _( '镜像' ) }}</th><th>{{ _( '容器端口' ) }}</th><th>{{ _( '对外端口' ) }}</th><th>{{ _( '诱饵路由' ) }}</th><th>{{ _( '状态' ) }}</th><th>{{ _( '操作' ) }}</th></tr></thead>
     <tbody>
     {% for d in docker_records %}
       <tr>
@@ -680,86 +680,86 @@
         <td><a href="http://{{ request.host.split(':')[0] }}:{{ d.proxy_port }}" target="_blank">{{ d.proxy_port }}</a></td>
         <td>{{ (d.baits_json or [])|length }} 条{% if d.js_inject %} · JS注入{% endif %}</td>
         <td>
-          {% if d.status == 'running' %}<span class="badge badge-success">运行中</span>
-          {% elif d.status == 'error' %}<span class="badge badge-danger">异常</span>
-          {% else %}<span class="badge badge-warning">已停止</span>{% endif %}
+          {% if d.status == 'running' %}<span class="badge badge-success">{{ _( '运行中' ) }}</span>
+          {% elif d.status == 'error' %}<span class="badge badge-danger">{{ _( '异常' ) }}</span>
+          {% else %}<span class="badge badge-warning">{{ _( '已停止' ) }}</span>{% endif %}
         </td>
         <td>
           <div class="actions-inline">
-            <button type="button" class="secondary btn-sm" onclick="openDockerBaits({{ d.id }}, {{ (d.baits_json or [])|tojson }}, {{ 'true' if d.js_inject else 'false' }})" style="cursor:pointer">诱饵配置</button>
-            <button type="button" class="secondary btn-sm" onclick="openDockerLogs({{ d.id }})" style="cursor:pointer">日志</button>
+            <button type="button" class="secondary btn-sm" onclick="openDockerBaits({{ d.id }}, {{ (d.baits_json or [])|tojson }}, {{ 'true' if d.js_inject else 'false' }})" style="cursor:pointer">{{ _( '诱饵配置' ) }}</button>
+            <button type="button" class="secondary btn-sm" onclick="openDockerLogs({{ d.id }})" style="cursor:pointer">{{ _( '日志' ) }}</button>
             {% if d.status == 'running' %}
-            <form method="post" action="/admin/templates/docker/{{ d.id }}/stop" style="margin:0"><button class="secondary btn-sm" type="submit">停止</button></form>
+            <form method="post" action="/admin/templates/docker/{{ d.id }}/stop" style="margin:0"><button class="secondary btn-sm" type="submit">{{ _( '停止' ) }}</button></form>
             {% else %}
-            <form method="post" action="/admin/templates/docker/{{ d.id }}/start" style="margin:0"><button class="primary btn-sm" type="submit">启动</button></form>
+            <form method="post" action="/admin/templates/docker/{{ d.id }}/start" style="margin:0"><button class="primary btn-sm" type="submit">{{ _( '启动' ) }}</button></form>
             {% endif %}
-            <form method="post" action="/admin/templates/docker/{{ d.id }}/remove" style="margin:0" data-confirm="确认删除该蜜罐容器？不可撤销。"><button class="danger btn-sm" type="submit">删除</button></form>
+            <form method="post" action="/admin/templates/docker/{{ d.id }}/remove" style="margin:0" data-confirm="_( '确认删除该蜜罐容器？不可撤销。' )"><button class="danger btn-sm" type="submit">删除</button></form>
           </div>
         </td>
       </tr>
     {% else %}
-      <tr><td colspan="7" class="muted" style="text-align:center;padding:18px">暂无 Docker 蜜罐容器——上传镜像包或从预设模板部署。</td></tr>
+      <tr><td colspan="7" class="muted" style="text-align:center;padding:18px">{{ _( '暂无 Docker 蜜罐容器——上传镜像包或从预设模板部署。' ) }}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
   {% endif %}
 </section>
 
-{% call modal_dialog('docker-upload-modal', '上传 Docker 镜像包', '上传 docker save 导出的镜像 tar 包，导入后将出现在部署表单的镜像列表中。') %}
+{% call modal_dialog('docker-upload-modal', "_( '上传 Docker 镜像包' )", "_( '上传 docker save 导出的镜像 tar 包，导入后将出现在部署表单的镜像列表中。' )") %}
 <form method="post" action="/admin/templates/docker/upload" enctype="multipart/form-data" class="stack">
-  <label class="field-label"><span>镜像 tar 包</span>
+  <label class="field-label"><span>{{ _( '镜像 tar 包' ) }}</span>
     <input type="file" name="image_tar" accept=".tar,.tar.gz" required>
   </label>
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>取消</button>
-    <button type="submit">导入镜像</button>
+    <button type="button" class="secondary" data-modal-close>{{ _( '取消' ) }}</button>
+    <button type="submit">{{ _( '导入镜像' ) }}</button>
   </div>
 </form>
 {% endcall %}
 
-{% call modal_dialog('docker-deploy-modal', '部署 Docker 蜜罐容器', '选择预设模板或直接填写镜像；容器仅经诱饵代理对外暴露，代理注入 API 欺骗路由与蜜饵信号。') %}
+{% call modal_dialog('docker-deploy-modal', "_( '部署 Docker 蜜罐容器' )", "_( '选择预设模板或直接填写镜像；容器仅经诱饵代理对外暴露，代理注入 API 欺骗路由与蜜饵信号。' )") %}
 <form method="post" action="/admin/templates/docker/deploy" class="stack" id="docker-deploy-form">
-  <label class="field-label"><span>预设模板</span>
+  <label class="field-label"><span>{{ _( '预设模板' ) }}</span>
     <select id="dd-preset" onchange="ddFillPreset()">
-      <option value="">自定义镜像</option>
+      <option value="">{{ _( '自定义镜像' ) }}</option>
       {% for p in docker_presets %}<option value="{{ p.name }}">{{ p.name }}（{{ p.image }}）</option>{% endfor %}
     </select>
   </label>
-  <label class="field-label"><span>容器名称</span><input name="name" placeholder="如 honeypot-wordpress" required></label>
-  <label class="field-label"><span>镜像</span><input name="image" id="dd-image" placeholder="nginx:alpine" required></label>
+  <label class="field-label"><span>{{ _( '容器名称' ) }}</span><input name="name" placeholder="{{ _('如 honeypot-wordpress') }}" required></label>
+  <label class="field-label"><span>{{ _( '镜像' ) }}</span><input name="image" id="dd-image" placeholder="nginx:alpine" required></label>
   <div class="grid-2">
-    <label class="field-label"><span>容器端口（应用监听）</span><input type="number" name="container_port" id="dd-cport" value="80" required></label>
-    <label class="field-label"><span>对外端口（诱饵代理）</span><input type="number" name="proxy_port" value="8081" required></label>
+    <label class="field-label"><span>{{ _( '容器端口（应用监听）' ) }}</span><input type="number" name="container_port" id="dd-cport" value="80" required></label>
+    <label class="field-label"><span>{{ _( '对外端口（诱饵代理）' ) }}</span><input type="number" name="proxy_port" value="8081" required></label>
   </div>
-  <label class="field-label"><span>诱饵 API 路由（JSON 数组：path + body，可留空用预设默认）</span>
+  <label class="field-label"><span>{{ _( '诱饵 API 路由（JSON 数组：path + body，可留空用预设默认）' ) }}</span>
     <textarea name="baits_json" id="dd-baits" rows="5" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px" placeholder='[{"path":"/api/user/info","body":"{...}"}]'></textarea>
   </label>
   <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
     <input type="checkbox" name="js_inject" checked> 注入蜜饵信号（beacon 回传 + 隐藏诱饵链接）
   </label>
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>取消</button>
-    <button type="submit">部署容器</button>
+    <button type="button" class="secondary" data-modal-close>{{ _( '取消' ) }}</button>
+    <button type="submit">{{ _( '部署容器' ) }}</button>
   </div>
 </form>
 {% endcall %}
 
-{% call modal_dialog('docker-baits-modal', '诱饵路由配置', '每条路由在代理上返回预设响应（自动附加容器水印与 canary）；所有 HTML 响应可注入蜜饵信号。') %}
+{% call modal_dialog('docker-baits-modal', "_( '诱饵路由配置' )", "_( '每条路由在代理上返回预设响应（自动附加容器水印与 canary）；所有 HTML 响应可注入蜜饵信号。' )") %}
 <form method="post" action="#" class="stack" id="docker-baits-form">
-  <label class="field-label"><span>诱饵路由 JSON</span>
+  <label class="field-label"><span>{{ _( '诱饵路由 JSON' ) }}</span>
     <textarea name="baits_json" id="db-baits" rows="8" spellcheck="false" style="font-family:'Fira Code',ui-monospace,monospace;font-size:12px"></textarea>
   </label>
   <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
     <input type="checkbox" name="js_inject" id="db-js"> 注入蜜饵信号
   </label>
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>取消</button>
-    <button type="submit">保存诱饵配置</button>
+    <button type="button" class="secondary" data-modal-close>{{ _( '取消' ) }}</button>
+    <button type="submit">{{ _( '保存诱饵配置' ) }}</button>
   </div>
 </form>
 {% endcall %}
 
-{% call modal_dialog('docker-logs-modal', '容器日志', '最近 200 行（stdout + stderr）') %}
+{% call modal_dialog('docker-logs-modal', "_( '容器日志' )", "_( '最近 200 行（stdout + stderr）' )") %}
 <pre id="docker-logs-pre" style="max-height:420px;overflow:auto;font-size:11.5px;background:rgba(3,10,26,.85);color:#bbf7d0;padding:14px;border-radius:10px;white-space:pre-wrap"></pre>
 {% endcall %}
 

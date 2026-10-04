@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state %}
+{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state with context %}
 {% block content %}
-{{ page_header('PB', '反制剧本', '一键应用成套的反制姿态：联动 Portal 收编、协议蜜罐启停与收编 Agent 任务下发。每步结果落执行历史审计。', ['Playbooks', '一键联动']) }}
+{{ page_header('PB', "_( '反制剧本' )", "_( '一键应用成套的反制姿态：联动 Portal 收编、协议蜜罐启停与收编 Agent 任务下发。每步结果落执行历史审计。' )", ['Playbooks', "_( '一键联动' )"]) }}
 
 {% if applied %}
 <div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
@@ -14,7 +14,7 @@
     <colgroup>
       <col style="width: 22%"><col style="width: 15%"><col style="width: 43%"><col style="width: 20%">
     </colgroup>
-    <thead><tr><th>剧本</th><th>适用蜜罐类型</th><th>执行步骤</th><th style="text-align:right">应用</th></tr></thead>
+    <thead><tr><th>{{ _( '剧本' ) }}</th><th>{{ _( '适用蜜罐类型' ) }}</th><th>{{ _( '执行步骤' ) }}</th><th style="text-align:right">{{ _( '应用' ) }}</th></tr></thead>
     <tbody>
     {% for pb in playbooks %}
       <tr>
@@ -34,7 +34,7 @@
             {% for step in pb.steps %}
             <div style="font-size:12px;display:flex;gap:6px;align-items:baseline">
               <span class="pill" style="flex-shrink:0">{{ loop.index }}</span>
-              <span>{{ {'deploy_clone': '部署克隆门户（Web 蜜罐节点）', 'start_service': '启动协议蜜罐：' ~ step.params.service_key, 'portal': '功能性伪装 Portal：' ~ ('启用' if step.params.enabled else '停用'), 'task_recruited': '向收编 Agent 下发任务'}.get(step.action, step.action) }}</span>
+              <span>{{ {'deploy_clone': "_( '部署克隆门户（Web 蜜罐节点）' )", 'start_service': "_( '启动协议蜜罐：' )" ~ step.params.service_key, 'portal': "_( '功能性伪装 Portal：' )" ~ ("_( '启用' )" if step.params.enabled else "_( '停用' )"), 'task_recruited': "_( '向收编 Agent 下发任务' )"}.get(step.action, step.action) }}</span>
             </div>
             {% if step.action == 'task_recruited' %}
             <div style="margin:-2px 0 4px 26px"><code style="font-size:11px">{{ step.params.command }}</code></div>
@@ -45,17 +45,17 @@
         <td>
           <form method="post" action="/admin/playbooks/{{ pb.id }}/apply" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
             <select name="target" style="width:auto;min-width:150px">
-              <option value="">全部适用面</option>
+              <option value="">{{ _( '全部适用面' ) }}</option>
               {% for t in pb.targets %}
               <option value="{{ t }}">{{ honeypot_type_labels.get(t, t) }}</option>
               {% endfor %}
             </select>
-            <button type="submit" class="primary btn-sm">一键应用到所选蜜罐</button>
+            <button type="submit" class="primary btn-sm">{{ _( '一键应用到所选蜜罐' ) }}</button>
           </form>
         </td>
       </tr>
     {% else %}
-    {{ empty_state('暂无反制剧本', '当前条件下没有可显示的记录。', 4) }}
+    {{ empty_state("_( '暂无反制剧本' )", "_( '当前条件下没有可显示的记录。' )", 4) }}
     {% endfor %}
     </tbody>
   </table>

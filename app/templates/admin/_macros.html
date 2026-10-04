@@ -72,11 +72,12 @@
 {% macro pagination(page, per_page, total, base_url='') -%}
 {% set pages = ((total / per_page) | round(0, 'ceil')) | int %}
 {% if pages > 0 %}
-<nav class="pager" aria-label="分页">
-  <span class="pager-summary">共 {{ total }} 条 · 第 {{ page }} / {{ pages }} 页</span>
+{% if lang == 'en' %}{% set prev_label = 'Prev' %}{% set next_label = 'Next' %}{% set aria = 'Pagination' %}{% set summary = 'Total ' ~ total ~ ' · Page ' ~ page ~ ' / ' ~ pages %}{% else %}{% set prev_label = "_( '上一页' )" %}{% set next_label = "_( '下一页' )" %}{% set aria = '分页' %}{% set summary = "_( '共 ' )" ~ total ~ "_( ' 条 · 第 ' )" ~ page ~ ' / ' ~ pages ~ "_( ' 页' )" %}{% endif %}
+<nav class="pager" aria-label="{{ aria }}">
+  <span class="pager-summary">{{ summary }}</span>
   <div class="pager-links">
     {% set sep = '&' if '?' in base_url else '?' %}
-    {% if page > 1 %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ page - 1 }}">上一页</a>{% else %}<span class="chip is-disabled">上一页</span>{% endif %}
+    {% if page > 1 %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ page - 1 }}">{{ prev_label }}</a>{% else %}<span class="chip is-disabled">{{ prev_label }}</span>{% endif %}
     {% set window_start = [1, page - 2] | max %}
     {% set window_end = [pages, window_start + 4] | min %}
     {% if window_start > 1 %}<a class="chip" href="{{ base_url }}{{ sep }}page=1">1</a>{% if window_start > 2 %}<span class="pager-ellipsis">…</span>{% endif %}{% endif %}
@@ -84,7 +85,7 @@
       {% if p == page %}<span class="chip primary">{{ p }}</span>{% else %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ p }}">{{ p }}</a>{% endif %}
     {% endfor %}
     {% if window_end < pages %}{% if window_end < pages - 1 %}<span class="pager-ellipsis">…</span>{% endif %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ pages }}">{{ pages }}</a>{% endif %}
-    {% if page < pages %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ page + 1 }}">下一页</a>{% else %}<span class="chip is-disabled">下一页</span>{% endif %}
+    {% if page < pages %}<a class="chip" href="{{ base_url }}{{ sep }}page={{ page + 1 }}">{{ next_label }}</a>{% else %}<span class="chip is-disabled">{{ next_label }}</span>{% endif %}
   </div>
 </nav>
 {% endif %}
@@ -98,7 +99,7 @@
         <h2 class="modal-title" id="{{ id }}-title">{{ title }}</h2>
         {% if subtitle %}<p class="muted" style="margin:6px 0 0;font-size:12.5px;line-height:1.6">{{ subtitle }}</p>{% endif %}
       </div>
-      <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+      <button type="button" class="modal-close" data-modal-close aria-label="{{ _('关闭') }}">×</button>
     </div>
     <div class="modal-body">
 {{ caller() }}
@@ -151,9 +152,9 @@
   'redis': 'Redis',
   'nginx-admin': 'Nginx Admin',
   'elasticsearch': 'ElasticSearch',
-  'web-api-route': 'API 路由蜜饵',
-  'web-admin': 'Web 后台凭证',
-  'file-decoy': '文件蜜饵'
+  'web-api-route': "_( 'API 路由蜜饵' )",
+  'web-admin': "_( 'Web 后台凭证' )",
+  'file-decoy': "_( '文件蜜饵' )"
 } %}
 {% if items %}
   <div class="service-tags">
@@ -164,9 +165,9 @@
           {% set port = svc.get('deploy_port') or '-' %}
           {% set route = svc.get('deploy_route') or '/' %}
           {% set enabled = svc.get('enabled', true) %}
-          {% set label = 'Web 蜜罐' %}
+          {% set label = "_( 'Web 蜜罐' )" %}
           {% if svc.get('web_stack') and svc.get('web_stack') != '自定义页面' %}{% set label = svc.get('web_stack') %}{% endif %}
-          <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ svc.get('artifact_name') or 'web-app honeypot' }} · 来源: {{ svc.get('clone_source_url') or '手动上传' }} · {{ '运行中' if enabled else '已停用' }}">
+          <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ svc.get('artifact_name') or 'web-app honeypot' }} · 来源: {{ svc.get('clone_source_url') or "_( '手动上传' )" }} · {{ "_( '运行中' )" if enabled else '已停用' }}">
             <span class="service-tag-dot"></span>
             <span class="service-tag-name">{{ label }}</span>
             <span class="service-tag-meta">HTTP:{{ port }}{{ route }}</span>
@@ -191,6 +192,6 @@
     {% endfor %}
   </div>
 {% else %}
-  <span class="muted">未部署</span>
+  <span class="muted">{{ _('未部署') }}</span>
 {% endif %}
 {%- endmacro %}

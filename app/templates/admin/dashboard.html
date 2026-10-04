@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import icon, section_header %}
+{% from 'admin/_macros.html' import icon, section_header with context %}
 {% block content %}
 {% set today_count = trend_visual[-1].count if trend_visual else 0 %}
 {% set yesterday_count = trend_visual[-2].count if trend_visual|length > 1 else 0 %}
@@ -184,20 +184,20 @@
   <section class="lp-hero lp-card">
     <span class="lp-pill">
       <span class="lp-dot"></span>
-      <b>Deception Layer Active</b> · 诱捕网络运行中
+      <b>Deception Layer Active</b> · {{ _("诱捕网络运行中") }}
       <span class="lp-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
     </span>
-    <h1 class="lp-title">运营控制台</h1>
-    <p class="lp-sub">攻击态势、反制溯源、节点运营与 C2 控制的统一作战台。</p>
+    <h1 class="lp-title">{{ _('运营控制台') }}</h1>
+    <p class="lp-sub">{{ _('攻击态势、反制溯源、节点运营与 C2 控制的统一作战台。') }}</p>
   </section>
 
   <div class="lp-kpis">
     {% for card in summary_cards %}
       <div class="lp-card lp-kpi">
-        <div class="lp-kpi-label">{{ card.label }}</div>
+        <div class="lp-kpi-label">{{ _(card.label) }}</div>
         <div class="lp-kpi-value {% if card.tone in ['danger', 'warning'] %}tone-{{ card.tone }}{% endif %}">{{ card.value }}</div>
         <div class="lp-kpi-foot">
-          <span class="lp-kpi-note">{{ card.note }}</span>
+          <span class="lp-kpi-note">{{ _(card.note) }}</span>
           {% if card.key == 'total_events' %}
             {% if day_delta > 0 %}<span class="lp-delta up">↑ {{ day_delta }}%</span>
             {% elif day_delta < 0 %}<span class="lp-delta down">↓ {{ -day_delta }}%</span>
@@ -212,11 +212,11 @@
     <section class="lp-card lp-panel">
       <div class="lp-panel-head">
         <div>
-          <h3 class="lp-panel-title">攻击趋势</h3>
-          <div class="lp-panel-sub">近 {{ trend_visual|length }} 天事件量（实线）与上一周期（虚线）对比</div>
+          <h3 class="lp-panel-title">{{ _('攻击趋势') }}</h3>
+          <div class="lp-panel-sub">{{ _("近 ") }}{{ trend_visual|length }}{{ _(" 天事件量（实线）与上一周期（虚线）对比") }}</div>
         </div>
       </div>
-      <div class="trend-chart dashboard-ui-kit-chart snowui-chart" role="img" aria-label="最近攻击趋势折线图">
+      <div class="trend-chart dashboard-ui-kit-chart snowui-chart" role="img" aria-label="{{ _('最近攻击趋势折线图') }}">
         {% set trend_count = trend_visual|length %}
         {% set chart_left = 70 %}
         {% set chart_right = 820 %}
@@ -231,16 +231,16 @@
         {% endfor %}
 
         <div class="snow-chart-tabs">
-          <span class="snow-chart-tab active">攻击流量</span>
-          <span class="snow-chart-tab">文件蜜饵下载</span>
-          <span class="snow-chart-tab">凭证登录</span>
+          <span class="snow-chart-tab active">{{ _('攻击流量') }}</span>
+          <span class="snow-chart-tab">{{ _('文件蜜饵下载') }}</span>
+          <span class="snow-chart-tab">{{ _('凭证登录') }}</span>
           <span class="snow-chart-divider">|</span>
-          <span class="snow-chart-tag current"><i></i>本周期</span>
-          <span class="snow-chart-tag compare"><i></i>对比周期</span>
+          <span class="snow-chart-tag current"><i></i>{{ _('本周期') }}</span>
+          <span class="snow-chart-tag compare"><i></i>{{ _('对比周期') }}</span>
           <span class="lp-chart-meta">
-            <span>本周期<b>{{ trend_ns.total }}</b></span>
-            <span>峰值日<b>{{ trend_ns.peak }}</b></span>
-            <span>日均<b>{{ (trend_ns.total / trend_count)|round|int }}</b></span>
+            <span>{{ _('本周期') }}<b>{{ trend_ns.total }}</b></span>
+            <span>{{ _('峰值日') }}<b>{{ trend_ns.peak }}</b></span>
+            <span>{{ _('日均') }}<b>{{ (trend_ns.total / trend_count)|round|int }}</b></span>
           </span>
         </div>
 
@@ -294,8 +294,8 @@
     <section class="lp-card lp-panel">
         <div class="lp-panel-head">
           <div>
-            <h3 class="lp-panel-title">系统健康</h3>
-            <div class="lp-panel-sub">宿主实时状态</div>
+            <h3 class="lp-panel-title">{{ _('系统健康') }}</h3>
+            <div class="lp-panel-sub">{{ _('宿主实时状态') }}</div>
           </div>
         </div>
         <div class="lp-health">
@@ -303,18 +303,18 @@
             {% set ratio = 0 if item.key == 'uptime_seconds' else item.percent %}
             <div class="lp-health-row">
               <span class="lp-hdot {{ 'bad' if ratio >= 85 else ('warn' if ratio >= 60 else 'ok') }}"></span>
-              <span class="lp-hname">{{ item.label }}</span>
+              <span class="lp-hname">{{ _(item.label) }}</span>
               <span class="lp-hval">{{ item.display }}</span>
             </div>
           {% endfor %}
           <div class="lp-health-row">
             <span class="lp-hdot ok"></span>
-            <span class="lp-hname">在线节点</span>
+            <span class="lp-hname">{{ _('在线节点') }}</span>
             <span class="lp-hval">{{ stats.summary.online_nodes }}</span>
           </div>
           <div class="lp-health-row">
             <span class="lp-hdot {{ 'warn' if c2_summary.active == 0 else 'ok' }}"></span>
-            <span class="lp-hname">活跃 C2 Agent</span>
+            <span class="lp-hname">{{ _('活跃 C2 Agent') }}</span>
             <span class="lp-hval">{{ c2_summary.active }}</span>
           </div>
         </div>
@@ -324,14 +324,14 @@
     <section class="lp-card lp-panel">
       <div class="lp-panel-head">
         <div>
-          <h3 class="lp-panel-title">威胁链路分布</h3>
-          <div class="lp-panel-sub">扫描枚举 → 失陷线索</div>
+          <h3 class="lp-panel-title">{{ _('威胁链路分布') }}</h3>
+          <div class="lp-panel-sub">{{ _('扫描枚举 → 失陷线索') }}</div>
         </div>
       </div>
       <div class="lp-rows">
         {% for item in chain_visual %}
           <div class="lp-row">
-            <span class="lp-row-name">{{ item.label }}</span>
+            <span class="lp-row-name">{{ _(item.label) }}</span>
             <div class="lp-bar"><span style="width: {{ item.percent if item.percent > 0 else 2 }}%"></span></div>
             <span class="lp-row-num">{{ item.value }}</span>
           </div>
@@ -343,16 +343,16 @@
     <section class="lp-card lp-panel">
       <div class="lp-panel-head">
         <div>
-          <h3 class="lp-panel-title">快捷操作</h3>
-            <div class="lp-panel-sub">值守常用入口</div>
+          <h3 class="lp-panel-title">{{ _('快捷操作') }}</h3>
+            <div class="lp-panel-sub">{{ _('值守常用入口') }}</div>
           </div>
         </div>
         <div class="lp-quick">
-          <a class="lp-q" href="/admin/attacks"><span class="q-icon">{{ icon(name='activity', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">攻击流量分析</span><span class="q-arrow">→</span></a>
-          <a class="lp-q" href="/admin/big-screen"><span class="q-icon">{{ icon(name='monitor', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">态势大屏</span><span class="q-arrow">→</span></a>
-          <a class="lp-q" href="/admin/c2/console"><span class="q-icon">{{ icon(name='terminal', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">C2 控制台</span><span class="q-arrow">→</span></a>
-          <a class="lp-q" href="/admin/decoy-management"><span class="q-icon">{{ icon(name='flag', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">蜜饵部署</span><span class="q-arrow">→</span></a>
-          <a class="lp-q" href="/admin/alerts"><span class="q-icon">{{ icon(name='bell', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">告警配置</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/attacks"><span class="q-icon">{{ icon(name='activity', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">{{ _('攻击流量分析') }}</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/big-screen"><span class="q-icon">{{ icon(name='monitor', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">{{ _('态势大屏') }}</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/c2/console"><span class="q-icon">{{ icon(name='terminal', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">{{ _('C2 控制台') }}</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/decoy-management"><span class="q-icon">{{ icon(name='flag', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">{{ _('蜜饵部署') }}</span><span class="q-arrow">→</span></a>
+          <a class="lp-q" href="/admin/alerts"><span class="q-icon">{{ icon(name='bell', class_name='ui-icon ui-icon-sm') }}</span><span class="q-name">{{ _('告警配置') }}</span><span class="q-arrow">→</span></a>
         </div>
       </section>
   </div>
@@ -361,8 +361,8 @@
   <section class="lp-card lp-panel">
     <div class="lp-panel-head">
       <div>
-        <h3 class="lp-panel-title">功能模块</h3>
-        <div class="lp-panel-sub">全部产品域直达</div>
+        <h3 class="lp-panel-title">{{ _('功能模块') }}</h3>
+        <div class="lp-panel-sub">{{ _('全部产品域直达') }}</div>
       </div>
     </div>
     <div class="lp-modules">
@@ -377,7 +377,7 @@
           </div>
           <div class="lp-module-title">{{ module.title }}</div>
           <div class="lp-module-desc">{{ module.description }}</div>
-          <span class="lp-module-link">进入模块 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+          <span class="lp-module-link">{{ _('进入模块') }} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
         </a>
       {% endfor %}
     </div>
