@@ -1,14 +1,14 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
-{{ page_header('AK', "_( '第三方数源接入' )", "_( '接入第三方威胁情报数源（微步在线）与开放 API Key 管理，为来源研判提供外部数据支撑。' )", ["_( '威胁数源' )", 'API Key'],
-      actions='<button type="button" class="chip primary" data-modal-open="api-tokens-create-modal">' ~ "_( '＋ 快速接入数源' )" ~ '</button>') }}
+{{ page_header('AK', _('第三方数源接入'), _('接入第三方威胁情报数源（微步在线）与开放 API Key 管理，为来源研判提供外部数据支撑。'), [_('威胁数源'), 'API Key'],
+      actions='<button type="button" class="chip primary" data-modal-open="api-tokens-create-modal">' ~ _('＋ 快速接入数源') ~ '</button>') }}
 
 {% if saved %}<div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>{% endif %}
 {% if intel_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ intel_err }}</div>{% endif %}
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( '已接入数源' )", "_( '第三方威胁情报数源及其接入状态——点「＋ 快速接入数源」选择数源模板并填写 Key；配置在弹窗内完成，不在首页展开。' )") }}
+  {{ section_header(_('已接入数源'), _('第三方威胁情报数源及其接入状态——点「＋ 快速接入数源」选择数源模板并填写 Key；配置在弹窗内完成，不在首页展开。')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _('数源') }}</th><th>{{ _('类别') }}</th><th>{{ _('说明') }}</th><th>{{ _('状态') }}</th><th style="text-align:right">{{ _('操作') }}</th></tr></thead>
@@ -33,7 +33,7 @@
           </td>
         </tr>
         {% else %}
-        {{ empty_state("_( '暂无数源' )", "_( '当前条件下没有可显示的记录。' )", 5) }}
+        {{ empty_state(_('暂无数源'), _('当前条件下没有可显示的记录。'), 5) }}
         {% endfor %}
       </tbody>
     </table>
@@ -110,13 +110,13 @@
 
 {% if raw_token %}
 <section class="panel page-banner success">
-  {{ section_header("_( '新建 API Key — 仅显示一次，请立即保存' )", "_( '复制下方令牌并妥善保管，离开此页面后将无法再次查看。' )") }}
+  {{ section_header(_('新建 API Key — 仅显示一次，请立即保存'), _('复制下方令牌并妥善保管，离开此页面后将无法再次查看。')) }}
   <pre style="margin:0;font-size:14px;color:#bbf7d0;background:rgba(52,211,153,0.06);padding:14px;border-radius:10px;word-break:break-all">{{ raw_token }}</pre>
 </section>
 {% endif %}
 
 <section class="panel">
-  {{ section_header("_( '令牌清单' )", "_( '查看前缀、权限与最后使用时间' )") }}
+  {{ section_header(_('令牌清单'), _('查看前缀、权限与最后使用时间')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _('名称') }}</th><th>{{ _('前缀') }}</th><th>{{ _('权限') }}</th><th>{{ _('最后使用') }}</th><th>{{ _('操作') }}</th></tr></thead>
@@ -134,14 +134,14 @@
           </td>
         </tr>
         {% else %}
-        {{ empty_state("_( '暂无 API Key' )", "_( '创建令牌后会显示在这里。' )", 5, 'AK') }}
+        {{ empty_state(_('暂无 API Key'), _('创建令牌后会显示在这里。'), 5, 'AK') }}
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
 
-{% call modal_dialog('api-tokens-create-modal', "_( '快速接入 · 选择数源模板' )", "_( '选择要接入的第三方数源并按模板填写即可；开放 API Key 用于对外读取平台数据。' )") %}
+{% call modal_dialog('api-tokens-create-modal', _('快速接入 · 选择数源模板'), _('选择要接入的第三方数源并按模板填写即可；开放 API Key 用于对外读取平台数据。')) %}
 <form method="post" action="/admin/api-tokens" id="prov-form-openapi" class="stack">
   <div class="stack" style="gap:8px">
     <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">

@@ -594,7 +594,7 @@ function loadOverview() {
     var pw = $('#t-pending-wrap'), pending = data.stats.pendingApprovals;
     pw.style.display = pending ? 'inline' : 'none';
     $('#t-pending').textContent = pending;
-    $('#overview-generated').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
+    $('#overview-generated').textContent = {{ _('更新于') | tojson }} + ' ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
     renderHosts(data.hosts || []);
     renderTasks(data.tasks || []);
     renderDock();

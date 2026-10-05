@@ -88,8 +88,8 @@
   }
 </style>
 
-{{ page_header('SV', title or "_( '端口服务蜜罐管理' )", "_( '管理端口服务型蜜罐，支持 SSH / MySQL / Redis / FTP / ElasticSearch 真实协议仿真。' )", ["_( '协议仿真' )", "_( '端口' )", "_( '凭据捕获' )", "_( '反制剧本' )"],
-      actions='<button type="button" class="chip primary" data-modal-open="services-create-modal">' ~ "_( '＋ 新增端口服务蜜罐' )" ~ '</button>') }}
+{{ page_header('SV', title or _('端口服务蜜罐管理'), _('管理端口服务型蜜罐，支持 SSH / MySQL / Redis / FTP / ElasticSearch 真实协议仿真。'), [_('协议仿真'), _('端口'), _('凭据捕获'), _('反制剧本')],
+      actions='<button type="button" class="chip primary" data-modal-open="services-create-modal">' ~ _('＋ 新增端口服务蜜罐') ~ '</button>') }}
 
 <div class="panel" style="margin-bottom:14px;padding:12px 16px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:wrap;text-align:left">
   <span class="muted" style="font-size:12.5px">{{ _( '操作一览 · 反制剧本：' ) }}</span>
@@ -132,7 +132,7 @@
   </section>
 
     <section class="panel">
-      {{ section_header("_( '端口服务蜜罐清单' )", "_( '启动/停止协议仿真引擎，查看运行状态' )") }}
+      {{ section_header(_('端口服务蜜罐清单'), _('启动/停止协议仿真引擎，查看运行状态')) }}
       <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center">
         <form method="post" action="/admin/services/bulk-delete" data-confirm="{{ _('确认删除选中的 {n} 项服务？不可撤销。') }}" class="bulk-del-form">
           <input type="hidden" name="ids" value="">
@@ -158,18 +158,18 @@
               <td class="sv-port-cell"><code>{{ item.default_port }}</code></td>
               <td>
                 {% if item.service_key in running %}
-                  {{ badge("_( '运行中 :' )" ~ running[item.service_key], 'success') }}
+                  {{ badge(_('运行中 :') ~ running[item.service_key], 'success') }}
                 {% elif item.status == 'running' %}
-                  {{ badge("_( '异常' )", 'warning') }}
+                  {{ badge(_('异常'), 'warning') }}
                 {% else %}
-                  {{ badge("_( '已停止' )", 'default') }}
+                  {{ badge(_('已停止'), 'default') }}
                 {% endif %}
                 {% if listening is defined %}
                 {% set port_up = listening.get(item.service_key, false) %}
                 {% if item.service_key in running and not port_up %}
-                  {{ badge("_( '端口未监听' )", 'danger') }}
+                  {{ badge(_('端口未监听'), 'danger') }}
                 {% elif item.service_key not in running and port_up %}
-                  {{ badge("_( '端口被其他进程占用' )", 'warning') }}
+                  {{ badge(_('端口被其他进程占用'), 'warning') }}
                 {% endif %}
                 {% endif %}
               </td>
@@ -188,14 +188,14 @@
                   {% else %}
                     <span class="muted">{{ _( '暂无仿真引擎' ) }}</span>
                   {% endif %}
-                  <form method="post" action="/admin/services/{{ item.id }}/delete" style="margin:0" onsubmit="return confirm("_( '确认删除该服务?' )")">
+                  <form method="post" action="/admin/services/{{ item.id }}/delete" style="margin:0" onsubmit="return confirm('{{ _( '确认删除该服务?' ) }}')">
                     <button class="secondary btn-sm" type="submit">{{ _( '删除' ) }}</button>
                   </form>
                 </div>
               </td>
             </tr>
             {% else %}
-            {{ empty_state("_( '暂无服务' )", "_( '新增服务后会在这里显示。' )", 8, 'SV') }}
+            {{ empty_state(_('暂无服务'), _('新增服务后会在这里显示。'), 8, 'SV') }}
             {% endfor %}
           </tbody>
         </table>
@@ -221,7 +221,7 @@
 </script>
 </div>
 
-{% call modal_dialog('services-create-modal', "_( '新增端口服务蜜罐' )", "_( '录入 service_key、分类、协议、端口与描述' )") %}
+{% call modal_dialog('services-create-modal', _('新增端口服务蜜罐'), _('录入 service_key、分类、协议、端口与描述')) %}
 <form method="post" action="/admin/services" class="stack">
   <p class="sv-form-eyebrow">{{ _( 'REG.NEW // 身份标识' ) }}</p>
   <div class="grid-4">

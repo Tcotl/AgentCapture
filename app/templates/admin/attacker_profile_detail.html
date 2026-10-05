@@ -1,10 +1,10 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, empty_state, badge with context %}
 {% block content %}
-{{ page_header('AP', "_( '攻击者档案 · ' )" ~ ip, "_( '该来源的完整行为档案与捕获证据。' )", ['Dossier']) }}
+{{ page_header('AP', _('攻击者档案 · ') ~ ip, _('该来源的完整行为档案与捕获证据。'), ['Dossier']) }}
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( '凭证捕获' )", "_( '该来源提交过的全部账号密码（含蜜饵与协议蜜罐捕获）' )") }}
+  {{ section_header(_('凭证捕获'), _('该来源提交过的全部账号密码（含蜜饵与协议蜜罐捕获）')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _('时间') }}</th><th>{{ _('用户名') }}</th><th>{{ _('密码') }}</th><th>{{ _('服务') }}</th><th>{{ _('来源') }}</th></tr></thead>
@@ -18,7 +18,7 @@
           <td><span class="pill">{{ c.source_label or '-' }}</span></td>
         </tr>
         {% else %}
-        {{ empty_state("_( '无凭证捕获' )", "_( '该来源尚未提交任何凭证。' )", 5, 'AP') }}
+        {{ empty_state(_('无凭证捕获'), _('该来源尚未提交任何凭证。'), 5, 'AP') }}
         {% endfor %}
       </tbody>
     </table>
@@ -26,7 +26,7 @@
 </section>
 
 <section class="panel">
-  {{ section_header("_( '最近事件' )", "_( '最近 50 条事件（含指纹与蜜标证据）' )") }}
+  {{ section_header(_('最近事件'), _('最近 50 条事件（含指纹与蜜标证据）')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _('时间') }}</th><th>{{ _('类型') }}</th><th>{{ _('路径') }}</th><th>{{ _('风险') }}</th><th>{{ _('决策') }}</th><th>{{ _('信号') }}</th></tr></thead>
@@ -41,7 +41,7 @@
           <td><small>{% for s in (item.signals_json or [])[:4] %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
         </tr>
         {% else %}
-        {{ empty_state("_( '暂无事件' )", "_( '该来源暂无事件记录。' )", 6, 'AP') }}
+        {{ empty_state(_('暂无事件'), _('该来源暂无事件记录。'), 6, 'AP') }}
         {% endfor %}
       </tbody>
     </table>

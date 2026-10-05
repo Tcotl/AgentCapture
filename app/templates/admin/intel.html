@@ -1,24 +1,24 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
-{{ page_header('IN', "_( '情报与白名单' )", "_( '管理本地情报条目与白名单地址，抑制误报并辅助来源研判。' )", [],
-      actions='<button type="button" class="chip primary" data-modal-open="intel-create-modal">' ~ "_( '＋ 新增情报 / 白名单' )" ~ '</button>') }}
+{{ page_header('IN', _('情报与白名单'), _('管理本地情报条目与白名单地址，抑制误报并辅助来源研判。'), [],
+      actions='<button type="button" class="chip primary" data-modal-open="intel-create-modal">' ~ _('＋ 新增情报 / 白名单') ~ '</button>') }}
 
 {% if saved %}<div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>{% endif %}
 <div class="cards">
-  {{ metric_card("_( '总条目' )", stats.total) }}
-  {{ metric_card("_( '白名单' )", stats.whitelist, tone='success') }}
+  {{ metric_card(_('总条目'), stats.total) }}
+  {{ metric_card(_('白名单'), stats.whitelist, tone='success') }}
 </div>
 
 <section class="panel">
-  {{ section_header("_( '条目清单' )", "_( '查看类型、来源与描述' )") }}
+  {{ section_header(_('条目清单'), _('查看类型、来源与描述')) }}
     <div class="table-wrap">
       <table>
         <thead><tr><th>{{ _( '类型' ) }}</th><th>{{ _( '值' ) }}</th><th>{{ _( '标签' ) }}</th><th>{{ _( '来源' ) }}</th><th class="cell-prose">{{ _( '描述' ) }}</th><th>{{ _( '操作' ) }}</th></tr></thead>
         <tbody>
           {% for item in items %}
           <tr>
-            <td>{{ badge("_( '白名单' )" if item.entry_type == 'whitelist' else "_( '标签' )", 'success' if item.entry_type == 'whitelist' else 'info') }}</td>
+            <td>{{ badge(_('白名单') if item.entry_type == 'whitelist' else _('标签'), 'success' if item.entry_type == 'whitelist' else 'info') }}</td>
             <td><code>{{ item.value }}</code></td>
             <td class="muted">{{ item.label or '—' }}</td>
             <td class="muted">{{ item.source }}</td>
@@ -30,7 +30,7 @@
             </td>
           </tr>
           {% else %}
-          {{ empty_state("_( '暂无情报条目' )", "_( '新增条目后将在这里显示。' )", 6, 'IN') }}
+          {{ empty_state(_('暂无情报条目'), _('新增条目后将在这里显示。'), 6, 'IN') }}
           {% endfor %}
         </tbody>
       </table>
@@ -38,7 +38,7 @@
   </section>
 </div>
 
-{% call modal_dialog('intel-create-modal', "_( '新增情报 / 白名单' )", "_( '支持 IP、CIDR 与标签值录入；白名单条目将抑制误报。' )") %}
+{% call modal_dialog('intel-create-modal', _('新增情报 / 白名单'), _('支持 IP、CIDR 与标签值录入；白名单条目将抑制误报。')) %}
 <form method="post" action="/admin/intel" class="stack">
   <div class="grid-2">
     <select name="entry_type">

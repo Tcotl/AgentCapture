@@ -72,7 +72,7 @@
 {% macro pagination(page, per_page, total, base_url='') -%}
 {% set pages = ((total / per_page) | round(0, 'ceil')) | int %}
 {% if pages > 0 %}
-{% if lang == 'en' %}{% set prev_label = 'Prev' %}{% set next_label = 'Next' %}{% set aria = 'Pagination' %}{% set summary = 'Total ' ~ total ~ ' · Page ' ~ page ~ ' / ' ~ pages %}{% else %}{% set prev_label = "_( '上一页' )" %}{% set next_label = "_( '下一页' )" %}{% set aria = '分页' %}{% set summary = "_( '共 ' )" ~ total ~ "_( ' 条 · 第 ' )" ~ page ~ ' / ' ~ pages ~ "_( ' 页' )" %}{% endif %}
+{% if lang == 'en' %}{% set prev_label = 'Prev' %}{% set next_label = 'Next' %}{% set aria = 'Pagination' %}{% set summary = 'Total ' ~ total ~ ' · Page ' ~ page ~ ' / ' ~ pages %}{% else %}{% set prev_label = _('上一页') %}{% set next_label = _('下一页') %}{% set aria = '分页' %}{% set summary = _('共 ') ~ total ~ _(' 条 · 第 ') ~ page ~ ' / ' ~ pages ~ _(' 页') %}{% endif %}
 <nav class="pager" aria-label="{{ aria }}">
   <span class="pager-summary">{{ summary }}</span>
   <div class="pager-links">
@@ -152,9 +152,9 @@
   'redis': 'Redis',
   'nginx-admin': 'Nginx Admin',
   'elasticsearch': 'ElasticSearch',
-  'web-api-route': "_( 'API 路由蜜饵' )",
-  'web-admin': "_( 'Web 后台凭证' )",
-  'file-decoy': "_( '文件蜜饵' )"
+  'web-api-route': _('API 路由蜜饵'),
+  'web-admin': _('Web 后台凭证'),
+  'file-decoy': _('文件蜜饵')
 } %}
 {% if items %}
   <div class="service-tags">
@@ -165,9 +165,9 @@
           {% set port = svc.get('deploy_port') or '-' %}
           {% set route = svc.get('deploy_route') or '/' %}
           {% set enabled = svc.get('enabled', true) %}
-          {% set label = "_( 'Web 蜜罐' )" %}
+          {% set label = _('Web 蜜罐') %}
           {% if svc.get('web_stack') and svc.get('web_stack') != '自定义页面' %}{% set label = svc.get('web_stack') %}{% endif %}
-          <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ svc.get('artifact_name') or 'web-app honeypot' }} · 来源: {{ svc.get('clone_source_url') or "_( '手动上传' )" }} · {{ "_( '运行中' )" if enabled else '已停用' }}">
+          <span class="service-tag {% if not enabled %}is-disabled{% endif %}" title="{{ svc.get('artifact_name') or 'web-app honeypot' }} · 来源: {{ svc.get('clone_source_url') or _('手动上传') }} · {{ _('运行中') if enabled else '已停用' }}">
             <span class="service-tag-dot"></span>
             <span class="service-tag-name">{{ label }}</span>
             <span class="service-tag-meta">HTTP:{{ port }}{{ route }}</span>

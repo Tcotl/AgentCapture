@@ -87,9 +87,9 @@
 #auto-refresh-indicator:hover { color:#67e8f9; border-color:rgba(34,211,238,.45); }
 </style>
 
-{{ page_header('C2', "_( 'Agent 对话式控制台' )", (agent.hostname or agent.agent_id[:16]), [
+{{ page_header('C2', _('Agent 对话式控制台'), (agent.hostname or agent.agent_id[:16]), [
   agent.status|status_zh,
-  "_( 'Portal 招募' )" if is_recruited else "_( '植入 Beacon' )",
+  _('Portal 招募') if is_recruited else _('植入 Beacon'),
   agent.privileges or 'user'
 ]) }}
 
@@ -111,7 +111,7 @@
       <div class="chat-exchange">
         <div class="chat-row agent"><div class="bubble">
           <div class="bubble-head"><span>SYSTEM</span></div>
-          <div class="bubble-body">会话已建立。下发的指令将进入队列，{{ "_( '招募 Agent 会在下一次心跳（≤' )" ~ agent.poll_interval ~ "_( 's）领取执行' )" if is_recruited else "_( 'Beacon 会在下一次轮询（≤' )" ~ agent.poll_interval ~ "_( 's）领取执行' )" }}，回传结果会实时出现在此处。</div>
+          <div class="bubble-body">会话已建立。下发的指令将进入队列，{{ _('招募 Agent 会在下一次心跳（≤') ~ agent.poll_interval ~ _('s）领取执行') if is_recruited else _('Beacon 会在下一次轮询（≤') ~ agent.poll_interval ~ _('s）领取执行') }}，回传结果会实时出现在此处。</div>
         </div></div>
       </div>
       {% endif %}
@@ -140,14 +140,14 @@
         <option value="read_file">{{ _('读文件 (read_file)') }}</option>
         <option value="uninstall">{{ _('卸载 Agent') }}</option>
       </select>
-      <textarea id="chat-input" placeholder="{{ "_( '用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…' )" if is_recruited else "_( '输入要下发的 shell 命令，例如：whoami; uname -a' )" }}"></textarea>
+      <textarea id="chat-input" placeholder="{{ _('用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…') if is_recruited else _('输入要下发的 shell 命令，例如：whoami; uname -a') }}"></textarea>
       <button type="button" class="primary" id="btn-send">{{ _('发送指令') }}</button>
     </div>
   </section>
 
   <aside style="display:flex;flex-direction:column;gap:14px">
     <section class="panel">
-      {{ section_header("_( '端点信息' )", '') }}
+      {{ section_header(_('端点信息'), '') }}
       <div class="side-card">
         <div class="side-kv"><span class="k">{{ _( '来源 IP' ) }}</span><span class="v c2-mono">{{ agent.source_ip }}</span></div>
         <div class="side-kv"><span class="k">{{ _( '主机名' ) }}</span><span class="v">{{ agent.hostname or '-' }}</span></div>
@@ -164,7 +164,7 @@
 
     {% if type_stats %}
     <section class="panel">
-      {{ section_header("_( '任务类型分布' )", '') }}
+      {{ section_header(_('任务类型分布'), '') }}
       <div class="side-card">
         {% for t, n in type_stats.items() %}
         <div class="side-kv"><span class="k">{{ t }}</span><span class="v c2-mono">{{ n }}</span></div>
@@ -174,9 +174,9 @@
     {% endif %}
 
     <section class="panel">
-      {{ section_header("_( '危险操作' )", '') }}
+      {{ section_header(_('危险操作'), '') }}
       <div class="side-card">
-        <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" onsubmit="return confirm("_( '确认删除该 Agent 及所有任务？不可撤销。' )")">
+        <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" onsubmit="return confirm('{{ _( '确认删除该 Agent 及所有任务？不可撤销。' ) }}')">
           <button class="danger" type="submit" style="width:100%">{{ _('删除 Agent') }}</button>
         </form>
       </div>

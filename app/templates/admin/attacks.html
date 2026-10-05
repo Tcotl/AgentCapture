@@ -121,7 +121,7 @@
   }
 </style>
 
-{{ page_header('AT', "_( '攻击流量' )", "_( '按来源 IP、站点与会话聚合攻击流量，并从这里进入攻击详情页与会话画像页。' )", ["_( '聚合视图' )"]) }}
+{{ page_header('AT', _('攻击流量'), _('按来源 IP、站点与会话聚合攻击流量，并从这里进入攻击详情页与会话画像页。'), [_('聚合视图')]) }}
 
 {% set at_ns = namespace(hits=0, peak=0, ips=[]) %}
 {% for item in items %}
@@ -159,7 +159,7 @@
     </div>
     {% endif %}
     <section class="panel">
-      {{ section_header("_( '筛选' )", "_( '按时间窗 / 来源 IP / 站点收窄聚合结果' )") }}
+      {{ section_header(_('筛选'), _('按时间窗 / 来源 IP / 站点收窄聚合结果')) }}
       <form method="get" action="/admin/attacks" class="at-filter" data-recent-filter-key="admin-attacks">
         <label class="at-field">
           <span class="at-field-label">{{ _('起始日期') }}</span>
@@ -171,11 +171,11 @@
         </label>
         <label class="at-field">
           <span class="at-field-label">{{ _('来源 IP') }}</span>
-          <input type="text" name="source_ip" value="{{ filters.source_ip }}" placeholder="_( '来源 IP' )" />
+          <input type="text" name="source_ip" value="{{ filters.source_ip }}" placeholder="{{ _( '来源 IP' ) }}" />
         </label>
         <label class="at-field">
           <span class="at-field-label">{{ _('站点节点') }}</span>
-          <input type="text" name="site_id" value="{{ filters.site_id }}" placeholder="_( '站点 / 节点' )" />
+          <input type="text" name="site_id" value="{{ filters.site_id }}" placeholder="{{ _( '站点 / 节点' ) }}" />
         </label>
         <div class="actions-inline at-filter-actions">
           <button type="submit" class="primary" style="width:auto">{{ _('应用筛选') }}</button>
@@ -226,7 +226,7 @@
     </section>
 
     <section class="panel">
-      {{ section_header("_( '攻击聚合视图' )", "_( '聚合维度：来源 IP + 站点 + 会话' )", '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+      {{ section_header(_('攻击聚合视图'), _('聚合维度：来源 IP + 站点 + 会话'), '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
       <div class="table-wrap compact at-table">
         <table>
           <colgroup>
@@ -252,7 +252,7 @@
                 <td class="cell-prose"><span class="at-signal-wrap" title="{{ item.top_signals|join('，') }}">{{ item.top_signals|join('，') if item.top_signals else '-' }}</span></td>
                 <td><div class="actions-inline"><a class="chip primary" href="/admin/attacks/{{ item.session_id }}">{{ _( '详情' ) }}</a><a class="chip" href="/admin/sessions/{{ item.session_id }}">{{ _( '画像' ) }}</a></div></td>
               </tr>
-            {% else %}{{ empty_state("_( '暂无攻击聚合记录' )", "_( '公开访问流量尚未触发可聚合的攻击事件。' )", 9, 'AT') }}{% endfor %}
+            {% else %}{{ empty_state(_('暂无攻击聚合记录'), _('公开访问流量尚未触发可聚合的攻击事件。'), 9, 'AT') }}{% endfor %}
           </tbody>
         </table>
       </div>

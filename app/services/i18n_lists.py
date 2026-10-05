@@ -1383,4 +1383,6 @@ EN = {
     "：登记的域名/上游/策略用于规划与评审，不会自动产生反向代理或注入行为。流量要进入采集管道，需将系统流量实际接入本平台（如 nginx 反代到主应用端口）。": ": registered domains/upstreams/policies are for planning and review only — no reverse proxy or injection happens automatically. Traffic enters the collection pipeline only when actually routed through the platform (e.g. nginx proxying to the main app port).",
     "：纯 Python 3 零依赖，支持命令执行、文件读写/下载、自卸载；指数退避轮询（10s → 300s），心跳上报系统信息。": ": pure Python 3 with zero deps — command execution, file read/write/download, self-uninstall; exponential-backoff polling (10s → 300s) with system-info heartbeats.",
     "：释放到": ": drops to ",
+    "已结束": "Ended",
+    "来源画像 →": "Source Profile →",
 }

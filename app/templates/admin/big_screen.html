@@ -7,11 +7,11 @@
 {% set total_nodes = node_summary.node_count or online_nodes or 1 %}
 {% set online_ratio = (((online_nodes / total_nodes) * 100) if total_nodes else 0)|round(0, 'floor') %}
 {% set chain_items = [
-  {'label': "_( '扫描感知' )", 'value': chain.scan},
-  {'label': "_( '攻击行为' )", 'value': chain.attack},
-  {'label': "_( '登录尝试' )", 'value': chain.login_attempt},
-  {'label': "_( '高危登录' )", 'value': chain.high_risk_login},
-  {'label': "_( '失陷线索' )", 'value': chain.compromise_hint},
+  {'label': _('扫描感知'), 'value': chain.scan},
+  {'label': _('攻击行为'), 'value': chain.attack},
+  {'label': _('登录尝试'), 'value': chain.login_attempt},
+  {'label': _('高危登录'), 'value': chain.high_risk_login},
+  {'label': _('失陷线索'), 'value': chain.compromise_hint},
 ] %}
 {% set chain_max = chain_items|map(attribute='value')|max or 1 %}
 <style>

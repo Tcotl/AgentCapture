@@ -159,4 +159,7 @@ EN = {
     "主机名": "Hostname",
 
     " 天事件量（实线）与上一周期（虚线）对比": "days of events (solid) vs previous period (dashed)",
+
+    "诱捕网络运行中": "decoy network active",
+    "更新于": "Updated ",
 }

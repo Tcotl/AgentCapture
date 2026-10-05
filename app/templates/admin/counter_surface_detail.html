@@ -13,8 +13,8 @@
 {% endif %}
 
 <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
-  <span class="badge {{ 'badge-success' if runtime.get('enabled') else 'badge-warning' }}" id="surface-badge">{{ "_( '运行中' )" if runtime.get('enabled') else "_( '已停用' )" }}</span>
-  <button type="button" class="chip" id="quick-toggle" data-enabled="{{ '1' if runtime.get('enabled') else '0' }}">{{ "_( '停用' )" if runtime.get('enabled') else "_( '启用' )" }}</button>
+  <span class="badge {{ 'badge-success' if runtime.get('enabled') else 'badge-warning' }}" id="surface-badge">{{ _('运行中') if runtime.get('enabled') else _('已停用') }}</span>
+  <button type="button" class="chip" id="quick-toggle" data-enabled="{{ '1' if runtime.get('enabled') else '0' }}">{{ _('停用') if runtime.get('enabled') else _('启用') }}</button>
   <span class="muted" style="font-size:12px">{{ _('快捷启停 · 配置修改点右上角「编辑配置」') }}</span>
 </div>
 
@@ -25,7 +25,7 @@
 
 {% if surface.key == 'thinkphp' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( '门面入口' )", "_( 'Web 蜜罐端口（默认 48777）的默认门面——点击预览当前生效内容' )") }}
+  {{ section_header(_('门面入口'), _('Web 蜜罐端口（默认 48777）的默认门面——点击预览当前生效内容')) }}
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <a class="chip honeypot-preview" data-path="/" href="#" target="_blank">{{ _('/（指纹页）') }}</a>
     <a class="chip honeypot-preview" data-path="/admin.php" href="#" target="_blank">{{ _('/admin.php（假后台）') }}</a>
@@ -45,7 +45,7 @@
 
 {% if surface.key == 'agent_files' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( '部署的指令文件' )", "_( 'Agent 自动读取的项目级信任入口——部署在 Web 蜜罐端口（默认 48777），点击预览当前生效内容' )") }}
+  {{ section_header(_('部署的指令文件'), _('Agent 自动读取的项目级信任入口——部署在 Web 蜜罐端口（默认 48777），点击预览当前生效内容')) }}
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <a class="chip honeypot-preview" data-path="/AGENTS.md" href="#" target="_blank">/AGENTS.md</a>
     <a class="chip honeypot-preview" data-path="/CLAUDE.md" href="#" target="_blank">/CLAUDE.md</a>
@@ -65,7 +65,7 @@
 
 {% if surface.key == 'mcp' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( 'MCP Server 模版' )", "_( '五套默认模版：恶意 Agent 发现并接入即被反向控制（注册上线 / stager 投递）或信息泄露（水印凭证 / 配置窃取）。当前生效模版以「运行中」标记。' )") }}
+  {{ section_header(_('MCP Server 模版'), _('五套默认模版：恶意 Agent 发现并接入即被反向控制（注册上线 / stager 投递）或信息泄露（水印凭证 / 配置窃取）。当前生效模版以「运行中」标记。')) }}
   <div class="table-wrap">
     <table>
       <colgroup>
@@ -105,7 +105,7 @@
         </td>
       </tr>
       {% else %}
-      {{ empty_state("_( '暂无模版' )", "_( '当前条件下没有可显示的记录。' )", 4) }}
+      {{ empty_state(_('暂无模版'), _('当前条件下没有可显示的记录。'), 4) }}
       {% endfor %}
       </tbody>
     </table>
@@ -115,7 +115,7 @@
 
 {% if surface.key == 'behavior' %}
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( '会话分类结果' )", "_( '最近高频会话的实时行为分析（阈值来自上方配置）' )") }}
+  {{ section_header(_('会话分类结果'), _('最近高频会话的实时行为分析（阈值来自上方配置）')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _('会话') }}</th><th>{{ _('来源') }}</th><th>{{ _('请求数') }}</th><th>{{ _('得分') }}</th><th>{{ _('分类') }}</th><th>{{ _('信号') }}</th></tr></thead>
@@ -126,11 +126,11 @@
           <td><code>{{ b.source_ip }}</code></td>
           <td class="c2-mono">{{ b.events }}</td>
           <td><span class="badge {% if b.score >= 75 %}badge-danger{% elif b.score >= 50 %}badge-warning{% else %}badge-info{% endif %}">{{ b.score }}</span></td>
-          <td>{{ badge("_( '自动化' )" if b.classification == 'automation_like' else ("_( '人类' )" if b.classification == 'human_like' else "_( '未知' )"), 'danger' if b.classification == 'automation_like' else 'info') }}</td>
+          <td>{{ badge(_('自动化') if b.classification == 'automation_like' else (_('人类') if b.classification == 'human_like' else _('未知')), 'danger' if b.classification == 'automation_like' else 'info') }}</td>
           <td><small>{% for s in b.signals %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
         </tr>
         {% else %}
-        {{ empty_state("_( '暂无 ≥5 次请求的会话' )", "_( '会话请求数达到阈值后将在此显示行为分析。' )", 6, 'CF') }}
+        {{ empty_state(_('暂无 ≥5 次请求的会话'), _('会话请求数达到阈值后将在此显示行为分析。'), 6, 'CF') }}
         {% endfor %}
       </tbody>
     </table>
@@ -139,7 +139,7 @@
 {% endif %}
 
 <section class="panel">
-  {{ section_header("_( '证据记录' )", "_( '本面最近 20 条命中事件' )") }}
+  {{ section_header(_('证据记录'), _('本面最近 20 条命中事件')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _('时间') }}</th><th>{{ _('类型') }}</th><th>{{ _('来源') }}</th><th>{{ _('路径') }}</th><th>{{ _('风险') }}</th><th>{{ _('信号') }}</th></tr></thead>
@@ -154,14 +154,14 @@
           <td><small>{% for s in (ev.signals_json or [])[:3] %}<span class="pill" style="margin:1px">{{ s }}</span>{% endfor %}</small></td>
         </tr>
         {% else %}
-        {{ empty_state("_( '暂无命中记录' )", "_( '该面被访问后将在此显示证据。' )", 6, 'CF') }}
+        {{ empty_state(_('暂无命中记录'), _('该面被访问后将在此显示证据。'), 6, 'CF') }}
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
 
-{% call modal_dialog('config-modal', "_( '编辑配置 · ' )" ~ surface.name, '支持占位符：{{portal_url}} {{ticket}} {{audit_code}} {{page}} {{slug}} {{target}}（请求时注入会话值）。保存即时生效（≤5s 缓存刷新）。', wide=true) %}
+{% call modal_dialog('config-modal', _('编辑配置 · ') ~ surface.name, '支持占位符：{{portal_url}} {{ticket}} {{audit_code}} {{page}} {{slug}} {{target}}（请求时注入会话值）。保存即时生效（≤5s 缓存刷新）。', wide=true) %}
 <form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
   <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
     <input type="checkbox" name="enabled" {% if runtime.get('enabled') %}checked{% endif %}>

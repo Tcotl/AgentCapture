@@ -3250,14 +3250,16 @@ def _dashboard_context(db: Session) -> dict:
     uptime_days, uptime_rem = divmod(uptime_seconds, 86400)
     uptime_hours, uptime_rem = divmod(uptime_rem, 3600)
     uptime_minutes, uptime_secs = divmod(uptime_rem, 60)
+    # Unit-neutral duration (m/h/d) so the value renders correctly in both
+    # console languages — the label carries the localization.
     if uptime_days:
-        uptime_display = f"{uptime_days}天 {uptime_hours}时"
+        uptime_display = f"{uptime_days}d {uptime_hours}h"
     elif uptime_hours:
-        uptime_display = f"{uptime_hours}时 {uptime_minutes}分"
+        uptime_display = f"{uptime_hours}h {uptime_minutes}m"
     elif uptime_minutes:
-        uptime_display = f"{uptime_minutes}分"
+        uptime_display = f"{uptime_minutes}m"
     else:
-        uptime_display = f"{uptime_secs}秒"
+        uptime_display = f"{uptime_secs}s"
     system_dashboard_cards = [
         {
             "key": "cpu_percent",

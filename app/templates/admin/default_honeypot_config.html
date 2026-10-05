@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, badge with context %}
 {% block content %}
-{{ page_header('TP', "_( '默认 Web 蜜罐 · 配置' )", "_( '48777 端口默认 Web 蜜罐的运行控制与诱饵面配置——修改即时生效（≤5s）。' )", ["_( '运行控制' )", "_( '诱饵面配置' )"]) }}
+{{ page_header('TP', _('默认 Web 蜜罐 · 配置'), _('48777 端口默认 Web 蜜罐的运行控制与诱饵面配置——修改即时生效（≤5s）。'), [_('运行控制'), _('诱饵面配置')]) }}
 
 {% if hp_ok %}<div class="panel page-banner success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
 {% if hp_err %}<div class="panel page-banner error" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
@@ -99,7 +99,7 @@
         <label class="field-label"><span>{{ _('Runtime 路径指纹') }}</span>
           <input name="runtime_path" value="{{ default_honeypot.config.get('runtime_path', '/var/www/html/app/runtime') }}"></label>
         <label class="field-label"><span>{{ _('假后台登录页标题') }}</span>
-          <input name="login_title" value="{{ default_honeypot.config.get('login_title', "_( '内容管理后台' )") }}"></label>
+          <input name="login_title" value="{{ default_honeypot.config.get('login_title', _('内容管理后台')) }}"></label>
       </div>
       <div style="display:flex;gap:18px;flex-wrap:wrap">
         <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
@@ -159,7 +159,7 @@
         <label class="field-label"><span>{{ _('邮箱域名') }}</span>
           <input name="email_domain" value="{{ dataset_face.config.get('email_domain', 'corp-internal.example') }}"></label>
         <label class="field-label"><span>{{ _('备注前缀') }}</span>
-          <input name="note_prefix" value="{{ dataset_face.config.get('note_prefix', "_( '内部核对' )") }}"></label>
+          <input name="note_prefix" value="{{ dataset_face.config.get('note_prefix', _('内部核对')) }}"></label>
       </div>
       <p class="muted" style="font-size:12px;margin:0">{{ _('无限分页水印假客户数据：逐行可溯源至（会话， 页， 行），诱导自动化 Agent 陷入翻页消耗。') }}</p>
       <div><button type="submit" class="primary btn-sm">{{ _('保存数据集配置') }}</button></div>

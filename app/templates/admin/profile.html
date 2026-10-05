@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, badge with context %}
 {% block content %}
-{{ page_header('PF', "_( '系统设置' )", "_( '账号资料、密码与控制台安全路径。' )", ["_( '账号设置' )", "_( '安全路径' )"]) }}
+{{ page_header('PF', _('系统设置'), _('账号资料、密码与控制台安全路径。'), [_('账号设置'), _('安全路径')]) }}
 
 {% if saved %}
 <div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>
@@ -12,7 +12,7 @@
 
 <div class="grid-2">
   <section class="panel">
-    {{ section_header("_( '更新资料' )", "_( '姓名、邮箱与语言偏好' )") }}
+    {{ section_header(_('更新资料'), _('姓名、邮箱与语言偏好')) }}
     <form method="post" action="/admin/profile" class="stack">
       <label class="field-label"><span>{{ _('姓名') }}</span><input name="name" value="{{ current_user.name }}" placeholder="{{ _('姓名') }}"></label>
       <label class="field-label"><span>{{ _('邮箱') }}</span><input name="email" value="{{ current_user.email }}" placeholder="{{ _('邮箱') }}"></label>
@@ -27,7 +27,7 @@
     </form>
   </section>
   <section class="panel">
-    {{ section_header("_( '修改密码' )", "_( '验证当前密码后设置新密码' )") }}
+    {{ section_header(_('修改密码'), _('验证当前密码后设置新密码')) }}
     <form method="post" action="/admin/profile/change-password" class="stack">
       <label class="field-label"><span>{{ _('当前密码') }}</span><input name="current_password" type="password" placeholder="{{ _('当前密码') }}" required></label>
       <label class="field-label"><span>{{ _('新密码') }}</span><input name="new_password" type="password" placeholder="{{ _('请输入密码') }}" required></label>
@@ -37,14 +37,14 @@
 </div>
 
 <section class="panel" style="margin-top:16px">
-  {{ section_header("_( '控制台安全路径' )", "_( '后台控制台的访问前缀——修改后立即生效（≤5s），旧路径即刻失效并返回 404。请妥善保管新路径，它是控制台的第一道访问屏障。' )") }}
+  {{ section_header(_('控制台安全路径'), _('后台控制台的访问前缀——修改后立即生效（≤5s），旧路径即刻失效并返回 404。请妥善保管新路径，它是控制台的第一道访问屏障。')) }}
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
     <span class="muted" style="font-size:13px">{{ _('当前访问地址：') }}</span>
     <code style="font-size:13px">http://{{ _("&lt;主机&gt;") }}:{{ settings_port }}/{{ admin_access_path }}/</code>
     {% if admin_path_is_default %}
-    {{ badge("_( '默认路径' )", 'warning') }}
+    {{ badge(_('默认路径'), 'warning') }}
     {% else %}
-    {{ badge("_( '已自定义' )", 'success') }}
+    {{ badge(_('已自定义'), 'success') }}
     {% endif %}
   </div>
   <form method="post" action="/admin/profile/access-path" class="stack" style="max-width:560px">

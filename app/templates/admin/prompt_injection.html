@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
-{{ page_header('AI', title or "_( '提示词注入管理' )", "_( '以表格方式管理提示词注入模板；选择具体模板后在弹窗中编辑正文、触发条件、优先级和启用状态。' )", ["_( '表格管理' )", "_( '弹窗编辑' )", "_( '内容维护' )"],
-      actions='<button type="button" class="chip primary" data-modal-open="prompt-create-modal">' ~ "_( '＋ 新增模板' )" ~ '</button>') }}
+{{ page_header('AI', title or _('提示词注入管理'), _('以表格方式管理提示词注入模板；选择具体模板后在弹窗中编辑正文、触发条件、优先级和启用状态。'), [_('表格管理'), _('弹窗编辑'), _('内容维护')],
+      actions='<button type="button" class="chip primary" data-modal-open="prompt-create-modal">' ~ _('＋ 新增模板') ~ '</button>') }}
 
 <style>
   .prompt-kpi-grid { margin-bottom: 18px; }
@@ -140,14 +140,14 @@
 </style>
 
 <div class="cards tight prompt-kpi-grid">
-  {{ metric_card("_( '模板总数' )", summary.total) }}
-  {{ metric_card("_( '启用模板' )", summary.active, 'success') }}
-  {{ metric_card("_( 'HTML 注入' )", summary.html, 'info') }}
-  {{ metric_card("_( 'API 注入' )", summary.api, 'warning') }}
+  {{ metric_card(_('模板总数'), summary.total) }}
+  {{ metric_card(_('启用模板'), summary.active, 'success') }}
+  {{ metric_card(_('HTML 注入'), summary.html, 'info') }}
+  {{ metric_card(_('API 注入'), summary.api, 'warning') }}
 </div>
 
 <section class="panel">
-  {{ section_header("_( '提示词注入模板表格' )", "_( '通过表格选择模板，点击“编辑”后在弹窗中修改模板内容。' )") }}
+  {{ section_header(_('提示词注入模板表格'), _('通过表格选择模板，点击“编辑”后在弹窗中修改模板内容。')) }}
   <div class="prompt-table-toolbar">
     <div class="prompt-help-inline">{{ _( '正文内容不会在列表中展开，避免页面信息过密；需要修改时进入对应模板弹窗。' ) }}</div>
     <form method="post" action="/admin/prompt-injection/bulk-delete" data-confirm="{{ _('确认删除选中的 {n} 个模板？不可撤销。') }}" class="bulk-del-form">
@@ -175,12 +175,12 @@
         <tr>
           <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
           <td class="prompt-template-name"><strong>{{ item.name }}</strong><span>{{ item.template_key }}</span></td>
-          <td>{{ badge({'html_response': "_( 'HTML 页面' )", 'api_response': "_( 'API 响应' )", 'all': "_( '全部范围' )"}.get(item.target_scope, item.target_scope), 'info') }}</td>
-          <td>{{ badge({'always': "_( '始终启用' )", 'agent_only': "_( '命中 Agent 时' )", 'high_risk': "_( '高风险会话' )", 'agent_or_high_risk': "_( 'Agent 或高风险' )"}.get(item.trigger_type, item.trigger_type), 'warning') }}</td>
+          <td>{{ badge({'html_response': _('HTML 页面'), 'api_response': _('API 响应'), 'all': _('全部范围')}.get(item.target_scope, item.target_scope), 'info') }}</td>
+          <td>{{ badge({'always': _('始终启用'), 'agent_only': _('命中 Agent 时'), 'high_risk': _('高风险会话'), 'agent_or_high_risk': _('Agent 或高风险')}.get(item.trigger_type, item.trigger_type), 'warning') }}</td>
           <td>{% if item.variables_json %}{% for variable in item.variables_json %}<span class="pill" style="margin:1px">{{ variable }}</span>{% endfor %}{% else %}<span class="muted">-</span>{% endif %}</td>
           <td><span class="pill">P{{ item.priority }}</span></td>
           <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
-          <td class="prompt-description-cell cell-prose">{{ item.description or "_( '暂无说明' )" }}</td>
+          <td class="prompt-description-cell cell-prose">{{ item.description or _('暂无说明') }}</td>
           <td>
             <div class="prompt-actions-row">
               <button type="button" onclick="openPromptModal('prompt-edit-{{ item.id }}')">{{ _( '编辑' ) }}</button>
@@ -194,14 +194,14 @@
           </td>
         </tr>
         {% else %}
-        {{ empty_state("_( '暂无提示词注入模板' )", "_( '点击新增模板后会显示在这里。' )", 9, 'AI') }}
+        {{ empty_state(_('暂无提示词注入模板'), _('点击新增模板后会显示在这里。'), 9, 'AI') }}
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
 
-{% call modal_dialog('prompt-create-modal', "_( '新增提示词注入模板' )", "_( '创建新的提示词注入内容，保存后进入表格统一管理。' )") %}
+{% call modal_dialog('prompt-create-modal', _('新增提示词注入模板'), _('创建新的提示词注入内容，保存后进入表格统一管理。')) %}
 <form method="post" action="/admin/prompt-injection" class="stack">
   <div class="grid-2">
     <label class="field-label"><span>{{ _( '模板标识' ) }}</span><input name="template_key" placeholder="{{ _('如 system_override') }}"></label>
@@ -283,7 +283,7 @@
           </label>
         </div>
         <label class="field-label"><span>{{ _( '变量列表' ) }}</span><input name="variables_csv" value="{{ (item.variables_json or [])|join(',') }}" placeholder="{{ _('如 source_ip,session_id,canary_token') }}"></label>
-        <label class="field-label"><span>用途说明</span><textarea name="description" placeholder="_( '用途说明' )">{{ item.description }}</textarea></label>
+        <label class="field-label"><span>用途说明</span><textarea name="description" placeholder="{{ _( '用途说明' ) }}">{{ item.description }}</textarea></label>
         <label class="field-label"><span>{{ _( '注入正文 *' ) }}</span><textarea class="prompt-editor" name="content_template" required>{{ item.content_template }}</textarea></label>
         <div class="prompt-help">{{ _( '可用变量：' ) }}<code>{source_ip}</code><code>{session_id}</code><code>{canary_token}</code><code>{callback_url}</code><code>{risk_score}</code><code>{agent_type}</code></div>
         <div class="prompt-modal-footer">

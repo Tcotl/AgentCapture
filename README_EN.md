@@ -107,42 +107,42 @@ All five were recruited online: each agent autonomously completed the full onboa
 
 ## Interface Preview
 
-> All screenshots are captured live from a running test deployment (real browser window proportions, 2946×1556 @2x; not mockups).
+> All screenshots are captured live from a running test deployment in **English UI mode** (real browser window proportions, 2946×1556 @2x; not mockups). The Chinese README shows the same pages in Chinese.
 
 <table>
   <tr>
     <td width="50%" align="center">
       <strong>SaaS Honeypot Console</strong><br>
-      <img src="docs/screenshots/dashboard.png" alt="SaaS Honeypot Console" />
+      <img src="docs/screenshots/en/dashboard.png" alt="SaaS Honeypot Console" />
       <br><sub>Global attack metrics, risk events, sources, captured honeypot credentials, and a seven-day trend comparison.</sub>
     </td>
     <td width="50%" align="center">
       <strong>FUI Situational Big Screen</strong><br>
-      <img src="docs/screenshots/big-screen.png" alt="FUI Situational Big Screen" />
+      <img src="docs/screenshots/en/big-screen.png" alt="FUI Situational Big Screen" />
       <br><sub>3D attack globe, trends, source pressure, hot-path load, and host load — built for on-duty display and auto-rotation.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <strong>Decoy Command Center</strong><br>
-      <img src="docs/screenshots/decoy-management.png" alt="Decoy Command Center" />
+      <img src="docs/screenshots/en/decoy-management.png" alt="Decoy Command Center" />
       <br><sub>API-route, file, and credential decoys managed together with one-click default attack-chain and delivery snippets.</sub>
     </td>
     <td width="50%" align="center">
       <strong>Protocol Honeypot Matrix</strong><br>
-      <img src="docs/screenshots/services.png" alt="Protocol Honeypot Matrix" />
+      <img src="docs/screenshots/en/services.png" alt="Protocol Honeypot Matrix" />
       <br><sub>One-click start/stop for SSH / MySQL / Redis / FTP / ElasticSearch / nginx-admin engines with live status reconciliation.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <strong>SSH Session Replay</strong><br>
-      <img src="docs/screenshots/honeypot-session-replay.png" alt="SSH Session Replay" />
+      <img src="docs/screenshots/en/honeypot-session-replay.png" alt="SSH Session Replay" />
       <br><sub>Terminal-style per-command replay: auth events, attacker input, and honeypot output in order, with watermarked credentials.</sub>
     </td>
     <td width="50%" align="center">
       <strong>C2 Console</strong><br>
-      <img src="docs/screenshots/c2-console.png" alt="C2 Console" />
+      <img src="docs/screenshots/en/c2-console.png" alt="C2 Console" />
       <br><sub>Unified beacon list, task queue, beacon generation, listeners, and the MSF panel, with approvals and lease control.</sub>
     </td>
   </tr>

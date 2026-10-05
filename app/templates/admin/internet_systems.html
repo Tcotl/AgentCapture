@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
-{{ page_header('API', title or "_( '嵌入式蜜罐管理' )", "_( '把你的业务系统接入嵌入式蜜罐：以反向代理、旁路镜像或回源方式纳入，默认放行、灰度注入蜜饵与信号采集、可一键回切。' )", ["_( '无损接入' )", "_( '默认放行' )", "_( '灰度策略' )"],
-      actions='<button type="button" class="chip" data-modal-open="internet-doc-modal">' ~ "_( '接入文档' )" ~ '</button>' ~ '<button type="button" class="chip primary" data-modal-open="internet-create-modal">' ~ "_( '＋ 新增互联网系统' )" ~ '</button>') }}
+{{ page_header('API', title or _('嵌入式蜜罐管理'), _('把你的业务系统接入嵌入式蜜罐：以反向代理、旁路镜像或回源方式纳入，默认放行、灰度注入蜜饵与信号采集、可一键回切。'), [_('无损接入'), _('默认放行'), _('灰度策略')],
+      actions='<button type="button" class="chip" data-modal-open="internet-doc-modal">' ~ _('接入文档') ~ '</button>' ~ '<button type="button" class="chip primary" data-modal-open="internet-create-modal">' ~ _('＋ 新增互联网系统') ~ '</button>') }}
 
 <style>
   .internet-kpi-grid { margin-bottom: 18px; }
@@ -104,15 +104,15 @@
 </style>
 
 <div class="cards tight internet-kpi-grid">
-  {{ metric_card("_( '接入系统' )", summary.total) }}
-  {{ metric_card("_( '启用接入' )", summary.enabled, 'success') }}
-  {{ metric_card("_( '监测模式' )", summary.monitoring, 'info') }}
-  {{ metric_card("_( '灰度/反制' )", summary.protected, 'warning') }}
+  {{ metric_card(_('接入系统'), summary.total) }}
+  {{ metric_card(_('启用接入'), summary.enabled, 'success') }}
+  {{ metric_card(_('监测模式'), summary.monitoring, 'info') }}
+  {{ metric_card(_('灰度/反制'), summary.protected, 'warning') }}
 </div>
 
 <div class="internet-layout">
   <section class="panel">
-    {{ section_header("_( '已接入系统清单' )", "_( '每个系统独立配置域名、上游、接入模式、注入策略和回滚安全阀。建议先用“监测模式”接入，确认无业务影响后再灰度启用蜜饵与注入。' )") }}
+    {{ section_header(_('已接入系统清单'), _('每个系统独立配置域名、上游、接入模式、注入策略和回滚安全阀。建议先用“监测模式”接入，确认无业务影响后再灰度启用蜜饵与注入。')) }}
     <div class="panel page-banner" style="margin-bottom:12px">
       <p class="panel-subtitle" style="margin:0">{{ _( '⚠ 当前版本中此清单是' ) }}<strong>{{ _( '接入规划台账' ) }}</strong>{{ _( '：登记的域名/上游/策略用于规划与评审，不会自动产生反向代理或注入行为。流量要进入采集管道，需将系统流量实际接入本平台（如 nginx 反代到主应用端口）。' ) }}</p>
     </div>
@@ -143,7 +143,7 @@
             <td class="internet-system-cell">
               <strong>{{ item.name }}</strong>
               <code>{{ item.domain }}</code>
-              <div class="muted" style="margin-top:6px">负责人：{{ item.owner or "_( '未填写' )" }}</div>
+              <div class="muted" style="margin-top:6px">负责人：{{ item.owner or _('未填写') }}</div>
               {% if item.tags %}<div style="margin-top:6px">{% for tag in item.tags %}<span class="pill" style="margin:1px">{{ tag }}</span>{% endfor %}</div>{% endif %}
             </td>
             <td>
@@ -157,7 +157,7 @@
               <div class="internet-policy-stack">
                 <span class="pill">{{ item.inject_policy }}</span>
                 <span class="pill">{{ item.decoy_policy }}</span>
-                <span class="muted">JSONP：{{ item.jsonp_template_key or "_( '未绑定' )" }}</span>
+                <span class="muted">JSONP：{{ item.jsonp_template_key or _('未绑定') }}</span>
                 <span class="muted">风险处置：{{ item.risk_policy|decision_zh }}</span>
               </div>
             </td>
@@ -182,7 +182,7 @@
             </td>
           </tr>
           {% else %}
-          {{ empty_state("_( '暂未接入业务系统' )", "_( '点击新增后可把业务域名、上游地址和无损接入策略纳入嵌入式蜜罐管理。' )", 7, 'API') }}
+          {{ empty_state(_('暂未接入业务系统'), _('点击新增后可把业务域名、上游地址和无损接入策略纳入嵌入式蜜罐管理。'), 7, 'API') }}
           {% endfor %}
         </tbody>
       </table>
@@ -190,7 +190,7 @@
   </section>
 </div>
 
-{% call modal_dialog('internet-doc-modal', "_( '无损接入路线' )", "_( '推荐按 4 个阶段为互联网系统逐步接入；关键原则：默认放行、异常旁路、只对 HTML/公开页灰度注入、每个系统独立开关。完整接入文档（五种方式、逐条命令、验收清单）见仓库 docs/integration.md。' )", wide=true) %}
+{% call modal_dialog('internet-doc-modal', _('无损接入路线'), _('推荐按 4 个阶段为互联网系统逐步接入；关键原则：默认放行、异常旁路、只对 HTML/公开页灰度注入、每个系统独立开关。完整接入文档（五种方式、逐条命令、验收清单）见仓库 docs/integration.md。'), wide=true) %}
 <div class="internet-playbook">
   <div class="internet-step"><div class="internet-step-num">1</div><strong>{{ _( '旁路监测' ) }}</strong><span>{{ _( '先接入访问日志、攻击流量和扫描器识别，不改业务响应、不注入脚本。' ) }}</span></div>
   <div class="internet-step"><div class="internet-step-num">2</div><strong>{{ _( '反向代理' ) }}</strong><span>{{ _( '按域名配置 upstream，默认放行到原业务；代理层故障时自动旁路或回切。' ) }}</span></div>
@@ -288,7 +288,7 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
     <div class="internet-modal-body">
       <form method="post" action="/admin/internet-systems/{{ item.id }}/update" class="stack">
         <div class="grid-2"><input name="name" value="{{ item.name }}" required><input name="domain" value="{{ item.domain }}" required></div>
-        <div class="grid-2"><input name="upstream_url" value="{{ item.upstream_url }}" required><input name="owner" value="{{ item.owner }}" placeholder="_( '负责人/团队' )"></div>
+        <div class="grid-2"><input name="upstream_url" value="{{ item.upstream_url }}" required><input name="owner" value="{{ item.owner }}" placeholder="{{ _( '负责人/团队' ) }}"></div>
         <div class="grid-4">
           <select name="deploy_mode"><option {% if item.deploy_mode == '反向代理无损接入' %}selected{% endif %}>{{ _( '反向代理无损接入' ) }}</option><option {% if item.deploy_mode == '旁路镜像监测' %}selected{% endif %}>{{ _( '旁路镜像监测' ) }}</option><option {% if item.deploy_mode == 'CDN/SLB 回源接入' %}selected{% endif %}>{{ _( 'CDN/SLB 回源接入' ) }}</option><option {% if item.deploy_mode == '测试域名预接入' %}selected{% endif %}>{{ _( '测试域名预接入' ) }}</option></select>
           <select name="status"><option {% if item.status == '监测模式' %}selected{% endif %}>{{ _( '监测模式' ) }}</option><option {% if item.status == '灰度注入' %}selected{% endif %}>{{ _( '灰度注入' ) }}</option><option {% if item.status == '反制模式' %}selected{% endif %}>{{ _( '反制模式' ) }}</option><option {% if item.status == '规划中' %}selected{% endif %}>{{ _( '规划中' ) }}</option><option {% if item.status == '暂停' %}selected{% endif %}>{{ _( '暂停' ) }}</option></select>
@@ -302,7 +302,7 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
           <select name="risk_policy"><option value="observe" {% if item.risk_policy == 'observe' %}selected{% endif %}>{{ _( 'observe 观察' ) }}</option><option value="challenge" {% if item.risk_policy == 'challenge' %}selected{% endif %}>{{ _( 'challenge 挑战' ) }}</option><option value="isolate" {% if item.risk_policy == 'isolate' %}selected{% endif %}>{{ _( 'isolate 隔离' ) }}</option><option value="block" {% if item.risk_policy == 'block' %}selected{% endif %}>{{ _( 'block 阻断' ) }}</option></select>
         </div>
         <div class="grid-2"><input name="tags_csv" value="{{ item.tags|join(',') }}" placeholder="{{ _('标签') }}"><select name="is_enabled"><option value="1" {% if item.is_enabled %}selected{% endif %}>{{ _( '启用' ) }}</option><option value="0" {% if not item.is_enabled %}selected{% endif %}>{{ _( '暂停' ) }}</option></select></div>
-        <textarea name="notes" placeholder="_( '接入备注' )">{{ item.notes }}</textarea>
+        <textarea name="notes" placeholder="{{ _( '接入备注' ) }}">{{ item.notes }}</textarea>
         <div class="internet-help"><strong>{{ _( '配置预览' ) }}</strong><pre class="internet-config-preview">{{ item.config_preview }}</pre></div>
         <div class="internet-modal-footer"><button type="button" class="secondary" onclick="closeInternetModal('internet-edit-{{ item.id }}')">{{ _( '取消' ) }}</button><button type="submit">{{ _( '保存修改' ) }}</button></div>
       </form>

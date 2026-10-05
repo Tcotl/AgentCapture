@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, badge, section_header with context %}
 {% block content %}
-{{ page_header('HS', "_( '会话回放 · ' )" ~ row.source_ip, "_( 'SSH 蜜罐会话的完整转录：认证 → 命令 → 输出，按时间顺序重放。' )", ["_( '回放' )", row.username or 'unknown'],
-      actions='<a class="chip" href="/admin/honeypot-sessions">' ~ "_( '← 返回列表' )" ~ '</a>' ~ '<a class="chip" href="/admin/attack-sources/' ~ row.source_ip ~ '">来源画像 →</a>') }}
+{{ page_header('HS', _('会话回放 · ') ~ row.source_ip, _('SSH 蜜罐会话的完整转录：认证 → 命令 → 输出，按时间顺序重放。'), [_('回放'), row.username or 'unknown'],
+      actions='<a class="chip" href="/admin/honeypot-sessions">' ~ _('← 返回列表') ~ '</a>' ~ '<a class="chip" href="/admin/attack-sources/' ~ row.source_ip ~ '">来源画像 →</a>') }}
 
 <div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
   <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _( '登录用户' ) }}</p><code style="font-size:15px">{{ row.username or '—' }}</code></div>
@@ -10,12 +10,12 @@
   <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _( '认证尝试 / 命令' ) }}</p><code style="font-size:15px">{{ row.auth_attempts }} / {{ row.command_count }}</code></div>
   <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _('时长 / 状态') }}</p>
     <code style="font-size:15px">{{ (duration_s // 60).__str__() + 'm' + (duration_s % 60).__str__() + 's' }}</code>
-    {% if row.status == 'active' %}{{ badge('进行中', 'success') }}{% else %}{{ badge('已结束', 'muted') }}{% endif %}
+    {% if row.status == 'active' %}{{ badge('进行中', 'success') }}{% else %}{{ badge(_('已结束'), 'muted') }}{% endif %}
   </div>
 </div>
 
 <section class="panel">
-  {{ section_header("_( '终端回放' )", "_( '绿色为攻击者输入，灰色为蜜罐返回输出；认证事件以标签行呈现。' )") }}
+  {{ section_header(_('终端回放'), _('绿色为攻击者输入，灰色为蜜罐返回输出；认证事件以标签行呈现。')) }}
   <div class="hp-terminal" style="margin-top:12px;background:#05080f;border:1px solid #16233d;border-radius:14px;padding:18px 20px;font-family:'Fira Code',ui-monospace,monospace;font-size:12.5px;line-height:1.62;overflow-x:auto;max-height:70vh;overflow-y:auto;">
     <div style="display:flex;gap:6px;margin-bottom:12px">
       <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57;display:inline-block"></span>
@@ -28,7 +28,7 @@
     {% for entry in transcript %}
       {% if entry.kind == 'auth' %}
         <div style="margin:10px 0">
-          {{ badge('AUTH · ' ~ (entry.method or 'password') ~ ' · ' ~ (entry.user or '?') ~ ("_( ' · 通过' )" if entry.accepted else "_( ' · 拒绝' )"), 'success' if entry.accepted else 'danger') }}
+          {{ badge('AUTH · ' ~ (entry.method or 'password') ~ ' · ' ~ (entry.user or '?') ~ (_(' · 通过') if entry.accepted else _(' · 拒绝')), 'success' if entry.accepted else 'danger') }}
           <span style="color:#3d5178">{{ entry.ts[:19] }}</span>
         </div>
       {% elif entry.kind == 'session_open' %}

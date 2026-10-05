@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, metric_card, badge, modal_dialog with context %}
 {% block content %}
-{{ page_header('CF', "_( '功能性伪装反制' )", "_( 'Developer API 伪装通道的运营配置：总开关、页脚展示、心跳节奏与注册限速。变更实时生效（≤5s），无需重启。' )", ['Portal API', "_( '实时生效' )"],
+{{ page_header('CF', _('功能性伪装反制'), _('Developer API 伪装通道的运营配置：总开关、页脚展示、心跳节奏与注册限速。变更实时生效（≤5s），无需重启。'), ['Portal API', _('实时生效')],
       actions='<button type="button" class="chip" id="pc-quick-toggle" data-enabled="{{ \'1\' if config.enabled else \'0\' }}" style="margin-right:8px">{{ \'停用通道\' if config.enabled else \'启用通道\' }}</button>'
               ~ '<button type="button" class="chip primary" data-modal-open="portal-config-modal">编辑配置</button>') }}
 
@@ -12,28 +12,28 @@
 {% endif %}
 
 <div class="cards" style="margin-bottom:16px" id="pc-stats-cards">
-  {{ metric_card("_( '24h API 拉取' )", '<span id="pc-stat-fetches">' ~ stats.fetches ~ '</span>') }}
-  {{ metric_card("_( '24h 注册' )", '<span id="pc-stat-registrations">' ~ stats.registrations ~ '</span>') }}
-  {{ metric_card("_( '24h 心跳' )", '<span id="pc-stat-heartbeats">' ~ stats.heartbeats ~ '</span>') }}
-  {{ metric_card("_( '已收编 Agent' )", '<span id="pc-stat-recruited">' ~ stats.recruited ~ '</span>') }}
-  {{ metric_card("_( '24h 限速拦截' )", '<span id="pc-stat-throttled">' ~ stats.throttled ~ '</span>') }}
+  {{ metric_card(_('24h API 拉取'), '<span id="pc-stat-fetches">' ~ stats.fetches ~ '</span>') }}
+  {{ metric_card(_('24h 注册'), '<span id="pc-stat-registrations">' ~ stats.registrations ~ '</span>') }}
+  {{ metric_card(_('24h 心跳'), '<span id="pc-stat-heartbeats">' ~ stats.heartbeats ~ '</span>') }}
+  {{ metric_card(_('已收编 Agent'), '<span id="pc-stat-recruited">' ~ stats.recruited ~ '</span>') }}
+  {{ metric_card(_('24h 限速拦截'), '<span id="pc-stat-throttled">' ~ stats.throttled ~ '</span>') }}
 </div>
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header("_( '反制效果指标' )", "_( '全链路转化度量——让蜜罐运营从事件流走向 KPI' )") }}
+  {{ section_header(_('反制效果指标'), _('全链路转化度量——让蜜罐运营从事件流走向 KPI')) }}
   <div class="cards">
-    {{ metric_card("_( '收编转化率 (24h)' )", kpis.portal_recruit_rate ~ '%', 'success' if kpis.portal_recruit_rate else 'default') }}
-    {{ metric_card("_( 'Stager 执行率 (7d)' )", kpis.stager_execution_rate ~ '%', 'success' if kpis.stager_execution_rate else 'default') }}
-    {{ metric_card("_( 'Stager 下载 (7d)' )", kpis.stager_downloads_7d) }}
-    {{ metric_card("_( 'Stager 上线数' )", kpis.stager_executions, 'success' if kpis.stager_executions else 'default') }}
-    {{ metric_card("_( 'SSH 平均命令数' )", kpis.ssh_avg_commands) }}
-    {{ metric_card("_( '回头客占比 (7d)' )", kpis.returning_ratio ~ '%') }}
+    {{ metric_card(_('收编转化率 (24h)'), kpis.portal_recruit_rate ~ '%', 'success' if kpis.portal_recruit_rate else 'default') }}
+    {{ metric_card(_('Stager 执行率 (7d)'), kpis.stager_execution_rate ~ '%', 'success' if kpis.stager_execution_rate else 'default') }}
+    {{ metric_card(_('Stager 下载 (7d)'), kpis.stager_downloads_7d) }}
+    {{ metric_card(_('Stager 上线数'), kpis.stager_executions, 'success' if kpis.stager_executions else 'default') }}
+    {{ metric_card(_('SSH 平均命令数'), kpis.ssh_avg_commands) }}
+    {{ metric_card(_('回头客占比 (7d)'), kpis.returning_ratio ~ '%') }}
   </div>
 </section>
 
 <div class="grid-2" style="align-items:start">
   <section class="panel">
-    {{ section_header("_( '页脚预览' )", "_( '公开页面注入的 Developer API 文档段实际外观（实时联动，令牌以会话为准）' )") }}
+    {{ section_header(_('页脚预览'), _('公开页面注入的 Developer API 文档段实际外观（实时联动，令牌以会话为准）')) }}
     <div style="background:#f7f9fc;border:1px solid #d8dee9;border-radius:8px;padding:16px 20px;font-size:13px;color:#37474f;max-width:560px" id="pc-preview">
       <h3 style="margin:0 0 6px;font-size:14px;color:#263238" id="pc-preview-title">{{ config.footer_title }}</h3>
       <p style="margin:4px 0">{{ _( '本页结构化数据与任务清单已迁移至 API（浏览器视图仅保留概览）：' ) }}</p>
@@ -50,7 +50,7 @@
   </section>
 </div>
 
-{% call modal_dialog('portal-config-modal', "_( '编辑配置 · 功能性伪装反制' )", "_( '总开关关闭时：页脚不再展示，/portal/api/* 全部返回 404（伪装成 API 不存在）。保存即时生效（≤5s 缓存刷新）。' )", wide=true) %}
+{% call modal_dialog('portal-config-modal', _('编辑配置 · 功能性伪装反制'), _('总开关关闭时：页脚不再展示，/portal/api/* 全部返回 404（伪装成 API 不存在）。保存即时生效（≤5s 缓存刷新）。'), wide=true) %}
 <form method="post" action="/admin/portal" class="stack" id="pc-form">
   <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
     <input type="checkbox" name="enabled" id="pc-enabled" {% if config.enabled %}checked{% endif %}>
@@ -74,7 +74,7 @@
     </label>
   </div>
   <label class="field-label"><span>{{ _( '备注' ) }}</span>
-    <textarea name="notes" id="pc-notes" rows="2" placeholder="_( '运营备注（如灰度计划、封禁原因）' )">{{ config.notes }}</textarea>
+    <textarea name="notes" id="pc-notes" rows="2" placeholder="{{ _( '运营备注（如灰度计划、封禁原因）' ) }}">{{ config.notes }}</textarea>
   </label>
   <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
     <button type="button" class="secondary" data-modal-close>{{ _( '取消' ) }}</button>

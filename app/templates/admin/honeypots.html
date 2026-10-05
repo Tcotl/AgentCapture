@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, badge with context %}
 {% block content %}
-{{ page_header('IP', "_( '蜜罐部署' )", "_( '同一套蜜饵与捕获引擎，三种挂载方式。每个蜜罐类型在这里选择部署哪些诱饵面；各诱饵面的具体内容在「配置」页独立维护。' )") }}
+{{ page_header('IP', _('蜜罐部署'), _('同一套蜜饵与捕获引擎，三种挂载方式。每个蜜罐类型在这里选择部署哪些诱饵面；各诱饵面的具体内容在「配置」页独立维护。')) }}
 
 {% if hp_ok %}<div class="panel page-banner page-banner-success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
 {% if hp_err %}<div class="panel page-banner page-banner-warning" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
@@ -40,7 +40,7 @@
 </section>
 
 <section class="panel">
-  {{ section_header("_( '诱饵面部署' )", "_( '在本蜜罐上部署/下线各个诱饵面——配置内容在各面的「配置」页独立维护，这里只决定部署哪一个。下线后对应端点即刻返回 404（≤5s 生效）。' )") }}
+  {{ section_header(_('诱饵面部署'), _('在本蜜罐上部署/下线各个诱饵面——配置内容在各面的「配置」页独立维护，这里只决定部署哪一个。下线后对应端点即刻返回 404（≤5s 生效）。')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _( '诱饵面' ) }}</th><th>{{ _( '入口路径' ) }}</th><th>{{ _( '24h 命中' ) }}</th><th>{{ _( '说明' ) }}</th><th style="text-align:center">{{ _( '部署状态' ) }}</th><th style="text-align:right">{{ _( '配置' ) }}</th></tr></thead>
@@ -101,7 +101,7 @@
 </section>
 
 <section class="panel">
-  {{ section_header("_( '嵌入式资产部署' )", "_( '可嵌入到业务站点的蜜饵资产——内容在各管理页独立配置，部署状态随各页操作即时生效。' )") }}
+  {{ section_header(_('嵌入式资产部署'), _('可嵌入到业务站点的蜜饵资产——内容在各管理页独立配置，部署状态随各页操作即时生效。')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _( '资产' ) }}</th><th>{{ _( '说明' ) }}</th><th style="text-align:right">{{ _( '配置 / 投放' ) }}</th></tr></thead>
@@ -134,7 +134,7 @@
 
 {% if active_tab == 'protocol' %}
 <section class="panel">
-  {{ section_header("_( '端口服务蜜罐' )", "_( '开假端口收连接——协议级仿真服务逐项部署，status 为运行中的服务随系统重启自动恢复。' )") }}
+  {{ section_header(_('端口服务蜜罐'), _('开假端口收连接——协议级仿真服务逐项部署，status 为运行中的服务随系统重启自动恢复。')) }}
   <div class="table-wrap">
     <table>
       <thead><tr><th>{{ _( '服务' ) }}</th><th>{{ _( '端口' ) }}</th><th style="text-align:center">{{ _( '部署状态' ) }}</th><th style="text-align:right">{{ _( '操作' ) }}</th></tr></thead>
