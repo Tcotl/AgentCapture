@@ -152,7 +152,7 @@ All five were recruited online: each agent autonomously completed the full onboa
 
 ## Architecture
 
-![AgentCapture Architecture](docs/architecture.png)
+![AgentCapture Architecture](docs/architecture-en.png)
 
 Component data flow:
 

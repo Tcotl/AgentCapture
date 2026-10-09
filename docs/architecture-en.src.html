@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Fira+Sans:wght@400;600;700;800&display=swap');
+  :root {
+    --bg: #070b16; --card: #0d1424; --card2: #111a2f; --line: rgba(148,163,184,.18);
+    --fg: #e5edf8; --muted: #94a3b8; --blue: #3b82f6; --cyan: #22d3ee; --green: #34d399;
+    --amber: #f59e0b; --red: #fb7185; --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 1080px; padding: 34px 40px;
+    background: radial-gradient(ellipse 60% 40% at 20% 0%, rgba(37,99,235,.09), transparent 70%), var(--bg);
+    color: var(--fg); font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+  }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: .3px; display: flex; align-items: baseline; gap: 14px; }
+  h1 small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .grid { display: grid; grid-template-columns: 300px 66px 1fr 66px 330px; grid-template-rows: 1fr 52px 168px; gap: 0; margin-top: 22px; height: 926px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .card h2 { font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 99px; flex: 0 0 auto; }
+  .sub { font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+  .item { background: var(--card2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; font-size: 12px; line-height: 1.4; }
+  .item b { font-size: 12.5px; }
+  .item .sub { display: block; margin-top: 2px; }
+  .mono { font-family: "Fira Code", monospace; }
+  .port { color: var(--cyan); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .flow { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; }
+  .arrow { font-size: 22px; color: var(--blue); line-height: 1; }
+  .arrow.back { color: var(--amber); }
+  .flow span { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.35; }
+  .plane { border: 1px solid rgba(59,130,246,.4); background: linear-gradient(180deg, rgba(37,99,235,.06), rgba(13,20,36,.6)); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .plane-tag { font-family: "Fira Code", monospace; font-size: 11px; color: var(--cyan); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: rgba(148,163,184,.06); border-radius: 99px; padding: 3px 10px; font-size: 11px; color: #cbd5e1; }
+  .chip.hot { border-color: rgba(251,113,133,.45); color: #fda4af; }
+  .chip.ok { border-color: rgba(52,211,153,.4); color: #6ee7b7; }
+  .bottom { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 14px; }
+  .flowline { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+  .flowline b { color: var(--fg); font-weight: 600; }
+  .legend { position: absolute; right: 42px; top: 40px; display: flex; gap: 14px; font-size: 11px; color: var(--muted); align-items: center; }
+  .legend i { width: 20px; height: 3px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 5px; }
+  .titlewrap { position: relative; }
+  .vflow { display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="titlewrap">
+  <h1>AgentCapture — System Architecture <small>embedded honeypot · dual-plane deception · AI-agent counter-offensive</small></h1>
+  <div class="legend">
+    <span><i style="background:var(--blue)"></i>attack / capture flow</span>
+    <span><i style="background:var(--amber)"></i>injection / delivery</span>
+    <span><i style="background:var(--green)"></i>recruit / counter-control</span>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- left: attackers -->
+  <div class="card">
+    <h2><span class="dot" style="background:var(--red)"></span>Attack Sources</h2>
+    <div class="item"><b>Scanners</b><span class="sub">nmap / nuclei / masscan probes</span></div>
+    <div class="item"><b>AI pentest agents</b><span class="sub">GPT · Claude · Kimi Code · autonomous pentest tooling — fingerprinted at product level</span></div>
+    <div class="item"><b>Human attackers</b><span class="sub">credential stuffing, RCE hunting, lateral movement</span></div>
+    <div class="sub" style="margin-top:auto">All public traffic is scored per request by the risk engine; sessions aggregate into attacker profiles.</div>
+  </div>
+
+  <div class="flow"><div class="arrow">→</div><span>attack traffic<br>via Internet</span></div>
+
+  <!-- center: dual planes + business -->
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div class="card" style="flex:0 0 auto;">
+      <h2><span class="dot" style="background:var(--amber)"></span>Your Internet-Facing Business Systems</h2>
+      <div class="row2">
+        <div class="item"><b>Business Nginx <span class="mono">(reverse proxy)</span></b><span class="sub">real services stay untouched — OA / portal / CRM behind it</span></div>
+        <div class="item"><b>Embedded honeypot, monitor → gated</b><span class="sub">one <span class="mono">location</span> block hands decoy &amp; callback paths to the platform; JS probe + hidden decoy links injected into public pages; bypass-on-failure &amp; one-click rollback</span></div>
+      </div>
+    </div>
+
+    <div class="plane" style="flex:1;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="font-size:15px;"><span class="dot" style="background:var(--blue)"></span>AgentCapture — dual-plane core</h2>
+        <span class="plane-tag">management plane down ⇏ deception plane stays up</span>
+      </div>
+      <div class="row2" style="flex:1;">
+        <div class="card" style="background:rgba(13,20,36,.65);">
+          <h2><span class="dot" style="background:var(--cyan)"></span>Management plane <span class="mono port">:4877</span></h2>
+          <div class="item"><b>FastAPI console <span class="mono">/{secret-path}/admin</span></b><span class="sub">situational deck · attack traffic · counter-intel · decoy ops · playbooks</span></div>
+          <div class="item"><b>Open API <span class="mono">/api/v1</span> + AI-SOC syslog</b><span class="sub">API-key reads; RFC5424/3164 event export</span></div>
+          <div class="item"><b>C2 control</b><span class="sub">conversational C2 for recruited agents · command console for managed beacons (approval-gated)</span></div>
+          <div class="item"><b>Alerts &amp; enforcement</b><span class="sub">webhook / DingTalk / Feishu / email; challenge · isolate · block</span></div>
+        </div>
+        <div class="card" style="background:rgba(13,20,36,.65);">
+          <h2><span class="dot" style="background:var(--green)"></span>Deception plane <span class="mono port">:48777</span> <span class="sub">(observe-only)</span></h2>
+          <div class="item"><b>ThinkPHP 5.x facade</b><span class="sub">fingerprint page · RCE emulation · fake admin login</span></div>
+          <div class="item"><b>Six counter-surfaces</b>
+            <div class="chips" style="margin-top:6px;">
+              <span class="chip">Portal · fake Developer API</span><span class="chip">MCP Server</span><span class="chip">MCP Inspector console</span>
+              <span class="chip">AGENTS.md / CLAU.md</span><span class="chip">cloud metadata (SSRF)</span><span class="chip">intranet Wiki</span><span class="chip">infinite dataset</span>
+            </div>
+          </div>
+          <div class="item"><b>Decoy chains</b><span class="sub">API-route + file + credential baits bound into one evidence chain with per-session watermarks; JS / Nginx / SQL / manifest delivery snippets</span></div>
+        </div>
+      </div>
+      <div class="flowline" style="justify-content:center;">
+        <span>both planes share one process &amp; database — events, credential baits, session transcripts, audit trail (<span class="mono">SQLite / PostgreSQL</span>)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow" style="gap:14px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="arrow">⇄</div><span>protocol-level lures<br>TCP connect</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><div class="arrow back" style="transform:scaleX(-1);">→</div><span>recruited agents<br>phone home</span></div>
+  </div>
+
+  <!-- right: protocol honeypots + C2 -->
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div class="card" style="flex:1;">
+      <h2><span class="dot" style="background:var(--violet)"></span>Protocol Honeypots</h2>
+      <div class="item"><b>SSH <span class="mono port">:2222</span></b><span class="sub">paramiko server + fake Ubuntu FS + terminal replay</span></div>
+      <div class="item"><b>MySQL <span class="mono port">:33060</span> · Redis <span class="mono port">:63790</span></b><span class="sub">full handshake, credential capture</span></div>
+      <div class="item"><b>FTP <span class="mono port">:2121</span> · ElasticSearch <span class="mono port">:19200</span></b><span class="sub">banner-level emulation</span></div>
+      <div class="sub">Docker-image honeypots: uploaded containers fronted by a deception proxy (decoy API routes + beacon injection).</div>
+    </div>
+    <div class="card" style="border-color:rgba(52,211,153,.35);">
+      <h2><span class="dot" style="background:var(--green)"></span>Counter-Control</h2>
+      <div class="item"><b>Agent recruited → C2</b><span class="sub">canary token echo enrolls the agent; conversational tasking (shell / NL), artifacts &amp; VPN-bundled implants (approval-gated)</span></div>
+    </div>
+  </div>
+
+  <!-- bottom flows -->
+  <div></div><div></div>
+  <div class="vflow">▼ &nbsp;capture → risk engine (score / decide) → alerts, isolation, syslog&nbsp; ▼</div>
+  <div></div><div></div>
+
+  <div class="card bottom" style="grid-column: 1 / -1; flex-direction: row; padding: 12px 16px; gap: 14px;">
+    <div style="flex:1;">
+      <h2><span class="dot" style="background:var(--blue)"></span>Detection &amp; Evidence</h2>
+      <div class="sub">Per-request risk scoring (UA · headers · payload · canary echo · rate) · behavior fingerprints · IP geo &amp; threat intel · credential hits per source</div>
+    </div>
+    <div style="flex:1;">
+      <h2><span class="dot" style="background:var(--amber)"></span>Enforcement</h2>
+      <div class="sub">JS challenge → isolation (TTL) → block · whitelists kill false positives · decoy paths stay observe-only</div>
+    </div>
+    <div style="flex:1.2;">
+      <h2><span class="dot" style="background:var(--green)"></span>Outputs</h2>
+      <div class="sub">AI-SOC syslog feed · webhook / DingTalk / Feishu / email alerts · attacker dossiers · session replay + <span class="mono">.pcap</span> · audit trail</div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>
