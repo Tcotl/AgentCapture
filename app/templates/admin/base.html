@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.10.5" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.10.6" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -809,8 +809,14 @@
         function enhance(sel) {
           if (sel.dataset.selx || sel.multiple || sel.size > 1 || sel.closest(".no-selx")) return;
           sel.dataset.selx = "1";
+          // While the native select is still in flow, capture its intrinsic
+          // width (longest option, incl. inline min-width) — once absolutely
+          // positioned it stops contributing, so seed it as the wrapper's
+          // min-width to keep long labels fully visible. Clamped for safety.
+          var intrinsicW = Math.min(sel.offsetWidth || 0, 320);
           var wrap = document.createElement("span");
           wrap.className = "sel-x";
+          if (intrinsicW > 0) wrap.style.minWidth = intrinsicW + "px";
           sel.parentNode.insertBefore(wrap, sel);
           wrap.appendChild(sel);
           sel.classList.add("sel-x-native");

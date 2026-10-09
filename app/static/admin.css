@@ -2694,7 +2694,12 @@ th:hover .th-resizer::after { background: rgba(96, 165, 250, 0.55); }
        * JS in base.html progressively enhances <select>; the native control
        * stays in the DOM (visually hidden) so forms submit as before.
        * ---------------------------------------------------------------------- */
-      .sel-x { position: relative; display: inline-flex; min-width: 0; }
+      /* single-cell grid: the in-flow button drives the wrapper's intrinsic
+         width (the native select is absolutely positioned and contributes
+         nothing), so long option labels are never clipped */
+      .sel-x { position: relative; display: inline-grid; min-width: 0; vertical-align: middle; }
+      .sel-x > .sel-x-btn { grid-area: 1 / 1; }
+      .sel-x > .sel-x-native { grid-area: 1 / 1; }
       button.sel-x-btn {
         display: inline-flex !important; align-items: center; justify-content: space-between; gap: 10px;
         width: 100% !important; min-width: 0;
