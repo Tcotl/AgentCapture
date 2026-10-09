@@ -625,7 +625,12 @@
         min-width: auto;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 5px;
+        /* inline action button: never inherit the form-wide width:100%,
+           nor get stretched to full track width inside grid forms */
+        width: auto !important;
+        justify-self: start;
       }
       /* Field label for form inputs */
       .field-label {
