@@ -14,6 +14,8 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+
+from app.services.timefmt import as_utc
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -268,7 +270,7 @@ def _rel(value: datetime | None) -> str:
     value = _as_utc(value)
     if not value:
         return "-"
-    seconds = max(0, int((managed_now() - value).total_seconds()))
+    seconds = max(0, int((managed_now() - as_utc(value)).total_seconds()))
     if seconds < 5:
         return "刚刚"
     if seconds < 60:
@@ -328,7 +330,7 @@ def serialize_host(
 
 def serialize_session(session: ManagedSession) -> dict[str, Any]:
     heartbeat_at = _as_utc(session.heartbeat_at)
-    heartbeat_age = int((managed_now() - heartbeat_at).total_seconds()) if heartbeat_at else None
+    heartbeat_age = int((managed_now() - as_utc(heartbeat_at)).total_seconds()) if heartbeat_at else None
     return {
         "id": session.id,
         "hostId": session.host_id,
@@ -393,7 +395,7 @@ def _presence_for(heartbeat_at: datetime | None, now: datetime) -> str:
     heartbeat_at = _as_utc(heartbeat_at)
     if not heartbeat_at:
         return "closed"
-    age = (now - heartbeat_at).total_seconds()
+    age = (now - as_utc(heartbeat_at)).total_seconds()
     if age > MANAGED_OFFLINE_AFTER_SECONDS:
         return "closed"
     if age > MANAGED_STALE_AFTER_SECONDS:
@@ -405,7 +407,7 @@ def _host_presence(last_seen_at: datetime | None, now: datetime) -> str:
     last_seen_at = _as_utc(last_seen_at)
     if not last_seen_at:
         return "offline"
-    age = (now - last_seen_at).total_seconds()
+    age = (now - as_utc(last_seen_at)).total_seconds()
     if age > MANAGED_OFFLINE_AFTER_SECONDS:
         return "offline"
     if age > MANAGED_STALE_AFTER_SECONDS:

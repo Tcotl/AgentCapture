@@ -96,6 +96,7 @@ router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 
 from app.services.timefmt import register as register_timefmt  # noqa: E402
+from app.services.timefmt import as_utc  # noqa: E402
 
 register_timefmt(templates.env)
 
@@ -4224,8 +4225,12 @@ def admin_honeypot_sessions(
     # annotate each row with a display duration
     items = []
     for row in rows:
-        end = row.ended_at or now
-        duration_s = max(0, int((end - row.started_at).total_seconds())) if row.started_at else 0
+        end = as_utc(row.ended_at) or now
+        duration_s = (
+            max(0, int((end - as_utc(row.started_at)).total_seconds()))
+            if row.started_at
+            else 0
+        )
         items.append({"row": row, "duration_s": duration_s})
     return _render(
         request,
@@ -4260,9 +4265,9 @@ def admin_honeypot_session_detail(session_pk: int, request: Request, db: Session
     if not row:
         raise HTTPException(status_code=404)
     transcript = list(row.transcript_json or [])
-    end = row.ended_at or datetime.now(timezone.utc)
+    end = as_utc(row.ended_at) or datetime.now(timezone.utc)
     duration_s = (
-        max(0, int((end - row.started_at).total_seconds())) if row.started_at else 0
+        max(0, int((end - as_utc(row.started_at)).total_seconds())) if row.started_at else 0
     )
     return _render(
         request,

@@ -11,6 +11,14 @@ from datetime import datetime, timezone
 DEFAULT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
+def as_utc(value: datetime | None) -> datetime | None:
+    """Normalize a datetime for arithmetic: naive values from legacy DB rows
+    are treated as UTC, aware values pass through, None stays None."""
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
+
+
 def fmt_dt(value, fmt: str = DEFAULT_FORMAT, none_text: str = "—") -> str:
     """Render a datetime (or ISO string) in the server-local timezone."""
     if value is None or value == "":

@@ -1,5 +1,7 @@
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+
+from app.services.timefmt import as_utc
 from urllib.parse import urlparse
 
 from sqlalchemy import desc, func, or_, select
@@ -706,7 +708,7 @@ def session_detail(db: Session, session_id: str) -> dict | None:
             {
                 "index": index,
                 "event": event,
-                "delta_ms": int((event.created_at - previous_time).total_seconds() * 1000) if index > 1 else 0,
+                "delta_ms": int((as_utc(event.created_at) - as_utc(previous_time)).total_seconds() * 1000) if index > 1 else 0,
             }
         )
         previous_time = event.created_at
@@ -718,7 +720,7 @@ def session_detail(db: Session, session_id: str) -> dict | None:
         "user_agent": first.user_agent,
         "first_seen": first.created_at,
         "last_seen": last.created_at,
-        "duration_seconds": max(0, int((last.created_at - first.created_at).total_seconds())),
+        "duration_seconds": max(0, int((as_utc(last.created_at) - as_utc(first.created_at)).total_seconds())),
         "event_count": len(events),
         "max_risk_score": max(event.risk_score for event in events),
         "top_paths": path_counter.most_common(10),
