@@ -2888,3 +2888,32 @@ button.secondary.btn-danger-ghost {
 button.secondary.btn-danger-ghost:hover { background: rgba(251, 113, 133, 0.1) !important; border-color: var(--danger) !important; }
 [data-theme="light"] button.secondary.btn-danger-ghost { color: #be123c !important; }
 [data-theme="light"] button.secondary.btn-danger-ghost:hover { background: rgba(190, 18, 60, 0.08); }
+
+/* ---- session-replay terminal (theme-aware; dark terminal on dark theme,
+        light terminal on light theme — container color pinned so the
+        [data-theme=light] panel rules cannot leak dark text onto it) ---- */
+.hp-terminal {
+  background: #05080f;
+  border: 1px solid #16233d;
+  border-radius: 14px;
+  color: #dbe4f0;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.62;
+  overflow-x: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.hp-terminal pre { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: inherit; }
+.hp-term-host, .hp-term-meta { color: #64748b; }
+[data-theme="light"] .hp-terminal .hp-term-host,
+[data-theme="light"] .hp-terminal .hp-term-meta { color: #64748b; }
+[data-theme="light"] .hp-terminal { background: #f8fafc; border-color: rgba(15, 23, 42, 0.14); color: #0f172a; }
+[data-theme="light"] .hp-terminal pre { color: #475569; }
+.hp-term-prompt { color: #4ae07a; }
+[data-theme="light"] .hp-terminal .hp-term-prompt { color: #15803d; }
+.hp-term-cmd { color: #dbe4f0; }
+[data-theme="light"] .hp-terminal .hp-term-cmd { color: #1e293b; }
+.hp-term-out { color: #8fa3c2; }
+[data-theme="light"] .hp-terminal .hp-term-out,
+[data-theme="light"] .hp-terminal pre.hp-term-out { color: #475569; }

@@ -16,12 +16,12 @@
 
 <section class="panel">
   {{ section_header(_('终端回放'), _('绿色为攻击者输入，灰色为蜜罐返回输出；认证事件以标签行呈现。')) }}
-  <div class="hp-terminal" style="margin-top:12px;background:#05080f;border:1px solid #16233d;border-radius:14px;padding:18px 20px;font-family:'Fira Code',ui-monospace,monospace;font-size:12.5px;line-height:1.62;overflow-x:auto;max-height:70vh;overflow-y:auto;">
+  <div class="hp-terminal" style="margin-top:12px;padding:18px 20px">
     <div style="display:flex;gap:6px;margin-bottom:12px">
       <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57;display:inline-block"></span>
       <span style="width:11px;height:11px;border-radius:50%;background:#febc2e;display:inline-block"></span>
       <span style="width:11px;height:11px;border-radius:50%;background:#28c840;display:inline-block"></span>
-      <span style="color:#4a5f83;margin-left:8px">{{ row.service or 'ssh' }} {{ row.username }}@{{ row.source_ip }} (port {{ row.port }})</span>
+      <span class="hp-term-host" style="margin-left:8px">{{ row.service or 'ssh' }} {{ row.username }}@{{ row.source_ip }} (port {{ row.port }})</span>
       <span style="flex:1"></span>
       <a class="chip" href="/admin/honeypot-sessions/{{ row.id }}/export.pcap" style="cursor:pointer;text-decoration:none">{{ _( '导出流量包 (.pcap)' ) }}</a>
     </div>
@@ -29,20 +29,20 @@
       {% if entry.kind == 'auth' %}
         <div style="margin:10px 0">
           {{ badge('AUTH · ' ~ (entry.method or 'password') ~ ' · ' ~ (entry.user or '?') ~ (_(' · 通过') if entry.accepted else _(' · 拒绝')), 'success' if entry.accepted else 'danger') }}
-          <span style="color:#3d5178">{{ entry.ts[:19] }}</span>
+          <span class="hp-term-meta">{{ entry.ts[:19] }}</span>
         </div>
       {% elif entry.kind == 'session_open' %}
-        <div style="margin:10px 0"><span style="color:#4a5f83">— session opened {{ entry.ts[:19] }} —</span></div>
+        <div style="margin:10px 0"><span class="hp-term-meta">— session opened {{ entry.ts[:19] }} —</span></div>
       {% else %}
         <div>
-          <span style="color:#4ae07a">{{ entry.user }}@honeypot:~$ </span><span style="color:#dbe4f0">{{ entry.cmd }}</span>
+          <span class="hp-term-prompt">{{ entry.user }}@honeypot:~$ </span><span class="hp-term-cmd">{{ entry.cmd }}</span>
         </div>
-        {% if entry.out %}<pre style="margin:0 0 8px;color:#8fa3c2;white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:inherit">{{ entry.out }}</pre>{% endif %}
+        {% if entry.out %}<pre class="hp-term-out">{{ entry.out }}</pre>{% endif %}
       {% endif %}
     {% else %}
-      <p style="color:#4a5f83">{{ _('（转录为空）') }}</p>
+      <p class="hp-term-meta">{{ _('（转录为空）') }}</p>
     {% endfor %}
-    <div style="color:#4ae07a">{{ row.username or 'root' }}@honeypot:~$ <span style="opacity:.5">▌</span></div>
+    <div class="hp-term-prompt">{{ row.username or 'root' }}@honeypot:~$ <span style="opacity:.5">▌</span></div>
   </div>
 </section>
 
