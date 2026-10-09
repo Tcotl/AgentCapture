@@ -1,4 +1,5 @@
 {% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header with context %}
 {% block content %}
 <script>document.documentElement.classList.add('c2-appmode');</script>
 
@@ -199,13 +200,7 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
 </style>
 
 <div id="host-menu" style="display:none;position:fixed;z-index:60;min-width:180px;padding:6px;border-radius:10px;"></div>
-<div class="page-header">
-  <div class="page-header-copy">
-    <div class="page-eyebrow">AGENTCAPTURE</div>
-    <h1 class="page-title">{{ _('命令式 C2 管理') }}</h1>
-    <p class="page-description">{{ _('Beacon 会话、任务队列、监听器与 Artifact 的实时控制台。') }}</p>
-  </div>
-</div>
+{{ page_header('terminal', _('命令式 C2 管理'), _('Beacon 会话、任务队列、监听器与 Artifact 的实时控制台。')) }}
 <div class="mcs">
   <div class="mc-shell">
     <!-- toolbar row -->
