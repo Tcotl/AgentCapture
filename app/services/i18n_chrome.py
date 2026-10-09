@@ -96,7 +96,6 @@ EN = {
     # --- base.html chrome ---
     "收起/展开侧栏": "Collapse/expand sidebar",
     "切换明暗主题": "Toggle light/dark theme",
-    "切换表格紧凑模式": "Toggle compact table density",
     "打开导航菜单": "Open navigation menu",
     "安全建议：自定义控制台访问路径": "Security tip: customize the console access path",
     "当前仍使用默认访问路径": "The console is still on the default access path",

@@ -2824,11 +2824,6 @@ th:hover .th-resizer::after { background: rgba(96, 165, 250, 0.55); }
 }
 .pager-ellipsis { color: var(--muted-foreground); padding: 0 2px; }
 
-/* ---- compact table density ---- */
-html.table-compact .table-wrap table th,
-html.table-compact .table-wrap table td { padding-top: 4px; padding-bottom: 4px; font-size: 12px; }
-html.table-compact .table-wrap table { line-height: 1.35; }
-
 /* ---- utility strip icon buttons ---- */
 .utility-icon-btn {
   display: inline-flex;

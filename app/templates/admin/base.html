@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.10.0" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.10.1" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -16,9 +16,6 @@
           document.documentElement.dataset.theme = theme;
           if (localStorage.getItem("ach:sidebar-collapsed") === "1") {
             document.documentElement.classList.add("sidebar-collapsed");
-          }
-          if (localStorage.getItem("ach:table-compact") === "1") {
-            document.documentElement.classList.add("table-compact");
           }
         } catch (e) {}
       })();
@@ -113,9 +110,6 @@
                 {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
                 {% if site_id %}<span class="chip">{{ site_id }}</span>{% endif %}
                 <span class="chip chip-live">Live</span>
-                <button type="button" class="utility-icon-btn" id="density-toggle" aria-label="{{ _('切换表格紧凑模式') }}" title="{{ _('切换表格紧凑模式') }}" aria-pressed="false">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18"/><path d="M3 10h18"/><path d="M3 15h18"/><path d="M3 20h18"/></svg>
-                </button>
                 <button type="button" class="theme-toggle" id="theme-toggle" aria-label="{{ _('切换明暗主题') }}" title="{{ _('切换明暗主题') }}">
                   <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                   <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -612,24 +606,6 @@
         });
       }
 
-      function initDensityToggle() {
-        var btn = document.getElementById("density-toggle");
-        if (!btn) return;
-        var KEY = "ach:table-compact";
-        function apply(on) {
-          document.documentElement.classList.toggle("table-compact", on);
-          btn.setAttribute("aria-pressed", String(on));
-        }
-        var saved = null;
-        try { saved = localStorage.getItem(KEY); } catch (e) {}
-        if (saved === "1") apply(true);
-        btn.addEventListener("click", function () {
-          var on = !document.documentElement.classList.contains("table-compact");
-          apply(on);
-          try { localStorage.setItem(KEY, on ? "1" : "0"); } catch (e) {}
-        });
-      }
-
       function initMobileNav() {
         var openBtn = document.getElementById("nav-open");
         var backdrop = document.getElementById("nav-backdrop");
@@ -796,7 +772,6 @@
         initRecentFilterForms();
         initTableColumnResize();
         initConfirmDelegation();
-        initDensityToggle();
         initMobileNav();
       });
     </script>
