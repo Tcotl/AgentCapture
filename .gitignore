@@ -4,7 +4,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
-agent_capture.db
+agent_capture.db*
 .env.docker
 .DS_Store
 .claude/
