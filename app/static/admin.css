@@ -1996,6 +1996,18 @@ input[type="checkbox"], input[type="radio"] { accent-color: #e5e7eb; }
   --foreground: #1e293b;
   --muted-foreground: #64748b;
   --border: rgba(15, 23, 42, 0.1);
+  /* surface tokens flip too — component rules already render these light,
+     but token consumers (e.g. the situation deck) read the variables. */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --input: #ffffff;
+  --muted: #f1f5f9;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #334155;
+  --accent: rgba(15, 23, 42, 0.05);
+  --accent-foreground: #0f172a;
   --tech-cyan: #0f172a;
   --tech-cyan-dim: rgba(15, 23, 42, 0.45);
   --tech-panel: #ffffff;

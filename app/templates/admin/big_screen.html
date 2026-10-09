@@ -16,10 +16,10 @@
 {% set chain_max = chain_items|map(attribute='value')|max or 1 %}
 <style>
   /* ---------- 覆盖 admin 外壳：大屏全视口 ---------- */
-  /* 大屏锁定深色：--bs-bg 定义在 body 作用域，两种站点主题（light/dark）下外壳都不露浅底 */
+  /* 外壳随站点主题：--background 在 admin.css 深浅主题各有定义 */
   body {
     height: 100vh; overflow: hidden;
-    --bs-bg: #070b16; /* = admin.css 深色 :root 的 --background */
+    --bs-bg: var(--background);
     background: var(--bs-bg) !important;
   }
   .pm-admin-scale-shell { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100vh !important; min-height: 100vh !important; transform: none !important; overflow: hidden !important; }
@@ -32,25 +32,25 @@
   .sidebar, .utility-strip, .topbar, #admin-path-banner, .nav-open-btn { display: none !important; }
   .content { padding: 0 !important; }
 
-  /* ---------- 大屏设计令牌（深色 OLED 基调，与 admin.css 深色 :root 对齐） ----------
-     稳定变量直接引用 admin.css（--card/--success/--danger/--warning/--info/--theme-accent
-     不随站点主题切换）；背景/文字/边框类在 light 主题下会被 admin.css 翻转为浅色，
-     因此此处按深色 :root 的取值写死，保证大屏在两种站点主题下都是深底浅字。 */
+  /* ---------- 大屏设计令牌 ----------
+     背景/文字/边框引用 admin.css 的主题变量（深浅主题自动翻转）；
+     装饰类变量（辉光/晕影/地球底色等）保留深色取值，并在下方
+     [data-theme="light"] 覆盖块中给亮色版本。 */
   .bs-stage {
-    --bs-cyan: #e5edf8;                        /* 主强调文字（深色 --foreground） */
+    --bs-cyan: var(--foreground);              /* 主强调文字 */
     --bs-cyan-dim: rgba(229, 237, 248, 0.5);
     --bs-blue: var(--theme-accent);            /* #3b82f6 */
     --bs-amber: var(--warning);                /* #f59e0b */
     --bs-red: var(--danger);                   /* #fb7185 */
     --bs-green: var(--success);                /* #34d399 */
     --bs-panel: var(--card);                   /* #0d1424 */
-    --bs-line: rgba(148, 163, 184, 0.14);      /* = 深色 --border */
-    --bs-text: #e5edf8;                        /* = 深色 --foreground */
-    --bs-muted: #94a3b8;                       /* = 深色 --muted-foreground（≥4.5:1） */
+    --bs-line: var(--border);
+    --bs-text: var(--foreground);
+    --bs-muted: var(--muted-foreground);
     /* surface family（大屏锁定深色，不随站点主题切换） */
-    --bs-bg: #070b16;                          /* = 深色 --background */
-    --bs-headline: #f2faff;
-    --bs-text-strong: #e5edf8;                 /* emphasized body text */
+    --bs-bg: var(--background);
+    --bs-headline: var(--foreground);
+    --bs-text-strong: var(--foreground);       /* emphasized body text */
     --bs-text-code: #d9ecff;                   /* mono data (IP / paths) */
     --bs-tag-high: #fecdd3;
     --bs-tag-medium: #fde68a;
@@ -62,6 +62,20 @@
     --bs-map-bg: #03060f;                      /* globe viewport */
     --bs-vignette: rgba(2, 4, 10, 0.6);        /* globe edge falloff */
   }
+
+  /* 亮色主题装饰覆盖：文字/背景/边框已由 admin 变量翻转，这里只处理
+     深色专属的装饰值（代码色、标签色、辉光、内井、地球底、晕影、网格密度）。 */
+  [data-theme="light"] .bs-stage {
+    --bs-cyan-dim: rgba(15, 23, 42, 0.45);
+    --bs-text-code: #0f172a;
+    --bs-tag-high: #be123c;
+    --bs-tag-medium: #a16207;
+    --bs-glow: rgba(59, 130, 246, 0.18);
+    --bs-deep: rgba(241, 245, 249, 0.92);
+    --bs-map-bg: #eef2f8;
+    --bs-vignette: rgba(226, 232, 240, 0.6);
+  }
+  [data-theme="light"] body { --bs-bg: var(--background); }
   /* 站点 light 主题下的浅色 re-skin 令牌已移除：大屏在两种主题下统一使用上述深色令牌。 */
   .bs-stage {
     position: absolute;
@@ -137,38 +151,38 @@
      both site themes. Explicit :hover/:active ownership included. */
   [data-theme="light"] .bs-tab,
   [data-theme="light"] .bs-tab:visited {
-    color: #94a3b8 !important;
+    color: var(--muted-foreground) !important;
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
   }
-  [data-theme="light"] .bs-tab:hover { color: #e5edf8 !important; background: rgba(148, 163, 184, 0.08) !important; }
+  [data-theme="light"] .bs-tab:hover { color: var(--foreground) !important; background: var(--bs-wash) !important; }
   [data-theme="light"] .bs-tab.is-active,
   [data-theme="light"] .bs-tab.is-active:visited {
-    color: #f2faff !important;
-    background: #0d1424 !important;
-    border-color: rgba(148, 163, 184, 0.14) !important;
+    color: var(--foreground) !important;
+    background: var(--card) !important;
+    border-color: var(--border) !important;
     box-shadow: inset 0 -2px 0 var(--theme-accent) !important;
   }
   [data-theme="light"] .bs-ctl,
   [data-theme="light"] .bs-ctl:visited {
-    color: #e5edf8 !important;
-    background: rgba(148, 163, 184, 0.06) !important;
-    border-color: rgba(148, 163, 184, 0.14) !important;
+    color: var(--foreground) !important;
+    background: var(--bs-wash) !important;
+    border-color: var(--border) !important;
     box-shadow: none !important;
   }
   [data-theme="light"] select.bs-ctl {
-    background: #0d1424 !important;
-    color: #e5edf8 !important;
+    background: var(--card) !important;
+    color: var(--foreground) !important;
   }
   [data-theme="light"] .bs-ctl:hover,
   [data-theme="light"] .bs-ctl.is-active {
-    color: #f2faff !important;
-    background: rgba(148, 163, 184, 0.12) !important;
+    color: var(--foreground) !important;
+    background: var(--bs-wash-strong) !important;
   }
   [data-theme="light"] .bs-ctl-link,
   [data-theme="light"] .bs-ctl-link:visited {
-    color: #94a3b8 !important;
+    color: var(--muted-foreground) !important;
   }
   .bs-header-right { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
   .bs-clock { text-align: right; }
@@ -893,10 +907,10 @@
           <stop offset="1" stop-color="rgba(59,130,246,0)"/>
         </linearGradient>
       </defs>
-      ${Array.from({ length: 4 }).map((_, index) => `<line x1="${padding.left}" y1="${padding.top + index * 42}" x2="${width - padding.right}" y2="${padding.top + index * 42}" stroke="rgba(255,255,255,.1)" stroke-dasharray="3 6"></line>`).join('')}
+      ${Array.from({ length: 4 }).map((_, index) => `<line x1="${padding.left}" y1="${padding.top + index * 42}" x2="${width - padding.right}" y2="${padding.top + index * 42}" style="stroke: var(--bs-hairline)" stroke-dasharray="3 6"></line>`).join('')}
       <path d="${area}" fill="url(#bsTrendArea)"></path>
       <path d="${line}" fill="none" stroke="#3b82f6" stroke-width="2.4"></path>
-      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.2" fill="#3b82f6"></circle><text x="${point.x}" y="${height - 8}" text-anchor="middle" fill="rgba(148,163,184,.85)" font-size="10" font-family="monospace">${point.label}</text>`).join('')}
+      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.2" fill="#3b82f6"></circle><text x="${point.x}" y="${height - 8}" text-anchor="middle" style="fill: var(--bs-muted)" font-size="10" font-family="monospace">${point.label}</text>`).join('')}
     `;
   }
 
