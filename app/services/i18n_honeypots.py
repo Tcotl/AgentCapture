@@ -318,4 +318,14 @@ EN = {
     "，nohup 后台运行，支持 crontab @reboot 持久化。": ", nohup background run with crontab @reboot persistence.",
     "：PowerShell 下载植入物，pythonw.exe 无窗口运行；HKCU Run 注册表键 + schtasks 双重持久化。": ": PowerShell downloads the implant; pythonw.exe runs windowless with HKCU Run + schtasks dual persistence.",
     "：自解压脚本，先装 VPN 再静默释放植入物到": ": self-extracting script installs the VPN first, then silently drops the implant to ",
+
+    "前往端口服务蜜罐管理": "Open Port Service Honeypots",
+    "本页为总览；启停、参数编辑与新增服务在": "This page is an overview; start/stop, parameter editing and new services live in",
+    "中统一操作，避免两处状态漂移。": " to avoid state drift between two pages.",
+    "门面指纹与诱饵面开关": "facade fingerprint and decoy-surface switches",
+    "面开关在此；蜜饵内容在蜜饵管理维护": "surface switch lives here; decoy content is maintained under Decoy Management",
+    "水印数据集参数": "watermarked dataset parameters",
+    "AWS/GCP 仿真与水印凭证": "AWS/GCP simulation and watermarked credentials",
+    "内网主机与页面模板": "intranet hosts and page templates",
+    "伪装 Developer API 通道参数": "fake Developer API channel parameters",
 }

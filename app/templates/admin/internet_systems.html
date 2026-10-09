@@ -4,6 +4,21 @@
 {{ page_header('API', title or _('嵌入式蜜罐管理'), _('把你的业务系统接入嵌入式蜜罐：以反向代理、旁路镜像或回源方式纳入，默认放行、灰度注入蜜饵与信号采集、可一键回切。'), [_('无损接入'), _('默认放行'), _('灰度策略')],
       actions='<button type="button" class="chip" data-modal-open="internet-doc-modal">' ~ _('接入文档') ~ '</button>' ~ '<button type="button" class="chip primary" data-modal-open="internet-create-modal">' ~ _('＋ 新增互联网系统') ~ '</button>') }}
 
+{% if request.query_params.get('added') %}
+<div class="panel page-banner page-banner-success" style="margin-bottom:14px">
+  <div class="page-banner-body">
+    <div class="panel-title page-banner-title">{{ _('系统已登记') }}：{{ request.query_params.get('added') }}</div>
+    <p class="page-banner-text" style="margin-top:4px">{{ _('接入尚未生效——完成以下三步让流量进入采集管道') }}：</p>
+    <ol class="page-banner-text" style="margin:6px 0 0;padding-left:20px;line-height:2">
+      <li>{{ _('在下方系统卡片中打开「配置预览」，复制反向代理配置') }}（location {{ _('转发段') }}）</li>
+      <li>{{ _('将配置部署到你的业务 Nginx 并 reload') }}（{{ _('业务零感知，默认放行') }}）</li>
+      <li>{{ _('回到本页确认系统状态变为「监测中」，并按需灰度开启蜜饵注入') }}</li>
+    </ol>
+    <p class="page-banner-text" style="margin:8px 0 0">{{ _('完整接入文档（五种方式、逐条命令、验收清单）') }}：<button type="button" class="chip" data-modal-open="internet-doc-modal">{{ _('打开接入文档') }}</button></p>
+  </div>
+</div>
+{% endif %}
+
 <style>
   .internet-kpi-grid { margin-bottom: 18px; }
   .internet-layout { display: block; }

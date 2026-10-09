@@ -4,8 +4,9 @@
 {{ page_header('PB', _('反制剧本'), _('一键应用成套的反制姿态：联动 Portal 收编、协议蜜罐启停与收编 Agent 任务下发。每步结果落执行历史审计。'), ['Playbooks', _('一键联动')]) }}
 
 {% if applied %}
-<div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
-  <p class="panel-subtitle" style="margin:0">{{ applied }}</p>
+<div class="panel page-banner page-banner-success" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <p class="panel-subtitle" style="margin:0;flex:1">{{ applied }}</p>
+  <a class="chip" href="/admin/execution-history">{{ _('查看执行历史') }}</a>
 </div>
 {% endif %}
 
@@ -43,14 +44,14 @@
           </div>
         </td>
         <td>
-          <form method="post" action="/admin/playbooks/{{ pb.id }}/apply" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <form method="post" action="/admin/playbooks/{{ pb.id }}/apply" data-confirm="{{ _('应用反制剧本') }}「{{ pb.name }}」？{{ _('联动动作将立即执行并落入执行历史。') }}" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
             <select name="target" style="width:auto;min-width:150px">
               <option value="">{{ _( '全部适用面' ) }}</option>
               {% for t in pb.targets %}
               <option value="{{ t }}">{{ honeypot_type_labels.get(t, t) }}</option>
               {% endfor %}
             </select>
-            <button type="submit" class="primary btn-sm">{{ _( '一键应用到所选蜜罐' ) }}</button>
+            <button type="submit" class="primary btn-sm">{{ _( '应用此剧本' ) }}</button>
           </form>
         </td>
       </tr>

@@ -45,9 +45,9 @@
   <div class="grid-4">
     <input name="username" placeholder="{{ _('用户名') }}" required>
     <input name="password" placeholder="{{ _('密码') }}" required>
-    <select name="role">
-      <option value="operator">{{ _('operator（操作员）') }}</option>
-      <option value="admin">{{ _('admin（管理员）') }}</option>
+    <select name="role" aria-label="{{ _('角色') }}">
+      <option value="operator" title="{{ _('可查看全部监测数据，不能管理用户/系统设置/隔离与删除操作') }}">{{ _('operator（操作员）') }} — {{ _('只读值守') }}</option>
+      <option value="admin" title="{{ _('完整权限：用户、系统设置、隔离、删除等敏感操作') }}">{{ _('admin（管理员）') }} — {{ _('完整权限') }}</option>
     </select>
     <input name="name" placeholder="{{ _('姓名') }}">
   </div>

@@ -58,7 +58,7 @@
     <label class="field-label"><span>{{ _('类型') }}</span>
       <select name="kind"><option value="ip">IP</option><option value="session">Session</option></select>
     </label>
-    <label class="field-label"><span>{{ _('值（IP 或 session_id）*') }}</span><input name="value" required placeholder="203.0.113.7"></label>
+    <label class="field-label"><span>{{ _('值（IP 或 session_id）*') }}</span><input name="value" required placeholder="203.0.113.7" value="{{ isolate_prefill }}"></label>
     <label class="field-label"><span>{{ _('原因') }}</span><input name="reason" value="manual" placeholder="manual"></label>
     <label class="field-label" style="min-width:120px;"><span>{{ _('TTL（分钟）') }}</span><input name="ttl_minutes" type="number" min="1" value="60"></label>
     <button type="submit" class="btn-sm" style="white-space:nowrap;align-self:flex-end;">{{ _('添加隔离') }}</button>
@@ -208,15 +208,18 @@
         </select>
       </label>
       <label class="field-label"><span>{{ _('最小风险分') }}</span><input type="number" name="min_risk_score" value="45" required></label>
-      <div style="display:flex;gap:10px;align-items:end;">
-        <label class="field-label" style="flex:1;"><span>{{ _('通知配置（逗号分隔）') }}</span><input name="channels_csv" placeholder="{{ _('如 soc-webhook,slack') }}" required></label>
-        <button type="submit" class="btn-sm" style="white-space:nowrap;">{{ _('新增策略') }}</button>
+      <div class="field-label" style="grid-column: 1 / -1;">
+        <span>{{ _('通知配置') }}</span>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;padding:6px 0">
+          {% for c in channels %}
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer">
+            <input type="checkbox" name="channels" value="{{ c.name }}" {% if loop.first %}checked{% endif %}>
+            <code>{{ c.name }}</code>
+          </label>
+          {% else %}<span class="muted" style="font-size:12px">{{ _('尚未创建通知配置——先在上方新增一个渠道。') }}</span>{% endfor %}
+        </div>
       </div>
-      {% if channels %}
-      <div class="muted" style="font-size: 12px; grid-column: 1 / -1;">
-        可用 channel：{% for c in channels %}<code>{{ c.name }}</code>{% if not loop.last %}，{% endif %}{% endfor %}
-      </div>
-      {% endif %}
+      <div style="grid-column: 1 / -1;"><button type="submit" class="btn-sm" style="width:auto">{{ _('新增策略') }}</button></div>
     </form>
 
     <div class="table-wrap" style="margin-top:16px;">
@@ -258,13 +261,18 @@
               </div>
               <div class="grid-2">
                 <label class="field-label"><span>{{ _( '最小风险分' ) }}</span><input type="number" name="min_risk_score" value="{{ item.min_risk_score }}" required></label>
-                <label class="field-label"><span>{{ _( '通知配置（逗号分隔）' ) }}</span><input name="channels_csv" value="{{ item.delivery_channels_json | join(',') }}" required></label>
               </div>
-              {% if channels %}
-              <div class="muted" style="font-size: 12px;">
-                可选 channel：{% for c in channels %}<code>{{ c.name }}</code>{% if not loop.last %}、{% endif %}{% endfor %}
+              <div class="field-label" style="grid-column: 1 / -1;">
+                <span>{{ _('通知配置') }}</span>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;padding:6px 0">
+                  {% for c in channels %}
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer">
+                    <input type="checkbox" name="channels" value="{{ c.name }}" {% if c.name in item.delivery_channels_json %}checked{% endif %}>
+                    <code>{{ c.name }}</code>
+                  </label>
+                  {% endfor %}
+                </div>
               </div>
-              {% endif %}
               <div class="grid-2" style="max-width: 320px;">
                 <button type="submit">{{ _('保存') }}</button>
                 <button type="button" class="secondary" onclick="location.href='/admin/alerts'">{{ _('取消') }}</button>

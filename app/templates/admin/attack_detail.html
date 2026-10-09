@@ -84,6 +84,34 @@
 
 {{ page_header('AD', _('攻击详情 / ') ~ detail.session_id, _('按单个会话展开完整时间线，便于回溯入口、路径、请求头、载荷、风险信号与凭据尝试。'), [_('时间线'), _('会话详情')]) }}
 <div class="cards">{{ metric_card(_('来源 IP'), detail.source_ip) }}{{ metric_card(_('事件数'), detail.event_count) }}{{ metric_card(_('最大风险'), detail.max_risk_score, risk_tone) }}{{ metric_card(_('持续时间'), dur_text) }}</div>
+
+<section class="panel ad-disposition" style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <strong style="font-size:13.5px">{{ _('来源处置') }}</strong>
+    <span class="muted" style="font-size:12px">{{ _('对来源') }} <code>{{ detail.source_ip }}</code> {{ _('直接执行处置动作') }}</span>
+    <div class="actions-inline" style="margin-left:auto;flex-wrap:nowrap">
+      {% if current_user and current_user.role == 'admin' %}
+      <form method="post" action="/admin/isolation" data-confirm="{{ _('确认隔离该来源？TTL 内其访问将收到伪装的 503 页面。') }}" style="margin:0">
+        <input type="hidden" name="kind" value="ip">
+        <input type="hidden" name="value" value="{{ detail.source_ip }}">
+        <input type="hidden" name="reason" value="manual:attack-detail">
+        <input type="hidden" name="ttl_minutes" value="60">
+        <button type="submit" class="secondary btn-danger-ghost btn-sm">{{ _('隔离此来源') }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/admin/intel" data-confirm="{{ _('确认加入白名单？该来源的后续事件将不再产生告警。') }}" style="margin:0">
+        <input type="hidden" name="entry_type" value="whitelist">
+        <input type="hidden" name="value" value="{{ detail.source_ip }}">
+        <input type="hidden" name="label" value="">
+        <input type="hidden" name="source" value="manual">
+        <input type="hidden" name="description" value="from attack detail">
+        <button type="submit" class="secondary btn-sm">{{ _('加入白名单') }}</button>
+      </form>
+      <a class="chip" href="/admin/alerts" title="{{ _('前往隔离名单查看/解除') }}">{{ _('隔离名单') }}</a>
+    </div>
+  </div>
+</section>
+
 <div class="grid-2">
   <section class="panel">
     {{ section_header(_('会话概览'), _('基础元信息与时间边界'), '<a class="chip primary" href="/admin/sessions/' ~ detail.session_id ~ '">切换到会话画像</a>') }}

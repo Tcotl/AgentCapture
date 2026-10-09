@@ -352,7 +352,12 @@
     </script>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="deployments">
+    {% if request.query_params.get('created') %}
+    <div class="panel page-banner page-banner-success" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <p class="panel-subtitle" style="margin:0;flex:1">{{ _('蜜饵模板') }}「{{ request.query_params.get('created') }}」{{ _('已创建。下一步：') }}<a href="#deployments">{{ _('生成部署并复制投放片段') }}</a>{{ _('，把蜜饵真正投放到业务页面。') }}</p>
+    </div>
+    {% endif %}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
       <div style="min-width:0">
         <h3 class="panel-title" style="margin:0;font-size:15px;font-weight:700">{{ _("已部署与投放的模版") }}</h3>

@@ -238,15 +238,19 @@
   <script>
     (function () {
       var items = document.querySelectorAll('.cfg-nav-item');
+      function activate(key) {
+        items.forEach(function (i) { i.setAttribute('aria-pressed', String(i.dataset.cfg === key)); });
+        document.querySelectorAll('.cfg-pane').forEach(function (p) { p.style.display = 'none'; });
+        var pane = document.getElementById('cfg-pane-' + key);
+        if (pane) pane.style.display = 'block';
+      }
       items.forEach(function (item) {
-        item.addEventListener('click', function () {
-          items.forEach(function (i) { i.setAttribute('aria-pressed', 'false'); });
-          item.setAttribute('aria-pressed', 'true');
-          document.querySelectorAll('.cfg-pane').forEach(function (p) { p.style.display = 'none'; });
-          var pane = document.getElementById('cfg-pane-' + item.dataset.cfg);
-          if (pane) pane.style.display = 'block';
-        });
+        item.addEventListener('click', function () { activate(item.dataset.cfg); });
       });
+      // Deep links: /admin/templates/default-honeypot#cfg-<face> opens that
+      // face's pane directly (used by the honeypot deployment page).
+      var m = location.hash.match(/^#cfg-([a-z_]+)$/);
+      if (m && document.getElementById('cfg-pane-' + m[1])) activate(m[1]);
     })();
   </script>
   <script>

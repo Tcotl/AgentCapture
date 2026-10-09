@@ -181,6 +181,37 @@
 </style>
 
 <div class="lp-deck">
+  {% if stats.summary.total_events == 0 %}
+  <section class="lp-card" style="padding:20px" id="onboarding">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span class="lp-dot"></span>
+      <h3 style="margin:0;font-size:15px">{{ _('开始使用：三步上线你的第一个蜜罐') }}</h3>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+      <a href="/admin/honeypots" style="text-decoration:none;color:inherit">
+        <div class="lp-card" style="padding:14px;min-height:0;cursor:pointer">
+          <div style="font-size:12px;color:var(--muted-foreground)">STEP 1</div>
+          <div style="font-weight:700;font-size:13.5px;margin:4px 0">{{ _('部署蜜罐') }}</div>
+          <div style="font-size:12px;color:var(--muted-foreground)">{{ _('开启默认 Web 蜜罐或端口服务，开始接收攻击流量。') }}</div>
+        </div>
+      </a>
+      <a href="/admin/decoy-management" style="text-decoration:none;color:inherit">
+        <div class="lp-card" style="padding:14px;min-height:0;cursor:pointer">
+          <div style="font-size:12px;color:var(--muted-foreground)">STEP 2</div>
+          <div style="font-weight:700;font-size:13.5px;margin:4px 0">{{ _('投放蜜饵') }}</div>
+          <div style="font-size:12px;color:var(--muted-foreground)">{{ _('一键生成 API 路由 + 文件 + 凭证的完整攻击链与投放片段。') }}</div>
+        </div>
+      </a>
+      <a href="/admin/alerts" style="text-decoration:none;color:inherit">
+        <div class="lp-card" style="padding:14px;min-height:0;cursor:pointer">
+          <div style="font-size:12px;color:var(--muted-foreground)">STEP 3</div>
+          <div style="font-weight:700;font-size:13.5px;margin:4px 0">{{ _('配置告警') }}</div>
+          <div style="font-size:12px;color:var(--muted-foreground)">{{ _('接入 webhook / 钉钉 / 飞书，或 syslog 对接 AI SOC。') }}</div>
+        </div>
+      </a>
+    </div>
+  </section>
+  {% endif %}
   <section class="lp-hero lp-card">
     <span class="lp-pill">
       <span class="lp-dot"></span>

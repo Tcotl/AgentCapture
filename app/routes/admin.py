@@ -4528,21 +4528,24 @@ def admin_honeypots(request: Request, db: Session = Depends(get_db)):
             "note": note,
         }
 
+    # Every face's 配置 link lands on its dedicated settings page (deep-linked
+    # via #cfg-<key> on the default-honeypot config hub) — no more dropping
+    # operators on a generic list page to hunt for the right section.
     web_faces = [
         _face_row(
             "thinkphp", "ThinkPHP 仿真门面", "/ · /index.php · /admin.php",
-            "/admin/templates", note="门面：在 Web 应用蜜罐管理中配置",
+            "/admin/templates/default-honeypot#cfg-thinkphp", note="门面指纹与诱饵面开关",
         ),
         _face_row("mcp", "MCP Server 蜜罐", "/mcp",
                   "/admin/counter-offense/mcp", note="5 套反制模板 · 接入即注册"),
         _face_row("agent_files", "Agent 指令文件蜜饵", "/AGENTS.md 等",
-                  "/admin/decoy-management", note="在蜜饵管理中配置"),
+                  "/admin/counter-offense/agent_files", note="面开关在此；蜜饵内容在蜜饵管理维护"),
         _face_row("dataset", "无限资源消耗数据集", "/portal/api/dataset",
-                  "/admin/templates", note="在 Web 应用蜜罐管理中配置"),
+                  "/admin/templates/default-honeypot#cfg-dataset", note="水印数据集参数"),
         _face_row("metadata", "云元数据蜜罐", "/latest/meta-data/*",
-                  "/admin/templates", note="在 Web 应用蜜罐管理中配置"),
+                  "/admin/templates/default-honeypot#cfg-metadata", note="AWS/GCP 仿真与水印凭证"),
         _face_row("intranet", "内网横向 Wiki", "/intranet/*",
-                  "/admin/templates", note="在 Web 应用蜜罐管理中配置"),
+                  "/admin/templates/default-honeypot#cfg-intranet", note="内网主机与页面模板"),
         _face_row("behavior", "行为序列指纹", "中间件（全请求）",
                   "/admin/counter-offense/behavior", note="检测分析器：参数在监测分析中配置"),
     ]
@@ -4555,8 +4558,8 @@ def admin_honeypots(request: Request, db: Session = Depends(get_db)):
         "paths": "/portal/api/*",
         "enabled": bool(portal_row.enabled),
         "hits_24h": "—",
-        "config_url": "/admin/templates",
-        "note": "在 Web 应用蜜罐管理中配置",
+        "config_url": "/admin/templates/default-honeypot#cfg-portal",
+        "note": "伪装 Developer API 通道参数",
     })
 
     qp = request.query_params
@@ -5980,7 +5983,7 @@ def create_internet_system(
         target_type="internet-system",
         target_ref=normalized_domain,
     )
-    return _redirect("/admin/internet-systems")
+    return _redirect("/admin/internet-systems" + _qs(added=normalized_domain))
 
 
 @router.post("/admin/internet-systems/{system_id}/update")
@@ -6433,7 +6436,10 @@ async def create_decoy_template(
         target_type=decoy_type,
         target_ref=name,
     )
-    return _redirect(return_to or "/admin/decoy-management")
+    return _redirect(
+        (return_to or "/admin/decoy-management")
+        + _qs(created=name, created_type=decoy_type)
+    )
 
 
 @router.post("/admin/decoys/templates/{template_id}/update")
@@ -6635,6 +6641,9 @@ def admin_alerts(request: Request, db: Session = Depends(get_db)):
             "alerts_enabled": get_settings().alerts_enabled,
             "edit_channel_id": edit_channel_id,
             "edit_policy_id": edit_policy_id,
+            # Disposition deep links (attack detail / source profile) prefill
+            # the isolation form so operators never re-type an IP.
+            "isolate_prefill": request.query_params.get("value", ""),
             "error": request.query_params.get("error", ""),
             "syslog": __import__("app.services.syslog_export", fromlist=["get_config"]).get_config(),
             "syslog_counters": __import__("app.services.syslog_export", fromlist=["counters"]).counters(),
@@ -6873,6 +6882,7 @@ def patch_alert_policy(
     name: str = Form(...),
     event_scope: str = Form(...),
     min_risk_score: int = Form(...),
+    channels: list[str] = Form(default_factory=list),
     channels_csv: str = Form(""),
     is_active: str = Form(""),
     db: Session = Depends(get_db),
@@ -6889,7 +6899,9 @@ def patch_alert_policy(
             return _redirect("/admin/alerts")
     if event_scope not in ("threat", "credential", "system"):
         return _redirect("/admin/alerts")
-    channels_list = [s.strip() for s in channels_csv.split(",") if s.strip()]
+    channels_list = [c.strip() for c in channels if c.strip()] or [
+        s.strip() for s in channels_csv.split(",") if s.strip()
+    ]
     item.name = name
     item.event_scope = event_scope
     item.min_risk_score = min_risk_score
@@ -6962,15 +6974,21 @@ def create_alert_policy(
     name: str = Form(...),
     event_scope: str = Form(...),
     min_risk_score: int = Form(...),
+    channels: list[str] = Form(default_factory=list),
     channels_csv: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = _require_admin(request, db)
+    # Checkboxes submit multiple `channels` values; the csv string remains a
+    # fallback for programmatic submissions.
+    selected = [c.strip() for c in channels if c.strip()] or [
+        part.strip() for part in channels_csv.split(",") if part.strip()
+    ]
     item = AlertPolicy(
         name=name,
         event_scope=event_scope,
         min_risk_score=min_risk_score,
-        delivery_channels_json=[part.strip() for part in channels_csv.split(",") if part.strip()],
+        delivery_channels_json=selected,
     )
     db.add(item)
     db.commit()
@@ -7029,6 +7047,8 @@ def admin_intel(request: Request, db: Session = Depends(get_db)):
             "current_user": user,
             "items": list_intel_entries(db),
             "stats": intel_stats(db),
+            # Deep links prefill the whitelist entry form.
+            "intel_prefill": request.query_params.get("value", ""),
         },
     )
 

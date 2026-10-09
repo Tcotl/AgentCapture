@@ -22,6 +22,34 @@
 
 {{ page_header('IP', _('来源画像 / ') ~ profile.source_ip, _('从单个来源地址观察多会话、多路径、多站点行为，用于识别扫描器、自动化工具和重复攻击链。'), [_('来源画像')]) }}
 <div class="cards">{{ metric_card(_('事件数'), profile.event_count) }}{{ metric_card(_('会话数'), profile.session_count) }}{{ metric_card(_('首见'), '<span class="sp-mono">' ~ profile.first_seen.strftime('%Y-%m-%d %H:%M:%S') ~ '</span>') }}{{ metric_card('末见', '<span class="sp-mono">' ~ profile.last_seen.strftime('%Y-%m-%d %H:%M:%S') ~ '</span>') }}</div>
+
+<section class="panel" style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <strong style="font-size:13.5px">{{ _('来源处置') }}</strong>
+    <span class="muted" style="font-size:12px"><code>{{ profile.source_ip }}</code></span>
+    <div class="actions-inline" style="margin-left:auto;flex-wrap:nowrap">
+      {% if current_user and current_user.role == 'admin' %}
+      <form method="post" action="/admin/isolation" data-confirm="{{ _('确认隔离该来源？TTL 内其访问将收到伪装的 503 页面。') }}" style="margin:0">
+        <input type="hidden" name="kind" value="ip">
+        <input type="hidden" name="value" value="{{ profile.source_ip }}">
+        <input type="hidden" name="reason" value="manual:source-profile">
+        <input type="hidden" name="ttl_minutes" value="60">
+        <button type="submit" class="secondary btn-danger-ghost btn-sm">{{ _('隔离此来源') }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/admin/intel" data-confirm="{{ _('确认加入白名单？该来源的后续事件将不再产生告警。') }}" style="margin:0">
+        <input type="hidden" name="entry_type" value="whitelist">
+        <input type="hidden" name="value" value="{{ profile.source_ip }}">
+        <input type="hidden" name="label" value="">
+        <input type="hidden" name="source" value="manual">
+        <input type="hidden" name="description" value="from source profile">
+        <button type="submit" class="secondary btn-sm">{{ _('加入白名单') }}</button>
+      </form>
+      <a class="chip" href="/admin/alerts" title="{{ _('前往隔离名单查看/解除') }}">{{ _('隔离名单') }}</a>
+    </div>
+  </div>
+</section>
+
 <div class="grid-2">
   <section class="panel">{{ section_header(_('热点统计'), _('站点、路径、信号与决策')) }}<div class="grid-2"><div><div class="muted">站点</div><pre>{% for name, count in profile.top_sites %}{{ name }} × {{ count }}
 {% endfor %}</pre></div><div><div class="muted">{{ _( '路径' ) }}</div><pre>{% for name, count in profile.top_paths %}{{ name }} × {{ count }}

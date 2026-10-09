@@ -134,10 +134,10 @@
 
 {% if active_tab == 'protocol' %}
 <section class="panel">
-  {{ section_header(_('端口服务蜜罐'), _('开假端口收连接——协议级仿真服务逐项部署，status 为运行中的服务随系统重启自动恢复。')) }}
+  {{ section_header(_('端口服务蜜罐'), _('开假端口收连接——协议级仿真服务逐项部署，status 为运行中的服务随系统重启自动恢复。'), '<a class="chip primary" href="/admin/services">' ~ _('前往端口服务蜜罐管理') ~ '</a>') }}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>{{ _( '服务' ) }}</th><th>{{ _( '端口' ) }}</th><th style="text-align:center">{{ _( '部署状态' ) }}</th><th style="text-align:right">{{ _( '操作' ) }}</th></tr></thead>
+      <thead><tr><th>{{ _( '服务' ) }}</th><th>{{ _( '端口' ) }}</th><th style="text-align:center">{{ _( '部署状态' ) }}</th></tr></thead>
       <tbody>
         {% for item in protocol_items %}
         {% set up = protocol_running_states.get(item.service_key) %}
@@ -147,22 +147,12 @@
           <td style="text-align:center">
             {% if up %}<span class="badge badge-success">{{ _( '部署中' ) }}</span>{% else %}<span class="badge badge-warning">{{ _( '未部署' ) }}</span>{% endif %}
           </td>
-          <td style="text-align:right">
-            <form method="post" action="/admin/services/{{ item.id }}/{{ 'stop' if up else 'start' }}" style="margin:0;display:inline-block">
-              <input type="hidden" name="next" value="/admin/honeypots?tab=protocol">
-              {% if up %}
-              <button type="submit" class="secondary btn-sm">{{ _( '下线' ) }}</button>
-              {% else %}
-              <button type="submit" class="primary btn-sm">{{ _( '部署' ) }}</button>
-              {% endif %}
-            </form>
-          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="muted" style="font-size:12px;margin:10px 0 0">{{ _( '协议细节与高级管理见' ) }} <a href="/admin/services">{{ _( '端口服务蜜罐管理' ) }}</a>。</p>
+  <p class="muted" style="font-size:12px;margin:10px 0 0">{{ _( '本页为总览；启停、参数编辑与新增服务在' ) }} <a href="/admin/services">{{ _( '端口服务蜜罐管理' ) }}</a> {{ _( '中统一操作，避免两处状态漂移。' ) }}</p>
 </section>
 {% endif %}
 

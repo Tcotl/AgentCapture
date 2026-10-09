@@ -1385,4 +1385,14 @@ EN = {
     "：释放到": ": drops to ",
     "已结束": "Ended",
     "来源画像 →": "Source Profile →",
+
+    "来源处置": "Source Disposition",
+    "对来源": "Act on source",
+    "直接执行处置动作": "directly from here",
+    "隔离此来源": "Isolate Source",
+    "加入白名单": "Whitelist",
+    "隔离名单": "Isolation List",
+    "前往隔离名单查看/解除": "Open the isolation list to view or revoke",
+    "确认隔离该来源？TTL 内其访问将收到伪装的 503 页面。": "Isolate this source? Until TTL expiry its requests receive a fake 503 page.",
+    "确认加入白名单？该来源的后续事件将不再产生告警。": "Whitelist this source? Its future events will no longer raise alerts.",
 }
