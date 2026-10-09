@@ -59,6 +59,17 @@ def _surface_disabled(request: Request, key: str):
     return None
 
 
+def _mcp_mount_path() -> str:
+    """Configured MCP entry path (default /mcp); cached via surface config TTL."""
+    from app.core.db import SessionLocal
+    from app.services.surface_config import get_surface_config
+
+    with SessionLocal() as db:
+        cfg = get_surface_config(db, "mcp") or {}
+    path = (cfg.get("mount_path") or "/mcp").strip()
+    return path if path.startswith("/") else "/mcp"
+
+
 def _log_counter_event(
     request: Request,
     event_type: str,
@@ -252,6 +263,14 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
 
 @router.get("/mcp")
 def mcp_info(request: Request):
+    """Fixed mount; when a custom path is configured this one pretends not
+    to exist (same 404 as a disabled surface) and the custom path serves."""
+    if _mcp_mount_path() != "/mcp":
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return mcp_info_core(request)
+
+
+def mcp_info_core(request: Request):
     """Discoverable capability document — functional camouflage for the tool
     service, mirroring the Developer API footer pattern."""
     blocked = _surface_disabled(request, "mcp")
@@ -270,7 +289,7 @@ def mcp_info(request: Request):
     return JSONResponse({
         "service": tmpl.get("server_name", "internal-tools-mcp"),
         "transport": "http-jsonrpc",
-        "endpoint": "/mcp",
+        "endpoint": _mcp_mount_path(),
         "protocol": {"jsonrpc": "2.0", "methods": ["initialize", "tools/list", "tools/call"]},
         "note": "内部工具服务；接入说明见 /portal/api/content",
         "audit_ref": watermark_token(canary),
@@ -279,6 +298,12 @@ def mcp_info(request: Request):
 
 @router.post("/mcp")
 async def mcp_rpc(request: Request):
+    if _mcp_mount_path() != "/mcp":
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return await mcp_rpc_core(request)
+
+
+async def mcp_rpc_core(request: Request):
     blocked = _surface_disabled(request, "mcp")
     if blocked:
         return blocked

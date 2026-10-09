@@ -231,6 +231,8 @@ SURFACE_FIELDS: dict[str, list[dict]] = {
     "mcp": [
         {"key": "server_name", "label": "服务名称", "type": "text"},
         {"key": "version", "label": "版本号", "type": "text"},
+        {"key": "mount_path", "label": "入口路径（默认 /mcp，可自定义如 /api/tools/mcp）",
+         "type": "text", "desc": "保存后 ≤5s 生效；原 /mcp 路径将伪装为不存在"},
         {"key": "_tools_json", "label": "工具定义（JSON 数组：name / description / response）",
          "type": "json", "desc": "response 为 JSON 模板，支持 {{audit_code}} {{slug}} {{target}} 占位符"},
     ],

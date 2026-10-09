@@ -4536,13 +4536,14 @@ def admin_honeypots(request: Request, db: Session = Depends(get_db)):
     # Every face's 配置 link lands on its dedicated settings page (deep-linked
     # via #cfg-<key> on the default-honeypot config hub) — no more dropping
     # operators on a generic list page to hunt for the right section.
+    mcp_entry = (runtime_map.get("mcp", {}).get("config", {}) or {}).get("mount_path") or "/mcp"
     web_faces = [
         _face_row(
             "thinkphp", "ThinkPHP 仿真门面", "/ · /index.php · /admin.php",
             "/admin/templates/default-honeypot#cfg-thinkphp", note="门面指纹与诱饵面开关",
         ),
-        _face_row("mcp", "MCP Server 蜜罐", "/mcp",
-                  "/admin/counter-offense/mcp", note="5 套反制模板 · 接入即注册"),
+        _face_row("mcp", "MCP Server 蜜罐", mcp_entry,
+                  "/admin/counter-offense/mcp", note="5 套反制模板 · 接入即注册 · 路径可自定义"),
         _face_row("agent_files", "Agent 指令文件蜜饵", "/AGENTS.md 等",
                   "/admin/counter-offense/agent_files", note="面开关在此；蜜饵内容在蜜饵管理维护"),
         _face_row("dataset", "无限资源消耗数据集", "/portal/api/dataset",
@@ -8002,6 +8003,9 @@ def admin_counter_offense(request: Request, db: Session = Depends(get_db)):
             "enabled": rt.get("enabled", True),
             "hits_24h": stats.get(meta["key"], {}).get("hits_24h", 0),
             "last_hit": stats.get(meta["key"], {}).get("last_hit"),
+            # MCP's entry path is configurable — reflect the live value.
+            **({"paths": (rt.get("config", {}) or {}).get("mount_path") or meta["paths"]}
+               if meta["key"] == "mcp" else {}),
         })
     laterals = db.scalars(
         select(Event).where(Event.event_type == "lateral_credential_reuse")
@@ -8162,6 +8166,38 @@ async def admin_counter_surface_save(
                 files_cfg[filename] = content
         if files_cfg:
             config["files"] = files_cfg
+
+    # MCP mount path: validate & normalize before persisting — a bad path
+    # could shadow other faces/channels on the honeypot plane.
+    if key == "mcp":
+        import re as _re
+
+        raw_path = (config.get("mount_path") or "/mcp").strip() or "/mcp"
+        # Only paths that actually exist on the honeypot plane (48877 app) —
+        # console-plane prefixes like /admin//api//static never collide there.
+        reserved = (
+            "/mcp-inspector", "/portal", "/admin.php", "/login", "/index.php", "/public",
+            "/d/", "/_bait/", "/_trap/", "/collect", "/recon", "/_agent/", "/payload/",
+            "/intranet", "/latest", "/healthz", "/favicon",
+            "/robots.txt", "/agents.md", "/claude.md", "/.cursorrules",
+        )
+        def _hits_reserved(candidate: str, rule: str) -> bool:
+            if rule.endswith("/"):
+                return candidate.startswith(rule)
+            return candidate == rule or candidate.startswith(rule + "/")
+
+        invalid = (
+            raw_path != "/mcp"
+            and (not _re.fullmatch(r"/[A-Za-z0-9._\-/]{1,120}", raw_path)
+                 or "//" in raw_path
+                 or any(_hits_reserved(raw_path, r) for r in reserved))
+        )
+        if invalid:
+            return _redirect(
+                f"/admin/counter-offense/{key}"
+                + _qs(saved="入口路径不合法（需以 / 开头，且不能占用其他面的路径），未保存")
+            )
+        config["mount_path"] = raw_path
 
     enabled = form.get("enabled") == "on"
     set_surface(db, key=key, enabled=enabled, actor=user.username, config=config)

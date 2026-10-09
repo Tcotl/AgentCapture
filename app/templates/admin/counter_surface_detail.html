@@ -15,7 +15,7 @@
 
 <div class="cards" style="margin-bottom:16px">
   <div class="card metric-card"><div class="muted metric-card-label">{{ _( '24h 命中' ) }}</div><div class="stat-card-value">{{ stats.hits_24h }}</div></div>
-  <div class="card metric-card"><div class="muted metric-card-label">{{ _( '入口路径' ) }}</div><div class="stat-card-value" style="font-size:14px"><code>{{ surface.paths }}</code></div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _( '入口路径' ) }}</div><div class="stat-card-value" style="font-size:14px"><code>{{ (runtime.get('config', {}).get('mount_path') or surface.paths) if surface.key == 'mcp' else surface.paths }}</code></div></div>
 </div>
 
 {% if surface.key == 'thinkphp' %}

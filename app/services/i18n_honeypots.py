@@ -328,4 +328,7 @@ EN = {
     "AWS/GCP 仿真与水印凭证": "AWS/GCP simulation and watermarked credentials",
     "内网主机与页面模板": "intranet hosts and page templates",
     "伪装 Developer API 通道参数": "fake Developer API channel parameters",
+    "入口路径（默认 /mcp，可自定义如 /api/tools/mcp）": "Entry path (default /mcp, customizable e.g. /api/tools/mcp)",
+    "保存后 ≤5s 生效；原 /mcp 路径将伪装为不存在": "Takes effect within 5s; the original /mcp path then pretends not to exist",
+    "入口路径不合法（需以 / 开头，且不能占用其他面的路径），未保存": "Invalid entry path (must start with / and must not shadow other faces); nothing was saved",
 }

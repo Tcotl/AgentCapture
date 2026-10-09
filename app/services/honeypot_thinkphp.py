@@ -267,6 +267,19 @@ async def tp_login_submit(request: Request) -> Response:
 
 
 async def tp_exploit(request: Request) -> Response:
+    # Custom MCP mount path dispatch (before the TP gate so the face stays
+    # independent): any path matching the configured entry serves the MCP
+    # honeypot; the default /mcp is a real route and never lands here.
+    from app.routes.counter_offense import _mcp_mount_path
+
+    mcp_path = _mcp_mount_path()
+    if mcp_path != "/mcp" and request.url.path == mcp_path:
+        from app.routes.counter_offense import mcp_info_core, mcp_rpc_core
+
+        if request.method == "POST":
+            return await mcp_rpc_core(request)
+        return mcp_info_core(request)
+
     enabled, cfg = _surface_state()
     if not enabled:
         return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
