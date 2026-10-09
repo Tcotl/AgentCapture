@@ -2969,3 +2969,11 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   height: 34px;
   padding: 0 12px !important;
 }
+
+/* ---- spacing between controls inside inline forms in table rows ---- */
+.table-wrap .actions-inline form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}

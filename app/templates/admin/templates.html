@@ -70,6 +70,20 @@
     gap: 6px;
     width: 100%;
   }
+  /* the deploy form itself lays out its controls with even spacing */
+  .deploy-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .deploy-form > input[type="number"],
+  .deploy-form > input[type="text"],
+  .deploy-form > select,
+  .deploy-form > .sel-x { width: auto; min-width: 0; flex: 0 1 auto; }
+  .deploy-form > input[type="number"] { width: 78px; }
+  .deploy-form > input[type="text"] { width: 104px; }
+  .deploy-form > .sel-x { flex: 0 0 auto; }
   .deploy-actions .deploy-form .actions-inline {
     display: flex !important;
     flex-wrap: nowrap;
