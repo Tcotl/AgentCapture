@@ -1779,13 +1779,13 @@ pre { border-color: var(--tech-line); border-radius: 4px; }
  * ------------------------------------------------------------------------- */
 
 /* Links inside content: visible affordance + smooth color shift */
-.panel a:not(.chip):not(.btn-sm):not(.nav-link):not(.db-module):not(.feature-card),
-.card a:not(.chip):not(.btn-sm):not(.nav-link) {
+.panel a:not(.chip):not(.btn-sm):not(.btn-preview):not(.nav-link):not(.db-module):not(.feature-card),
+.card a:not(.chip):not(.btn-sm):not(.btn-preview):not(.nav-link) {
   color: #7cc7f7;
   transition: color 140ms var(--ease-out);
 }
-.panel a:not(.chip):not(.btn-sm):not(.nav-link):not(.db-module):not(.feature-card):hover,
-.card a:not(.chip):not(.btn-sm):not(.nav-link):hover {
+.panel a:not(.chip):not(.btn-sm):not(.btn-preview):not(.nav-link):not(.db-module):not(.feature-card):hover,
+.card a:not(.chip):not(.btn-sm):not(.btn-preview):not(.nav-link):hover {
   color: #67e8f9;
   text-decoration: underline;
   text-underline-offset: 3px;
