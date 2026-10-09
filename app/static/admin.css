@@ -2932,3 +2932,11 @@ button.secondary.btn-danger-ghost:hover { background: rgba(251, 113, 133, 0.1) !
 .hp-term-out { color: #8fa3c2; }
 [data-theme="light"] .hp-terminal .hp-term-out,
 [data-theme="light"] .hp-terminal pre.hp-term-out { color: #475569; }
+
+/* ---- number inputs: no spinners — operators type values directly ---- */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
