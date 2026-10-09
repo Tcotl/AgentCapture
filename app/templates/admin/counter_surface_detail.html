@@ -1,22 +1,17 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_macros.html' import page_header, section_header, empty_state, badge, modal_dialog with context %}
 {% block content %}
+{% set surface_on = runtime.get('enabled') %}
 {{ page_header('CF', surface.name, surface.description, [surface.paths],
-      actions='<span class="badge ' ~ ('badge-success' if runtime.get('enabled') else 'badge-warning') ~ '" id="surface-badge" style="cursor:default;margin-right:8px">' ~ ('运行中' if runtime.get('enabled') else '已停用') ~ '</span>'
-
-              ~ '<button type="button" class="chip primary" data-modal-open="config-modal">编辑配置</button>') }}
+      actions='<span class="badge ' ~ ('badge-success' if surface_on else 'badge-warning') ~ '" id="surface-badge" style="cursor:default;margin-right:8px">' ~ (_('运行中') if surface_on else _('已停用')) ~ '</span>'
+              ~ '<button type="button" class="chip ' ~ ('' if surface_on else 'primary') ~ '" id="quick-toggle" data-enabled="' ~ ('1' if surface_on else '0') ~ '" style="margin-right:8px">' ~ (_('停用') if surface_on else _('启用')) ~ '</button>'
+              ~ '<button type="button" class="chip primary" data-modal-open="config-modal">' ~ _('编辑配置') ~ '</button>') }}
 
 {% if saved %}
 <div class="panel page-banner" style="border-left:3px solid var(--success,#34d399)">
   <p class="panel-subtitle" style="margin:0">{{ saved }}</p>
 </div>
 {% endif %}
-
-<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
-  <span class="badge {{ 'badge-success' if runtime.get('enabled') else 'badge-warning' }}" id="surface-badge">{{ _('运行中') if runtime.get('enabled') else _('已停用') }}</span>
-  <button type="button" class="chip" id="quick-toggle" data-enabled="{{ '1' if runtime.get('enabled') else '0' }}">{{ _('停用') if runtime.get('enabled') else _('启用') }}</button>
-  <span class="muted" style="font-size:12px">{{ _('快捷启停 · 配置修改点右上角「编辑配置」') }}</span>
-</div>
 
 <div class="cards" style="margin-bottom:16px">
   <div class="card metric-card"><div class="muted metric-card-label">{{ _( '24h 命中' ) }}</div><div class="stat-card-value">{{ stats.hits_24h }}</div></div>
@@ -232,6 +227,7 @@
         badge.textContent = turningOn ? '运行中' : '已停用';
         badge.className = 'badge ' + (turningOn ? 'badge-success' : 'badge-warning');
         toggleBtn.textContent = turningOn ? '停用' : '启用';
+        toggleBtn.classList.toggle('primary', !turningOn);
         toggleBtn.disabled = false;
       } else { toggleBtn.disabled = false; }
     }).catch(function () { toggleBtn.disabled = false; });
