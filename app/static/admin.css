@@ -2950,3 +2950,22 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* ---- uniform inline-control height inside table action cells ----
+   inputs, themed selects and buttons in one .actions-inline row share a
+   single 34px control height across every table in the console. */
+.table-wrap .actions-inline input,
+.table-wrap .actions-inline select {
+  height: 34px;
+  padding: 0 10px;
+}
+.table-wrap .actions-inline .sel-x { height: 34px; }
+.table-wrap .actions-inline .sel-x-btn {
+  height: 34px !important;
+  padding: 0 10px !important;
+}
+.table-wrap .actions-inline button,
+.table-wrap .actions-inline button.btn-sm {
+  height: 34px;
+  padding: 0 12px !important;
+}
