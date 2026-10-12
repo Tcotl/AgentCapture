@@ -154,6 +154,21 @@
     color: var(--muted); font-size: 12.5px;
   }
   footer a { color: #9fc3f7; text-decoration: none; }
+  .lang-switch {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted); user-select: none;
+  }
+  .lang-switch button {
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; color: var(--muted); cursor: pointer;
+    text-decoration: underline dotted rgba(143, 169, 216, 0.5);
+    text-underline-offset: 3px;
+  }
+  .lang-switch button.active {
+    color: var(--text); font-weight: 600;
+    text-decoration: none; cursor: default;
+  }
+  .lang-switch .sep { opacity: 0.5; }
   footer a:hover { text-decoration: underline; }
   .foot-right { letter-spacing: .18em; color: #6f8ec4; }
   @media (max-width: 640px) {
@@ -198,7 +213,11 @@
         </div>
         <div class="aux">
           <label><input type="checkbox" name="remember"> {{ _('记住账号') }}</label>
-          <a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">{{ _('了解 AgentCapture ↗') }}</a>
+          <span class="lang-switch" title="{{ _('语言') }}">
+            <button type="button" data-lang="zh" class="{{ 'active' if lang != 'en' else '' }}" onclick="setLoginLang('zh')">中文</button>
+            <span class="sep">·</span>
+            <button type="button" data-lang="en" class="{{ 'active' if lang == 'en' else '' }}" onclick="setLoginLang('en')">English</button>
+          </span>
         </div>
         <button type="submit" class="login">{{ _('登 录') }}</button>
       </form>
@@ -207,6 +226,14 @@
   </section>
 </main>
 
+<script>
+  function setLoginLang(code) {
+    try {
+      document.cookie = 'ach:lang=' + code + '; path=/; max-age=31536000; samesite=lax';
+    } catch (e) {}
+    window.location.reload();
+  }
+</script>
 <footer>
   <span>{{ _('开源项目&nbsp;&nbsp;') }}<a href="https://github.com/Tcotl/AgentCapture" target="_blank" rel="noopener">github.com/Tcotl/AgentCapture</a></span>
   <span class="foot-right">{{ _('以蜜罐之名 · 记录每一次威胁') }}</span>

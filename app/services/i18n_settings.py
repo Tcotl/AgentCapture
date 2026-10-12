@@ -35,4 +35,5 @@ EN = {
     "已创建。下一步：": "created. Next: ",
     "生成部署并复制投放片段": "generate a deployment and copy the delivery snippets",
     "，把蜜饵真正投放到业务页面。": " to actually deliver the decoy into business pages.",
+    "语言": "Language",
 }
