@@ -144,8 +144,6 @@
   }
   button.login:hover { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 14px 36px rgba(29, 95, 224, 0.55); }
   button.login:active { transform: translateY(0); }
-  .tenant { margin-top: 16px; text-align: center; color: var(--muted); font-size: 11.5px; letter-spacing: .06em; }
-  .tenant code { color: #9fc3f7; font-family: "Fira Code", ui-monospace, monospace; }
 
   footer {
     position: relative; z-index: 2;
@@ -221,7 +219,6 @@
         </div>
         <button type="submit" class="login">{{ _('登 录') }}</button>
       </form>
-      <div class="tenant">{{ _('默认租户：') }}<code>{{ site_id }}</code> {{ _('· 受控沙箱后台') }}</div>
     </div>
   </section>
 </main>
