@@ -187,6 +187,7 @@
             <td>
               <div class="internet-actions-row">
                 <button type="button" onclick="openInternetModal('internet-edit-{{ item.id }}')">{{ _( '编辑' ) }}</button>
+                <button type="button" class="secondary" data-verify="{{ item.verify_token }}" data-domain="{{ item.domain }}">{{ _( '接入自检' ) }}</button>
                 <form method="post" action="/admin/internet-systems/{{ item.id }}/toggle">
                   <button type="submit" class="secondary">{% if item.is_enabled %}暂停{% else %}启用{% endif %}</button>
                 </form>
@@ -269,21 +270,12 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
       <form method="post" action="/admin/internet-systems" class="stack">
         <div class="grid-2"><input name="name" placeholder="{{ _('系统名称，如 OA门户') }}" required><input name="domain" placeholder="{{ _('业务域名，如 oa.example.com') }}" required></div>
         <div class="grid-2"><input name="upstream_url" placeholder="{{ _('原业务上游，如 http://10.0.1.20:8080') }}" required><input name="owner" placeholder="{{ _('负责人/团队') }}"></div>
-        <div class="grid-4">
+        <div class="grid-2">
           <select name="deploy_mode"><option>{{ _( '反向代理无损接入' ) }}</option><option>{{ _( '旁路镜像监测' ) }}</option><option>{{ _( 'CDN/SLB 回源接入' ) }}</option><option>{{ _( '测试域名预接入' ) }}</option></select>
-          <select name="status"><option>{{ _( '监测模式' ) }}</option><option>{{ _( '灰度注入' ) }}</option><option>{{ _( '反制模式' ) }}</option><option>{{ _( '规划中' ) }}</option><option>{{ _( '暂停' ) }}</option></select>
-          <select name="tls_mode"><option>{{ _( '沿用原证书' ) }}</option><option>{{ _( '平台托管证书' ) }}</option><option>{{ _( '上游 TLS 透传' ) }}</option></select>
-          <select name="failover_mode"><option>{{ _( '异常自动旁路' ) }}</option><option>{{ _( '默认放行' ) }}</option><option>{{ _( '手动回切' ) }}</option></select>
+          <input name="tags_csv" placeholder="{{ _('标签，如 生产,公网,OA') }}">
         </div>
-        <div class="grid-4">
-          <select name="inject_policy"><option>{{ _( '关闭注入' ) }}</option><option selected>{{ _( '仅公开页面注入' ) }}</option><option>{{ _( '高风险请求注入' ) }}</option><option>{{ _( '全站灰度注入' ) }}</option></select>
-          <select name="decoy_policy"><option>{{ _( '仅记录' ) }}</option><option selected>{{ _( '蜜饵路径 + 假接口' ) }}</option><option>{{ _( '文件蜜饵 + 凭证蜜饵' ) }}</option><option>{{ _( '全量策略' ) }}</option></select>
-          <select name="jsonp_template_key"><option value="">{{ _( '不绑定 JSONP 模版' ) }}</option>{% for tmpl in jsonp_templates %}<option value="{{ tmpl.method_key }}">{{ tmpl.name }}</option>{% endfor %}</select>
-          <select name="risk_policy"><option value="observe">{{ _( 'observe 观察' ) }}</option><option value="challenge">{{ _( 'challenge 挑战' ) }}</option><option value="isolate">{{ _( 'isolate 隔离' ) }}</option><option value="block">{{ _( 'block 阻断' ) }}</option></select>
-        </div>
-        <div class="grid-2"><input name="tags_csv" placeholder="{{ _('标签，如 生产,公网,OA') }}"><select name="is_enabled"><option value="1">{{ _( '启用' ) }}</option><option value="0">{{ _( '暂停' ) }}</option></select></div>
         <textarea name="notes" placeholder="{{ _('接入备注：DNS/SLB 切流计划、回滚窗口、测试账号或业务影响评估') }}"></textarea>
-        <div class="internet-help">{{ _( '保存后会生成一份反向代理配置预览，真正切流前建议先完成旁路监测和业务回归验证。' ) }}</div>
+        <div class="internet-help">{{ _( '登记后生成按接入方式定制的 Nginx 配置（含欺骗路径转发段与接入自检命令）。TLS、灰度与蜜饵策略等细节在系统卡片的「编辑」中调整。' ) }}</div>
         <div class="internet-modal-footer"><button type="button" class="secondary" onclick="closeInternetModal('internet-create-modal')">{{ _( '取消' ) }}</button><button type="submit">{{ _( '保存接入' ) }}</button></div>
       </form>
     </div>
@@ -296,7 +288,7 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
     <div class="internet-modal-header">
       <div>
         <h2 class="internet-modal-title" id="internet-edit-title-{{ item.id }}">编辑接入：{{ item.name }}</h2>
-        <div class="internet-modal-subtitle">{{ item.domain }} · 调整上游地址、灰度策略和异常旁路方式。</div>
+        <div class="internet-modal-subtitle">{{ item.domain }} · {{ _('调整上游地址、灰度策略和异常旁路方式。策略为规划登记，当前版本不自动下发——实际行为由业务侧 Nginx 配置与平台全局开关决定。') }}</div>
       </div>
       <button type="button" class="internet-modal-close" onclick="closeInternetModal('internet-edit-{{ item.id }}')">×</button>
     </div>
@@ -361,6 +353,19 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
     if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
     form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
     form.submit();
+  });
+</script>
+<script>
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-verify]');
+    if (!btn) return;
+    var cmd = 'curl -s https://' + btn.dataset.domain + '/collect/internet-verify?token=' + btn.dataset.verify;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd);
+      showToast('已复制接入自检命令：在业务机执行；成功后台账自动翻为「监测中」', 'success');
+    } else {
+      window.prompt('复制以下命令并在业务机执行：', cmd);
+    }
   });
 </script>
 {% endblock %}

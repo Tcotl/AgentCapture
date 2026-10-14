@@ -27,6 +27,50 @@ def _require_embedded(request: Request) -> None:
     if gated is not None:
         raise HTTPException(status_code=404, detail="Not Found")
 
+@router.get("/internet-verify", dependencies=[Depends(_require_embedded)])
+def internet_system_verify(token: str, request: Request):
+    """Onboarding self-check for embedded internet systems.
+
+    The generated config preview includes a curl to this endpoint through
+    the business domain; a hit proves the decoy prefixes actually reach the
+    platform, and the ledger row flips to 监测模式 automatically.
+    """
+    import hashlib
+    import hmac
+
+    from fastapi import HTTPException
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import select
+
+    from app.models.internet_system import InternetSystem
+
+    source_ip = extract_client_ip(request)
+    with SessionLocal() as db:
+        systems = db.scalars(select(InternetSystem).order_by(InternetSystem.id)).all()
+        matched = None
+        secret = (get_settings().secret_key or "ac").encode("utf-8")
+        for item in systems:
+            expect = hmac.new(
+                secret, f"isv:{item.id}".encode("utf-8"), hashlib.sha256
+            ).hexdigest()[:24]
+            if hmac.compare_digest(expect, (token or "")):
+                matched = item
+                break
+        if matched is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+        if matched.status != "监测模式":
+            matched.status = "监测模式"
+            db.add(matched)
+            db.commit()
+        return JSONResponse(
+            {
+                "status": "ok",
+                "system": matched.domain,
+                "state": matched.status,
+                "note": "链路验证成功，台账已翻为监测模式",
+            }
+        )
+
 
 @router.post("/beacon", status_code=204, dependencies=[Depends(_require_embedded)])
 def collect_beacon(payload: BeaconPayload, request: Request) -> Response:

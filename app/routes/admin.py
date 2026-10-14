@@ -1159,27 +1159,70 @@ def _internet_system_status_tone(status: str, enabled: bool) -> str:
     return "info"
 
 
-def _internet_system_config_preview(item: InternetSystem) -> str:
-    return (
-        f"# AgentCapture 无损接入：{item.name}\n"
-        f"server {{\n"
-        f"  listen 443 ssl http2;\n"
-        f"  server_name {item.domain};\n"
-        f"\n"
-        f"  # fail-safe: {item.failover_mode}；默认放行到原业务\n"
-        f"  location / {{\n"
+def _internet_system_verify_token(item: InternetSystem) -> str:
+    """Stateless per-system token for the onboarding self-check endpoint."""
+    import hashlib
+    import hmac
+
+    secret = (get_settings().secret_key or "ac").encode("utf-8")
+    return hmac.new(secret, f"isv:{item.id}".encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+
+
+def _internet_system_config_preview(item: InternetSystem, ac_base: str) -> str:
+    """Ready-to-paste config for the registered deploy mode.
+
+    The generated block must actually route decoy/callback prefixes to the
+    platform — anything else (a plain reverse-proxy to the upstream) would
+    leave the operator with zero traffic captured after a copy-paste deploy.
+    """
+    verify = _internet_system_verify_token(item)
+    header = (
+        f"# AgentCapture 接入配置 —— {item.name}（{item.domain}）\n"
+        f"# 方式：{item.deploy_mode}；fail-safe：{item.failover_mode}\n"
+        f"# 1) 平台侧前提：.env.docker 中 TRUST_PROXY_HEADERS=true\n"
+        f"# 2) 将下方 AC 地址替换为平台内网地址（当前按本管理台推导：{ac_base}）\n"
+    )
+    ac = f"http://127.0.0.1:{get_settings().port}"
+    decoy_block = (
+        f"# —— server {{ ... }} 内追加；真实业务路径保持不变 ——\n"
+        f"location ~ ^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/|internal/|docs/runbook-internal\\.md|backup/) {{\n"
+        f"    proxy_pass {ac};\n"
         f"    proxy_set_header Host $host;\n"
         f"    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
-        f"    proxy_set_header X-AgentCapture-Site {item.domain};\n"
-        f"    proxy_pass {item.upstream_url};\n"
-        f"  }}\n"
-        f"\n"
-        f"  # observe={item.status}; inject={item.inject_policy}; decoy={item.decoy_policy}; risk={item.risk_policy}\n"
-        f"}}"
+        f"    proxy_set_header X-Forwarded-Proto $scheme;\n"
+        f"    proxy_http_version 1.1;\n"
+        f"}}\n"
+        f"location = /static/beacon.js {{ proxy_pass {ac}/static/beacon.js; }}\n"
+        f"location = /static/recon.js  {{ proxy_pass {ac}/static/recon.js; }}\n"
     )
+    footer = (
+        f"# 前缀可按需裁剪：业务自身已有 /portal 等路由时删除对应分支；\n"
+        f"# 仅前端注入场景（§5.3 sub_filter）可省略第一段，保留静态资源段。\n"
+        f"#\n"
+        f"# 生效与验收：\n"
+        f"#   nginx -t && nginx -s reload\n"
+        f"#   curl -sI https://{item.domain}/portal/api/content | grep -i x-agent-capture\n"
+        f"# 接入自检（经业务域名回传，成功后台账自动翻为「监测中」）：\n"
+        f"#   curl -s https://{item.domain}/collect/internet-verify?token={verify}\n"
+    )
+    if item.deploy_mode == "旁路镜像监测":
+        return header + (
+            "# 旁路镜像无需改业务 Nginx：将交换机 SPAN / 分流设备镜像流量送至平台主机，\n"
+            "# 平台以监测模式读取（不改写响应、不注入）。验收：\n"
+            f"#   curl -s http://<平台地址>:{get_settings().port}/healthz\n"
+        )
+    if item.deploy_mode == "CDN/SLB 回源接入":
+        return header + decoy_block + (
+            f"# CDN/SLB 场景：在回源规则中将上述欺骗前缀的回源源站指向 {ac}，\n"
+            f"# 其余路径回源 {item.upstream_url}；静态资源段同理由 CDN 回源到平台。\n"
+        ) + footer
+    # 反向代理无损接入 / 测试域名预接入 → 路径级挂载（§5.1，推荐）
+    return header + decoy_block + footer
 
 
-def _internet_system_rows(items: list[InternetSystem]) -> list[dict]:
+def _internet_system_rows(
+    items: list[InternetSystem], *, ac_base: str = ""
+) -> list[dict]:
     rows: list[dict] = []
     for item in items:
         rows.append(
@@ -1207,7 +1250,8 @@ def _internet_system_rows(items: list[InternetSystem]) -> list[dict]:
                 "updated_at": item.updated_at.strftime("%Y-%m-%d %H:%M")
                 if item.updated_at
                 else "-",
-                "config_preview": _internet_system_config_preview(item),
+                "config_preview": _internet_system_config_preview(item, ac_base),
+                "verify_token": _internet_system_verify_token(item),
             }
         )
     return rows
@@ -5902,7 +5946,9 @@ def undeploy_template(node_id: int, request: Request, db: Session = Depends(get_
 def admin_internet_systems(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
     systems = db.scalars(select(InternetSystem).order_by(InternetSystem.name)).all()
-    items = _internet_system_rows(systems)
+    items = _internet_system_rows(
+        systems, ac_base=str(request.url).rsplit("/admin", 1)[0]
+    )
     jsonp_templates = db.scalars(select(JsonpTemplate).order_by(JsonpTemplate.name)).all()
     summary = {
         "total": len(items),

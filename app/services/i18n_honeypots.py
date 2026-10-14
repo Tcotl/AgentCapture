@@ -331,4 +331,8 @@ EN = {
     "入口路径（默认 /mcp，可自定义如 /api/tools/mcp）": "Entry path (default /mcp, customizable e.g. /api/tools/mcp)",
     "保存后 ≤5s 生效；原 /mcp 路径将伪装为不存在": "Takes effect within 5s; the original /mcp path then pretends not to exist",
     "入口路径不合法（需以 / 开头，且不能占用其他面的路径），未保存": "Invalid entry path (must start with / and must not shadow other faces); nothing was saved",
+    "接入自检": "Onboarding Self-Check",
+    "登记后生成按接入方式定制的 Nginx 配置（含欺骗路径转发段与接入自检命令）。TLS、灰度与蜜饵策略等细节在系统卡片的「编辑」中调整。": "Registration generates an Nginx config tailored to the onboarding method (decoy-prefix forwarding block + self-check command). TLS / gating / decoy details are adjusted later via 'Edit' on the system card.",
+    "编辑配置": "Edit Config",
+    "调整上游地址、灰度策略和异常旁路方式。策略为规划登记，当前版本不自动下发——实际行为由业务侧 Nginx 配置与平台全局开关决定。": "Adjust upstream, gating policies and failover. Policies are ledger entries — this version does not push them automatically; actual behavior is set by the business-side Nginx config and the platform's global switches.",
 }
