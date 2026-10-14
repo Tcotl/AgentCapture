@@ -425,7 +425,7 @@ AgentCapture 仅用于授权环境下的安全监测、蜜罐运营、攻防演�
 
 <div align="center">
 
-<img src="docs/wechat-group.jpg" alt="AgentCapture 交流群" width="240" height="240" />
+<img src="docs/wechat-group.png" alt="AgentCapture 交流群" width="240" height="240" />
 &nbsp;&nbsp;&nbsp;&nbsp;
 <img src="docs/author-wechat.jpg" alt="作者微信" width="240" height="240" />
 
