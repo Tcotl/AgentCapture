@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     trust_proxy_headers: bool = False
     # Decision ladder enforcement
     challenge_enabled: bool = True  # serve a JS challenge for decision=challenge
+    # Guard mode: front registered internet systems on the management port
+    # with FULL enforcement (block/challenge/isolate) — the protective
+    # counterpart to the observe-only deception planes.
+    guard_mode_enabled: bool = False
     challenge_cookie_name: str = "ach_chal"
     isolation_ttl_minutes: int = 60  # persistence window for isolate/canary-echo
     # /console/events leaks signals/payloads; require an admin session unless

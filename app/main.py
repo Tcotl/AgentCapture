@@ -102,8 +102,12 @@ app.add_middleware(
 # (default /agentcapture/) and 404s the well-known /admin. Must sit inside
 # SessionMiddleware (sessions are path-independent) but outside the routers.
 from app.middleware.admin_path import AdminAccessPathMiddleware  # noqa: E402
+from app.middleware.guard import GuardProxyMiddleware  # noqa: E402
 
 app.add_middleware(AdminAccessPathMiddleware)
+if settings.guard_mode_enabled:
+    # Enforcement-mode proxy for ledger-registered business hosts.
+    app.add_middleware(GuardProxyMiddleware)
 app.mount("/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static")), name="static")
 
 # Serve cloned/uploaded web template assets so preview can resolve relative paths.
