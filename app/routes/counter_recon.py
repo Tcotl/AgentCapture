@@ -625,6 +625,9 @@ async def portal_client_heartbeat(request: Request):
 # bare 404 so deployed probes go dark until 嵌入式蜜罐 is enabled.
 embedded_router = APIRouter(tags=["embedded"])
 _EMBEDDED_DEPS = [Depends(_require_embedded)]
+embedded_router.add_api_route("/portal/api/content", portal_content, methods=["GET"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/portal/api/client-register", portal_client_register, methods=["GET", "POST"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/portal/api/client-heartbeat", portal_client_heartbeat, methods=["POST"], dependencies=_EMBEDDED_DEPS)
 embedded_router.add_api_route("/recon/fingerprint", collect_fingerprint, methods=["POST"], dependencies=_EMBEDDED_DEPS)
 embedded_router.add_api_route("/recon/jsonp", jsonp_callback, methods=["GET"], dependencies=_EMBEDDED_DEPS)
 embedded_router.add_api_route("/recon/callback/{tracking_id}", payload_callback, methods=["GET"], dependencies=_EMBEDDED_DEPS)

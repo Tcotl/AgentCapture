@@ -125,6 +125,14 @@ app.include_router(console_router)
 # distribution): handlers gate on the embedded master switch — with the
 # embedded honeypot disabled (deployment default) they answer 404.
 app.include_router(embedded_router)
+# Decoy-bait faces on the management plane: the §5.1 path-level mount hands
+# /_trap /d /_bait /internal /backup prefixes to this port, so these routers
+# (previously only on the web honeypot plane) must resolve here as well.
+from app.routes.traps import router as traps_router  # noqa: E402
+from app.routes.counter_offense import router as counter_offense_router  # noqa: E402
+
+app.include_router(traps_router)
+app.include_router(counter_offense_router)
 app.include_router(collect_router)
 app.include_router(public_api_router)
 app.include_router(admin_router)
