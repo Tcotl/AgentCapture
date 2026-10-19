@@ -78,13 +78,16 @@ AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入�
 
 ### Agent 反制结果
 
-| Agent | 行为检测 | 处置轨迹 | 诱饵 API 接入 | 注册上线 | 自主心跳 |
-| --- | --- | --- | --- | --- | --- |
-| ChatGPT（Codex CLI） | 命中 | challenge → block | 完成 | **已上线** | 持续 |
-| Claude Code | 命中 | challenge → isolate | 完成 | **已上线** | 持续 |
-| OpenCode | 命中 | challenge → isolate | 完成 | **已上线** | 持续 |
-| kimiCode | 命中 | challenge → isolate | 完成 | **已上线** | 持续 |
-| Pi | 命中 | challenge → block | 完成 | **已上线** | 持续 |
+<table width="100%">
+  <thead><tr><th align="center">Agent</th><th align="center">行为检测</th><th align="center">处置轨迹</th><th align="center">诱饵 API 接入</th><th align="center">注册上线</th><th align="center">自主心跳</th></tr></thead>
+  <tbody>
+    <tr><td align="center">ChatGPT（Codex CLI）</td><td align="center">命中</td><td align="center">challenge → block</td><td align="center">完成</td><td align="center"><strong>已上线</strong></td><td align="center">持续</td></tr>
+    <tr><td align="center">Claude Code</td><td align="center">命中</td><td align="center">challenge → isolate</td><td align="center">完成</td><td align="center"><strong>已上线</strong></td><td align="center">持续</td></tr>
+    <tr><td align="center">OpenCode</td><td align="center">命中</td><td align="center">challenge → isolate</td><td align="center">完成</td><td align="center"><strong>已上线</strong></td><td align="center">持续</td></tr>
+    <tr><td align="center">kimiCode</td><td align="center">命中</td><td align="center">challenge → isolate</td><td align="center">完成</td><td align="center"><strong>已上线</strong></td><td align="center">持续</td></tr>
+    <tr><td align="center">Pi</td><td align="center">命中</td><td align="center">challenge → block</td><td align="center">完成</td><td align="center"><strong>已上线</strong></td><td align="center">持续</td></tr>
+  </tbody>
+</table>
 
 五家全部被反制上线：Agent 自主完成"读取页面 Developer API 说明 → 携会话令牌调用结构化 API → 按 API 文档注册客户端 → 周期心跳"的完整接入流程，进入 C2 名册并可通过心跳领取操作员任务；全过程以**会话蜜标令牌**（session canary token）归因，从首次页面访问到注册可完整回溯。
 
@@ -236,12 +239,15 @@ AgentCapture/
 
 ## 在线演示
 
-| 项目 | 信息 |
-|---|---|
-| 演示地址 | https://agentcapture-demo.vercel.app/ |
-| 登录账号 | `admin` |
-| 登录口令 | `Admin@123`（首次登录需按提示完成强制改密，演示环境可沿用） |
-| 更新策略 | 每次代码推送自动部署（GitHub Actions → Vercel） |
+<table width="100%">
+  <thead><tr><th align="center">项目</th><th align="center">信息</th></tr></thead>
+  <tbody>
+    <tr><td align="center">演示地址</td><td align="center">https://agentcapture-demo.vercel.app/</td></tr>
+    <tr><td align="center">登录账号</td><td align="center"><code>admin</code></td></tr>
+    <tr><td align="center">登录口令</td><td align="center"><code>Admin@123</code>（首次登录需按提示完成强制改密，演示环境可沿用）</td></tr>
+    <tr><td align="center">更新策略</td><td align="center">每次代码推送自动部署（GitHub Actions → Vercel）</td></tr>
+  </tbody>
+</table>
 
 > 演示环境运行于 Vercel Serverless：Web 蜜罐面、控制台与开放 API 全功能可用；SQLite 数据库不持久化（冷启动重置），端口服务蜜罐等长驻组件请自建节点部署。
 
@@ -371,19 +377,22 @@ vercel --prod                    # 一键部署（仓库内置 vercel.json）
 
 ## 功能矩阵
 
-| 能力域 | 核心内容 | 入口 / 执行面 |
-| --- | --- | --- |
-| 监测分析 | 控制台、态势大屏、攻击流量、来源画像、会话画像 | `/admin` |
-| 三类蜜饵 | API 路由蜜饵、文件蜜饵、凭证蜜饵、默认攻击链路 | `/admin/decoy-management` |
-| 协议蜜罐 | SSH 交互式蜜罐、MySQL / Redis / FTP / ES / nginx-admin 仿真、会话回放 | `/admin/services` · `/admin/honeypot-sessions` |
-| 反制溯源 | Jsonp 攻击者画像、Agent 注入回显、文件下载记录、凭证登录记录 | `/admin/recon-data` 等 |
-| 部署运营 | 节点管理、端口服务蜜罐、Web 应用蜜罐、互联网系统接入、提示词注入 | `/admin/nodes` 等 |
-| Web 应用蜜罐 | 模板上传、一键克隆前端页面、Web 应用部署管理 | `/admin/templates` |
-| C2 控制 | C2 Console（Beacon/任务队列/Beacon 生成/监听器/MSF）、Agent 管理、木马捆绑 | `/admin/c2/console` |
-| 告警与处置 | 多通道告警、主动隔离名单管理、威胁情报与白名单 | `/admin/alerts` · `/admin/intel` |
-| 平台设置 | 执行历史、登录日志、用户管理、个人信息 | `/admin/execution-history` 等 |
-| 开放 API | 攻击来源、攻击详情、凭证数据输出 | `/api/v1/*` |
-| 自检验证 | 自动创建并验证三类蜜饵链路 | `scripts/verify_decoy_chain.py` |
+<table width="100%">
+  <thead><tr><th align="center">能力域</th><th align="center">核心内容</th><th align="center">入口 / 执行面</th></tr></thead>
+  <tbody>
+    <tr><td align="center">监测分析</td><td align="center">控制台、态势大屏、攻击流量、来源画像、会话画像</td><td align="center"><code>/admin</code></td></tr>
+    <tr><td align="center">三类蜜饵</td><td align="center">API 路由蜜饵、文件蜜饵、凭证蜜饵、默认攻击链路</td><td align="center"><code>/admin/decoy-management</code></td></tr>
+    <tr><td align="center">协议蜜罐</td><td align="center">SSH 交互式蜜罐、MySQL / Redis / FTP / ES / nginx-admin 仿真、会话回放</td><td align="center"><code>/admin/services</code> · <code>/admin/honeypot-sessions</code></td></tr>
+    <tr><td align="center">反制溯源</td><td align="center">Jsonp 攻击者画像、Agent 注入回显、文件下载记录、凭证登录记录</td><td align="center"><code>/admin/recon-data</code> 等</td></tr>
+    <tr><td align="center">部署运营</td><td align="center">节点管理、端口服务蜜罐、Web 应用蜜罐、互联网系统接入、提示词注入</td><td align="center"><code>/admin/nodes</code> 等</td></tr>
+    <tr><td align="center">Web 应用蜜罐</td><td align="center">模板上传、一键克隆前端页面、Web 应用部署管理</td><td align="center"><code>/admin/templates</code></td></tr>
+    <tr><td align="center">C2 控制</td><td align="center">C2 Console（Beacon/任务队列/Beacon 生成/监听器/MSF）、Agent 管理、木马捆绑</td><td align="center"><code>/admin/c2/console</code></td></tr>
+    <tr><td align="center">告警与处置</td><td align="center">多通道告警、主动隔离名单管理、威胁情报与白名单</td><td align="center"><code>/admin/alerts</code> · <code>/admin/intel</code></td></tr>
+    <tr><td align="center">平台设置</td><td align="center">执行历史、登录日志、用户管理、个人信息</td><td align="center"><code>/admin/execution-history</code> 等</td></tr>
+    <tr><td align="center">开放 API</td><td align="center">攻击来源、攻击详情、凭证数据输出</td><td align="center"><code>/api/v1/*</code></td></tr>
+    <tr><td align="center">自检验证</td><td align="center">自动创建并验证三类蜜饵链路</td><td align="center"><code>scripts/verify_decoy_chain.py</code></td></tr>
+  </tbody>
+</table>
 
 ---
 
