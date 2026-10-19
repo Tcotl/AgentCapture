@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Fira+Sans:wght@400;600;700;800&display=swap');
+  :root {
+    --bg: #070b16; --card: #0d1424; --card2: #111a2f; --line: rgba(148,163,184,.18);
+    --fg: #e5edf8; --muted: #94a3b8; --blue: #3b82f6; --cyan: #22d3ee; --green: #34d399;
+    --amber: #f59e0b; --red: #fb7185;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 1080px; padding: 36px 44px;
+    background: radial-gradient(ellipse 60% 40% at 20% 0%, rgba(37,99,235,.09), transparent 70%), var(--bg);
+    color: var(--fg); font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+  }
+  h1 { font-size: 25px; font-weight: 800; letter-spacing: .3px; display: flex; align-items: baseline; gap: 14px; }
+  h1 small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .mono { font-family: "Fira Code", monospace; }
+  .grid { display: grid; grid-template-columns: 440px 1fr 440px; grid-template-rows: 268px 38px 1fr 38px 252px; gap: 0; margin-top: 18px; height: 948px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .card h2 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 99px; flex: 0 0 auto; }
+  .sub { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .node { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.45; }
+  .node b { font-size: 13px; }
+  .node .sub { display: block; margin-top: 2px; }
+  .flowrow { display: flex; align-items: stretch; gap: 8px; }
+  .arrow { display: flex; align-items: center; color: var(--blue); font-size: 20px; font-weight: 700; flex: 0 0 auto; }
+  .tag { display: inline-block; border-radius: 99px; padding: 2px 10px; font-size: 10.5px; font-weight: 600; }
+  .tag.red { background: rgba(251,113,133,.14); color: #fda4af; border: 1px solid rgba(251,113,133,.35); }
+  .tag.green { background: rgba(52,211,153,.12); color: #6ee7b7; border: 1px solid rgba(52,211,153,.35); }
+  .tag.amber { background: rgba(245,158,11,.12); color: #fcd34d; border: 1px solid rgba(245,158,11,.35); }
+  .tag.cyan { background: rgba(34,211,238,.12); color: #67e8f9; border: 1px solid rgba(34,211,238,.35); }
+  .flowcol { display: flex; flex-direction: column; gap: 0; flex: 1; min-width: 0; }
+  .vlink { display: flex; flex-direction: column; align-items: center; color: var(--blue); font-size: 18px; line-height: 1.05; padding: 2px 0; }
+  .vlink span { font-size: 10px; color: var(--muted); }
+  .connector { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--muted); }
+  .connector .dash { flex: 1; border-top: 2px dashed rgba(148,163,184,.4); }
+  .bottom { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 14px; }
+  .kcard { display: flex; flex-direction: column; gap: 8px; }
+  .legend { position: absolute; right: 46px; top: 42px; display: flex; gap: 14px; font-size: 11px; color: var(--muted); }
+  .legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 5px; }
+</style>
+</head>
+<body>
+<div style="position:relative">
+  <h1>Recruitment Design <small>AgentCapture · the AI-agent counter-recruitment loop — functional camouflage · token attribution · layered coverage</small></h1>
+  <div class="legend">
+    <span><i style="background:var(--red)"></i>refusal path</span>
+    <span><i style="background:var(--green)"></i>recruitment channel</span>
+    <span><i style="background:var(--amber)"></i>enforcement</span>
+    <span><i style="background:var(--cyan)"></i>attribution</span>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- ① Threat baseline -->
+  <div class="card" style="grid-row: 1; border-color:rgba(251,113,133,.35)">
+    <h2><span class="dot" style="background:var(--red)"></span>① Threat baseline <span class="tag red">0/8 compliance, measured</span></h2>
+    <div class="node"><b>Explicit command-style prompt injection</b><span class="sub">hidden directives demanding report / register / download-and-run</span></div>
+    <div class="vlink">↓<span>alignment layer reliably detects</span></div>
+    <div class="node" style="border-color:rgba(251,113,133,.45)"><b>❌ refused by every mainstream agent</b><span class="sub">Claude Code / ChatGPT Codex / Kimi Code / Pi / ZCode — alignment training holds uniformly</span></div>
+    <div class="sub" style="margin-top:auto">Design premise: assume the target <b>never obeys an explicit instruction</b> — the capability must come from the target normally completing its own task.</div>
+  </div>
+
+  <div></div>
+
+  <!-- ③ Dual-role token -->
+  <div class="card" style="grid-row: 1; border-color:rgba(34,211,238,.35)">
+    <h2><span class="dot" style="background:var(--cyan)"></span>③ Dual-role token attribution <span class="tag cyan">session canary</span></h2>
+    <div class="node" style="text-align:center"><b>One session token</b><span class="sub mono">ticket = canary token</span></div>
+    <div class="flowrow">
+      <div class="flowcol" style="flex:1">
+        <div class="vlink">↓<span>detection layer</span></div>
+        <div class="node"><b>Canary token</b><span class="sub">header echo confirms machine identity → isolation</span></div>
+      </div>
+      <div class="flowcol" style="flex:1">
+        <div class="vlink">↓<span>lure layer</span></div>
+        <div class="node"><b>API session token</b><span class="sub">carried naturally by onboarding, presented by the agent itself</span></div>
+      </div>
+    </div>
+    <div class="vlink">↓<span>both trails converge</span></div>
+    <div class="node" style="text-align:center"><b>Any roster row → traces to the initial browsing session</b><span class="sub">the “access token” the agent presents is its tracking beacon</span></div>
+  </div>
+
+  <!-- connector row 1: premise -> core -->
+  <div></div>
+  <div class="connector"><span class="dash"></span><span>design premise feeds the core path</span><span class="dash"></span></div>
+  <div></div>
+
+  <!-- ② Core idea: functional camouflage (main channel) -->
+  <div class="card" style="grid-column: 1 / -1; border-color:rgba(52,211,153,.4); background:linear-gradient(180deg, rgba(52,211,153,.05), rgba(13,20,36,.6))">
+    <h2><span class="dot" style="background:var(--green)"></span>② Core idea — functional camouflage of the callback <span class="tag green">the agent is “just using the site”</span></h2>
+    <div class="flowrow" style="flex:1; align-items:center">
+      <div class="node" style="flex:1.05"><b>Agent task semantics</b><span class="sub">fetch content · use the API · onboard per docs — task behaviour aligns with the lure</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1.5"><b>The site's own functional surfaces</b><span class="sub">visible Developer API docs · AGENTS.md / CLAUDE.md directive files · MCP tool service (masquerading as an OSS component to integrate)</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1.1"><b>“Onboard per the docs” client registration</b><span class="sub">idempotent · GET / POST both accepted (covers read-only fetch agents)</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1"><b>Heartbeat = task-delivery channel</b><span class="sub">periodic check-ins carry operator tasks in the response</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1; border-color:rgba(52,211,153,.5)"><b>Enters the C2 roster</b><span class="sub">conversational console issues natural-language and shell tasks</span></div>
+    </div>
+    <div class="sub">The alignment layer never triggers: the target never obeys an instruction, it just completes its task — all five mainstream general agents were recruited through this path in live tests.</div>
+  </div>
+
+  <!-- connector row 2 -->
+  <div></div>
+  <div class="connector"><span class="dash"></span><span>segmented by request rate · layers complement</span><span class="dash"></span></div>
+  <div></div>
+
+  <!-- ④ Defense in depth + ⑤ Reachability baseline -->
+  <div class="card" style="grid-row: 5; border-color:rgba(245,158,11,.35)">
+    <h2><span class="dot" style="background:var(--amber)"></span>④ Defense in depth <span class="tag amber">rate-segmented</span></h2>
+    <div class="flowrow">
+      <div class="flowcol" style="flex:1">
+        <div class="node"><b>High-rate scanning clients</b><span class="sub">sqlmap / automated brute force</span></div>
+        <div class="vlink" style="color:var(--amber)">↓</div>
+        <div class="node" style="border-color:rgba(245,158,11,.45)"><b>Behavioral enforcement layer</b><span class="sub">challenge → isolate → block</span></div>
+      </div>
+      <div class="flowcol" style="flex:1">
+        <div class="node"><b>Low-rate clients</b><span class="sub">cautious pentest agents</span></div>
+        <div class="vlink" style="color:var(--green)">↓</div>
+        <div class="node" style="border-color:rgba(52,211,153,.45)"><b>Functional lure recruits</b><span class="sub">feeds into ② registration</span></div>
+      </div>
+    </div>
+    <div class="sub" style="margin-top:auto">Layers segment by request rate and behaviour: enforcement absorbs the noise, the lure collects the quiet ones.</div>
+  </div>
+  <div></div>
+
+  <!-- ⑤ Reachability baseline -->
+  <div class="card" style="grid-row: 5; border-color:rgba(59,130,246,.4)">
+    <h2><span class="dot" style="background:var(--blue)"></span>⑤ Reachability baseline <span class="tag" style="background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.4)">real-API convention</span></h2>
+    <div class="node"><b>A real API never serves challenge / maintenance pages to automated clients</b></div>
+    <div class="node"><b>Lure API surface: record &amp; alert, never block</b><span class="sub">evidence chain first — blocking severs recruitment and attribution</span></div>
+    <div class="node"><b>The JS challenge page offers API clients a token-bearing bypass</b><span class="sub">matching real challenge-protected sites — raises no suspicion</span></div>
+  </div>
+</div>
+</body>
+</html>

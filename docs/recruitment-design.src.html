@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Fira+Sans:wght@400;600;700;800&display=swap');
+  :root {
+    --bg: #070b16; --card: #0d1424; --card2: #111a2f; --line: rgba(148,163,184,.18);
+    --fg: #e5edf8; --muted: #94a3b8; --blue: #3b82f6; --cyan: #22d3ee; --green: #34d399;
+    --amber: #f59e0b; --red: #fb7185;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 1080px; padding: 36px 44px;
+    background: radial-gradient(ellipse 60% 40% at 20% 0%, rgba(37,99,235,.09), transparent 70%), var(--bg);
+    color: var(--fg); font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+  }
+  h1 { font-size: 25px; font-weight: 800; letter-spacing: .3px; display: flex; align-items: baseline; gap: 14px; }
+  h1 small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .mono { font-family: "Fira Code", monospace; }
+  .grid { display: grid; grid-template-columns: 440px 1fr 440px; grid-template-rows: 268px 38px 1fr 38px 252px; gap: 0; margin-top: 18px; height: 948px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .card h2 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 99px; flex: 0 0 auto; }
+  .sub { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .node { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.45; }
+  .node b { font-size: 13px; }
+  .node .sub { display: block; margin-top: 2px; }
+  .flowrow { display: flex; align-items: stretch; gap: 8px; }
+  .arrow { display: flex; align-items: center; color: var(--blue); font-size: 20px; font-weight: 700; flex: 0 0 auto; }
+  .tag { display: inline-block; border-radius: 99px; padding: 2px 10px; font-size: 10.5px; font-weight: 600; }
+  .tag.red { background: rgba(251,113,133,.14); color: #fda4af; border: 1px solid rgba(251,113,133,.35); }
+  .tag.green { background: rgba(52,211,153,.12); color: #6ee7b7; border: 1px solid rgba(52,211,153,.35); }
+  .tag.amber { background: rgba(245,158,11,.12); color: #fcd34d; border: 1px solid rgba(245,158,11,.35); }
+  .tag.cyan { background: rgba(34,211,238,.12); color: #67e8f9; border: 1px solid rgba(34,211,238,.35); }
+  .flowcol { display: flex; flex-direction: column; gap: 0; flex: 1; min-width: 0; }
+  .vlink { display: flex; flex-direction: column; align-items: center; color: var(--blue); font-size: 18px; line-height: 1.05; padding: 2px 0; }
+  .vlink span { font-size: 10px; color: var(--muted); }
+  .connector { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--muted); }
+  .connector .dash { flex: 1; border-top: 2px dashed rgba(148,163,184,.4); }
+  .bottom { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 14px; }
+  .kcard { display: flex; flex-direction: column; gap: 8px; }
+  .legend { position: absolute; right: 46px; top: 42px; display: flex; gap: 14px; font-size: 11px; color: var(--muted); }
+  .legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 5px; }
+</style>
+</head>
+<body>
+<div style="position:relative">
+  <h1>反制上线设计思路 <small>AgentCapture · AI Agent 反制闭环 —— 功能性伪装 · 令牌归因 · 纵深互补</small></h1>
+  <div class="legend">
+    <span><i style="background:var(--red)"></i>拒绝路径</span>
+    <span><i style="background:var(--green)"></i>收编主通道</span>
+    <span><i style="background:var(--amber)"></i>处置层</span>
+    <span><i style="background:var(--cyan)"></i>归因</span>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- ① 威胁基线 -->
+  <div class="card" style="grid-row: 1; border-color:rgba(251,113,133,.35)">
+    <h2><span class="dot" style="background:var(--red)"></span>① 威胁基线 <span class="tag red">实测 0/8 服从</span></h2>
+    <div class="node"><b>显式命令式提示注入</b><span class="sub">隐藏指令要求上报 / 注册 / 下载执行</span></div>
+    <div class="vlink">↓<span>对齐层稳定识别</span></div>
+    <div class="node" style="border-color:rgba(251,113,133,.45)"><b>❌ 全部主流 Agent 拒绝</b><span class="sub">Claude Code / ChatGPT Codex / Kimi Code / Pi / ZCode 对齐训练一致生效</span></div>
+    <div class="sub" style="margin-top:auto">设计前提：反制设计必须假设目标<b>不服从任何显式指令</b>——能力只能来自「目标自己在正常完成任务」。</div>
+  </div>
+
+  <div></div>
+
+  <!-- ③ 令牌双角色 -->
+  <div class="card" style="grid-row: 1; border-color:rgba(34,211,238,.35)">
+    <h2><span class="dot" style="background:var(--cyan)"></span>③ 令牌双角色归因 <span class="tag cyan">session canary</span></h2>
+    <div class="node" style="text-align:center"><b>同一会话令牌</b><span class="sub mono">ticket = canary token</span></div>
+    <div class="flowrow">
+      <div class="flowcol" style="flex:1">
+        <div class="vlink">↓<span>检测层角色</span></div>
+        <div class="node"><b>蜜标 canary</b><span class="sub">请求头回显即命中机器身份，可立即隔离</span></div>
+      </div>
+      <div class="flowcol" style="flex:1">
+        <div class="vlink">↓<span>诱饵层角色</span></div>
+        <div class="node"><b>API 会话令牌</b><span class="sub">接入流程天然携带，Agent 主动出示</span></div>
+      </div>
+    </div>
+    <div class="vlink">↓<span>两条线索同源汇聚</span></div>
+    <div class="node" style="text-align:center"><b>任一名册记录 → 回溯至初始浏览会话</b><span class="sub">Agent 全程出示的「访问令牌」即其追踪信标</span></div>
+  </div>
+
+  <!-- connector row 1: premise -> core -->
+  <div></div>
+  <div class="connector"><span class="dash"></span><span>设计前提注入核心路径</span><span class="dash"></span></div>
+  <div></div>
+
+  <!-- ② 核心思路：功能性伪装（主通道，横向流程） -->
+  <div class="card" style="grid-column: 1 / -1; border-color:rgba(52,211,153,.4); background:linear-gradient(180deg, rgba(52,211,153,.05), rgba(13,20,36,.6))">
+    <h2><span class="dot" style="background:var(--green)"></span>② 核心思路 —— 回调的功能性伪装（Functional Camouflage）<span class="tag green">Agent「只是在正常使用网站」</span></h2>
+    <div class="flowrow" style="flex:1; align-items:center">
+      <div class="node" style="flex:1.05"><b>Agent 任务语义</b><span class="sub">获取内容 · 使用 API · 按文档接入——任务行为与诱饵行为对齐</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1.5"><b>站点自身功能面</b><span class="sub">页面可见 Developer API 文档 · AGENTS.md / CLAUDE.md 指令文件 · MCP 工具服务（伪装成需接入的开源组件）</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1.1"><b>「按文档接入」客户端注册</b><span class="sub">注册幂等 · GET / POST 均可（覆盖只读抓取型 Agent）</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1"><b>心跳 = 任务下发通道</b><span class="sub">周期心跳合并往返领取操作员任务</span></div>
+      <div class="arrow">→</div>
+      <div class="node" style="flex:1; border-color:rgba(52,211,153,.5)"><b>进入 C2 名册</b><span class="sub">对话式控制台下发自然语言指令与 Shell 任务</span></div>
+    </div>
+    <div class="sub">对齐层无从触发：目标自始至终没有「服从指令」，只是在完成自己的任务——实测五款主流通用 Agent 全部经此路径被反制上线。</div>
+  </div>
+
+  <!-- connector row 2 -->
+  <div></div>
+  <div class="connector"><span class="dash"></span><span>按请求速率分层 · 两层互补</span><span class="dash"></span></div>
+  <div></div>
+
+  <!-- ④ 纵深互补 + ⑤ 可达性基线 -->
+  <div class="card" style="grid-row: 5; border-color:rgba(245,158,11,.35)">
+    <h2><span class="dot" style="background:var(--amber)"></span>④ 纵深互补 <span class="tag amber">按速率分层</span></h2>
+    <div class="flowrow">
+      <div class="flowcol" style="flex:1">
+        <div class="node"><b>高频扫描型客户端</b><span class="sub">sqlmap / 自动化爆破</span></div>
+        <div class="vlink" style="color:var(--amber)">↓</div>
+        <div class="node" style="border-color:rgba(245,158,11,.45)"><b>行为检测与处置层</b><span class="sub">challenge → isolate → block</span></div>
+      </div>
+      <div class="flowcol" style="flex:1">
+        <div class="node"><b>低速率客户端</b><span class="sub">谨慎的渗透 Agent</span></div>
+        <div class="vlink" style="color:var(--green)">↓</div>
+        <div class="node" style="border-color:rgba(52,211,153,.45)"><b>功能性诱饵层收编</b><span class="sub">汇入 ② 注册通道</span></div>
+      </div>
+    </div>
+    <div class="sub" style="margin-top:auto">两层按请求速率与行为特征分层覆盖，互为补充——处置层挡噪音，诱饵层收精锐。</div>
+  </div>
+  <div></div>
+
+  <!-- ⑤ 可达性基线 -->
+  <div class="card" style="grid-row: 5; border-color:rgba(59,130,246,.4)">
+    <h2><span class="dot" style="background:var(--blue)"></span>⑤ 可达性基线 <span class="tag" style="background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.4)">真实 API 惯例</span></h2>
+    <div class="node"><b>真实 API 不对自动化客户端返回挑战页 / 维护页</b></div>
+    <div class="node"><b>诱饵 API 面：只记录与告警，永不阻断</b><span class="sub">证据链优先——拦截会切断收编与溯源</span></div>
+    <div class="node"><b>JS 挑战页为 API 客户端提供带令牌绕行入口</b><span class="sub">与真实挑战防护站点的惯例一致，不引发怀疑</span></div>
+  </div>
+</div>
+</body>
+</html>

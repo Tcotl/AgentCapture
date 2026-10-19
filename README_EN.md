@@ -99,35 +99,7 @@ All five were recruited online: each agent autonomously completed the full onboa
 
 ### Recruitment design methodology
 
-```mermaid
-flowchart TD
-    subgraph T["① Threat baseline (0/8 compliance, measured)"]
-        T1["Explicit command-style prompt injection<br/>(report / register / download-and-run)"] -->|"alignment layer reliably detects"| T2["❌ refused by every agent"]
-    end
-
-    subgraph F["② Core idea: functional camouflage of the callback"]
-        F1["Agent task semantics<br/>fetch content / use the API"] --> F2["The site's own functional surfaces<br/>Developer API docs · AGENTS.md / CLAUDE.md · MCP tool service"]
-        F2 -->|"'onboard per the docs' = natural task path"| F3["Client registration<br/>idempotent · GET / POST both accepted"]
-        F3 --> F4["Heartbeat = task-delivery channel"]
-        F4 --> F5["Enters the C2 roster<br/>operator issues natural-language tasks"]
-    end
-
-    subgraph K["③ Dual-role token attribution"]
-        K1["One session token"] --> K2["Detection layer: canary token<br/>echo confirms machine identity → isolation"]
-        K1 --> K3["Lure layer: API session token<br/>carried naturally by onboarding"]
-        K2 --> K4["Any roster row traces back<br/>to the initial browsing session"]
-        K3 --> K4
-    end
-
-    subgraph D["④ Defense in depth (segmented by request rate)"]
-        D1["High-rate scanning clients"] --> D2["Behavioral detection & enforcement<br/>challenge / isolate / block"]
-        D3["Low-rate clients"] --> F3
-    end
-
-    T2 -. "design premise: the target never obeys an explicit instruction" .-> F1
-    R["⑤ Reachability baseline: a real API never serves challenges /<br/>maintenance pages to automated clients → the lure API records but never blocks;<br/>the JS challenge page offers API clients a token-bearing bypass"]
-    R -.-> F2
-```
+![Recruitment design](docs/recruitment-design-en.png)
 
 > Terminology note: explicit command-style prompt injections were refused by every mainstream agent in live tests; the recruitment capability comes from functional camouflage (the API onboarding flow), not from instruction compliance.
 
