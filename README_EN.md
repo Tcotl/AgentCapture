@@ -103,6 +103,24 @@ All five were recruited online: each agent autonomously completed the full onboa
 
 > Feature walkthrough of the recruitment going online: the three-stage portal onboarding (content fetch → client registration = online → heartbeat task pickup), the dual-delivery task dispatch loop, per-hop gating (switch / rate limit / listener token), and the session-canary attribution chain. The capability comes from functional camouflage (the API onboarding flow), not from instruction compliance — explicit command-style prompt injections are refused by every mainstream agent in live tests.
 
+## vs. Traditional Honeypots
+
+> Traditional honeypots are positioned as **passive deception**: disguise a target, wait for a hit, record and analyze — detection is the end point. AgentCapture layers **enforcement and counter-control** on top: threats are not only recorded but blocked, attributed, and even recruited.
+
+<table width="100%">
+  <thead><tr><th align="center">Dimension</th><th align="center">Traditional honeypots</th><th align="center">AgentCapture</th></tr></thead>
+  <tbody>
+    <tr><td align="center">Positioning</td><td align="center">Passive deception: wait for attackers to hit fake targets, record and analyze</td><td align="center"><strong>Active counter-measures</strong>: beyond detection, recruits AI agents via functional camouflage</td></tr>
+    <tr><td align="center">Detection focus</td><td align="center">Known exploits and brute-force mostly</td><td align="center">Covers <strong>AI agents</strong>: 23 product-level fingerprints (Claude Code / ChatGPT Codex / Kimi Code …) + behaviour sequences</td></tr>
+    <tr><td align="center">Attacker interaction</td><td align="center">Simulated protocols, limited depth (SSH often banner-level)</td><td align="center"><strong>High-fidelity interaction</strong>: full-command fake filesystem over SSH, MySQL query capture, terminal-style replay</td></tr>
+    <tr><td align="center">Counter-measures</td><td align="center">None — detection is the end point; enforcement needs external devices</td><td align="center"><strong>Five-tier decisions enforced natively</strong>: challenge / isolate / block built in</td></tr>
+    <tr><td align="center">Attribution</td><td align="center">Source IP + timestamp</td><td align="center"><strong>Session canary tokens</strong> trace the full chain + attacker profiles (fingerprints / credentials / auto tags)</td></tr>
+    <tr><td align="center">Credential defense</td><td align="center">Capture submitted credentials only</td><td align="center"><strong>Watermarked credentials</strong>: per-item leak tracing + lateral-reuse high-risk alerts</td></tr>
+    <tr><td align="center">Onboarding cost</td><td align="center">Standalone deployment, disconnected from business</td><td align="center"><strong>Lossless onboarding</strong> for live systems: proxy mount / injection / clone sites; rollback = remove config</td></tr>
+    <tr><td align="center">Data output</td><td align="center">Per-tool storage, mixed formats</td><td align="center">Unified event stream + <strong>AI-SOC syslog</strong> (RFC5424/3164) + open API</td></tr>
+  </tbody>
+</table>
+
 ## Interface Preview
 
 > All screenshots are captured live from a running test deployment in **English UI mode** (real browser window proportions, 2946×1556 @2x; not mockups). The Chinese README shows the same pages in Chinese.

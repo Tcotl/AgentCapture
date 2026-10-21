@@ -103,6 +103,24 @@ AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入�
 
 > 功能流程：Portal 三阶段接入（取内容 → 客户端注册即上线 → 心跳领任务）、双通道任务下发闭环、逐跳门控（总开关 / 限速 / 监听器令牌）与会话蜜标归因链。反制上线能力来自功能性伪装（API 接入流程），而非提示词服从——显式命令式提示注入在实测中被全部主流 Agent 拒绝。
 
+## 与传统蜜罐的对比
+
+> 传统蜜罐定位「被动诱捕」：伪装目标、等待命中、记录分析——发现攻击即终点。AgentCapture 在此之上叠加了**检测后的处置与反制**：威胁不只被记录，还会被阻断、被溯源、甚至被反控。
+
+<table width="100%">
+  <thead><tr><th align="center">维度</th><th align="center">传统蜜罐</th><th align="center">AgentCapture</th></tr></thead>
+  <tbody>
+    <tr><td align="center">定位</td><td align="center">被动诱捕：等攻击者踩中假目标，记录后分析</td><td align="center"><strong>主动反制</strong>：诱捕之外还能反控攻击者——功能性伪装收编 AI Agent 上线</td></tr>
+    <tr><td align="center">检测对象</td><td align="center">以已知漏洞利用、弱口令爆破为主</td><td align="center">覆盖 <strong>AI Agent</strong>：23 种产品级指纹（Claude Code / ChatGPT Codex / Kimi Code 等）+ 行为序列识别</td></tr>
+    <tr><td align="center">攻击者交互</td><td align="center">仿真协议交互，深度有限（SSH 多为 banner 级）</td><td align="center"><strong>高保真交互</strong>：SSH 全命令假文件系统、MySQL 查询捕获、终端式会话回放</td></tr>
+    <tr><td align="center">反制能力</td><td align="center">无——发现即终点，处置依赖外部防火墙/设备联动</td><td align="center"><strong>五档决策真实执行</strong>：挑战 / 隔离 / 阻断内置，无需额外设备</td></tr>
+    <tr><td align="center">攻击者归因</td><td align="center">来源 IP + 时间戳</td><td align="center"><strong>会话蜜标令牌</strong>全链路溯源 + 攻击者画像（指纹 / 凭证 / 自动标签）</td></tr>
+    <tr><td align="center">凭证防线</td><td align="center">仅捕获提交的凭证</td><td align="center"><strong>水印凭证</strong>：泄露可逐条溯源 + 跨面复用触发横向移动高危告警</td></tr>
+    <tr><td align="center">接入成本</td><td align="center">独立部署，与业务割裂</td><td align="center"><strong>无损接入</strong>业务系统：反代挂载 / 前端注入 / 克隆站，回退即删配置</td></tr>
+    <tr><td align="center">数据输出</td><td align="center">各自存储、格式不一</td><td align="center">统一事件流 + <strong>AI-SOC syslog</strong>（RFC5424/3164）+ 开放 API</td></tr>
+  </tbody>
+</table>
+
 ## 界面预览
 
 > 以下截图均为测试环境运行实拍（真实浏览器窗口比例，2946×1556 @2x，非设计稿）。
