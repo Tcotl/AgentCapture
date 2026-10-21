@@ -150,7 +150,7 @@ AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入�
 
 ## 系统架构
 
-![AgentCapture 系统架构](docs/architecture.png)
+![AgentCapture 系统结构图](docs/architecture-cn.png)
 
 组件数据流：
 
