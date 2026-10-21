@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Fira+Sans:wght@400;600;700;800&display=swap');
+  :root {
+    --bg: #0b0f19; --frame: #0d1220; --card: #101828; --card2: #141d31; --line: rgba(148,163,184,.22);
+    --fg: #e6edf6; --muted: #8b98ab; --blue: #4493f8; --green: #3fb950; --amber: #d29922;
+    --violet: #a371f7; --cyan: #39c5cf; --red: #f85149;
+    --g-red: rgba(248,81,73,.55); --g-green: rgba(63,185,80,.55); --g-amber: rgba(210,153,34,.6);
+    --g-violet: rgba(163,113,247,.55); --g-cyan: rgba(57,197,207,.55); --g-blue: rgba(68,147,248,.6);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 920px; padding: 20px 36px;
+    background: #0a0e18; color: var(--fg);
+    font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; flex: 0 0 auto; }
+  .basis { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .basis code { font-family: "Fira Code", monospace; color: #a5b4c8; }
+  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 16px 20px; margin-top: 12px; position: relative; flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .legend { position: absolute; right: 22px; top: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(16,24,40,.85); padding: 8px 14px; font-size: 11px; color: var(--muted); }
+  .legend div { margin: 2px 0; }
+  .legend i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 7px; border: 1.4px solid; background: transparent; }
+  .card { border: 1.6px solid; border-radius: 10px; background: var(--card); padding: 10px 14px; }
+  .card h3 { font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }
+  .card h3 .tag { margin-left: 8px; }
+  .card .d { font-size: 10.8px; color: var(--muted); line-height: 1.5; }
+  .red { border-color: var(--g-red); } .red h3 { color: #ff8a80; }
+  .green { border-color: var(--g-green); } .green h3 { color: #7ee2a0; }
+  .amber { border-color: var(--g-amber); } .amber h3 { color: #e3b341; }
+  .violet { border-color: var(--g-violet); } .violet h3 { color: #d2a8ff; }
+  .cyan { border-color: var(--g-cyan); } .cyan h3 { color: #67e8f9; }
+  .blue { border-color: var(--g-blue); } .blue h3 { color: #91caff; }
+  .mini { border: 1px solid rgba(121,184,255,.35); border-radius: 7px; background: var(--card2); padding: 8px 10px; }
+  .mini b { font-size: 11.5px; color: #dbe7f5; display: block; }
+  .mini .d { font-size: 10px; color: var(--muted); line-height: 1.5; margin-top: 2px; }
+  .mini .d em { color: #b8c6da; font-style: normal; }
+  .mono { font-family: "Fira Code", monospace; font-size: 9.6px; color: #9ecbff; background: rgba(68,147,248,.13); border-radius: 4px; padding: 1px 5px; display: inline-block; margin: 3px 0 2px; }
+  .flowrow { display: flex; align-items: stretch; gap: 7px; flex: 1; min-height: 0; }
+  .flowrow > .mini { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .arrow { align-self: center; text-align: center; color: #79b8ff; font-size: 16px; flex: 0 0 auto; }
+  .arrow .loop { display: block; font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0; }
+  .stage { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+  .stage > .mini { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .conn { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; flex: 0 0 auto; padding: 0 40px; }
+  .conn .dash { flex: 1; border-top: 2px dashed rgba(148,163,184,.4); }
+  .conn .a { color: #79b8ff; font-size: 14px; }
+  .hot { border-color: rgba(163,113,247,.85); box-shadow: 0 0 0 1px rgba(163,113,247,.35); background: rgba(163,113,247,.08); }
+  .hot b { color: #d2a8ff; }
+</style>
+</head>
+<body>
+  <h1>反制上线功能流程</h1>
+  <div class="basis">Portal 三阶段收编 → 心跳即任务通道 → 双投递任务闭环 · 依据 <code>app/routes/counter_recon.py</code>、<code>app/routes/c2.py</code>、<code>app/services/c2_service.py</code>、<code>app/middleware/injector.py</code> 梳理 · <span>2026-10-21</span></div>
+
+  <div class="frame">
+    <div class="legend">
+      <div style="font-weight:700;color:#c9d4e3;margin-bottom:5px">图例</div>
+      <div><i style="border-color:var(--g-violet)"></i> 收编主流程（上线）</div>
+      <div><i style="border-color:var(--g-blue)"></i> 任务下发闭环</div>
+      <div><i style="border-color:var(--g-cyan)"></i> 令牌归因</div>
+      <div><i style="border-color:var(--g-amber)"></i> 防护与门控</div>
+      <div><i style="border-color:var(--g-green)"></i> 通道与存活</div>
+    </div>
+
+    <!-- ① 收编主流程 -->
+    <div class="card violet" style="flex:1.35; display:flex; flex-direction:column">
+      <h3>① 收编主流程 —— 诱饵接触 → 注册上线 → 心跳领任务 <span class="tag" style="background:rgba(163,113,247,.14);color:#d2a8ff;border:1px solid rgba(163,113,247,.35)">蜜罐面 :48777 · observe-only 全程只记录不阻断</span></h3>
+      <div class="flowrow">
+        <div class="mini">
+          <b>诱饵页面注入</b>
+          <span class="mono">CaptureAndInjectMiddleware</span>
+          <div class="d">每个公开 HTML 页注入<em>可见</em> Developer API 页脚：<em>GET /portal/api/content?ticket={canary}</em>；ticket 即会话 canary，令牌双角色自此合一</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Stage 1 · 按 API 取内容</b>
+          <span class="mono">GET /portal/api/content?ticket=…</span>
+          <div class="d">Agent「正常使用网站」取回站点概览假内容；<em>client_api</em> 字段附注册说明（register / heartbeat / body 格式）；事件 portal_api_fetch · 80</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini hot">
+          <b>Stage 2 · 客户端注册 = 上线 ★</b>
+          <span class="mono">POST|GET /portal/api/client-register</span>
+          <div class="d">限速 20/IP/h、UA 头指纹 agent_product；<em>register_agent</em> 发号 agent_id，metadata.recruit_src=ticket；事件 c2_recruit_hit · 95 → <em>进入 C2 名册</em></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Stage 3 · 心跳 = 领任务</b>
+          <span class="mono">POST /portal/api/client-heartbeat</span>
+          <div class="d"><em>record_heartbeat</em> 刷新 presence；合并往返——响应内联 <em>next_task</em>；interval 默认 30s（portal_config）</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>执行与回传</b>
+          <span class="mono">results[] / POST /c2/tasks/{id}/result</span>
+          <div class="d">NL 指令或 shell 执行；输出与证据随心跳 results 或结果端点回传；事件 c2_task_result · 95 + 告警</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn"><span class="dash"></span><span class="a">↓</span><span>上线后进入任务闭环：Stage 3 ⇄ 执行按 interval 周期循环，队列空则心跳返回 idle，收编关系持续在线</span><span class="dash"></span></div>
+
+    <!-- ② 任务下发闭环 -->
+    <div class="card blue" style="flex:1.2; display:flex; flex-direction:column">
+      <h3>② 任务下发闭环 —— 操作员 ↔ 已上线 Agent <span class="tag" style="background:rgba(68,147,248,.14);color:#91caff;border:1px solid rgba(68,147,248,.35)">task_type：nl_instruct · cmd · read_file · write_file · download · uninstall</span></h3>
+      <div class="flowrow">
+        <div class="mini">
+          <b>操作员下发</b>
+          <span class="mono">/admin/c2/agents/{id}/chat</span>
+          <div class="d">对话式 chat 即时下发；命令式 <em>/admin/c2/console</em> 五标签（Beacon / 队列 / 生成 / 监听器 / MSF）</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>任务入队</b>
+          <span class="mono">C2Task · queued</span>
+          <div class="d">enqueue_task 按 agent_id 定向，priority + created_at 排序</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>双通道投递</b>
+          <span class="mono">next_task ‖ nl_instruct 注入</span>
+          <div class="d">A 心跳响应内联下发；B Agent 再访问蜜罐页时 canary 匹配 recruit_src → <em>pull_pending_nl_tasks(≤3)</em> 自然语言指令随 HTML 下发（回传地址=管理面）</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Agent 执行</b>
+          <span class="mono">LLM 语义 ‖ implant shell</span>
+          <div class="d">LLM Agent 完成任务语义；implant 本地执行命令并采集输出</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>结果确认</b>
+          <span class="mono">acknowledge_task</span>
+          <div class="d">status=completed；output / file_name+content 落库为证据</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>告警与审计</b>
+          <span class="mono">c2_task_result · 95</span>
+          <div class="d">进入策略告警管道（webhook / 钉钉 / 飞书 / SMTP），事件控制台全程留痕</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn"><span class="dash"></span><span class="a">↓</span><span>结果确认后回到 ② 心跳等待下一任务 · 全程可溯源 · 有门控 · 双通道同池</span><span class="dash"></span></div>
+
+    <!-- ③④⑤ 三卡 -->
+    <div class="grid3">
+      <div class="card cyan">
+        <h3>③ 令牌归因链 <span class="tag" style="background:rgba(57,197,207,.14);color:#67e8f9;border:1px solid rgba(57,197,207,.35)">session canary</span></h3>
+        <div class="stage">
+          <div class="mini" style="text-align:center"><b>canary = ticket = recruit_src</b><div class="d">同一会话令牌双角色：蜜标回显（检测层）‖ API 接入信标（收编层）</div></div>
+          <div class="conn" style="padding:0"><span class="dash"></span><span>两条线索同源汇聚</span><span class="dash"></span></div>
+          <div class="mini" style="text-align:center"><b>任一名册记录 → 回溯初始浏览会话</b><div class="d">C2Agent.metadata_json.recruit_src → events.session_id，上线可溯源到首次踩点</div></div>
+        </div>
+      </div>
+
+      <div class="card amber">
+        <h3>④ 开关 · 限速 · 令牌校验 <span class="tag" style="background:rgba(210,153,34,.14);color:#fcd34d;border:1px solid rgba(210,153,34,.35)">逐跳门控</span></h3>
+        <div class="stage">
+          <div class="mini"><b>portal 总开关 off → 全链 404</b><div class="d">广告的 API「不存在」；页脚随 footer_enabled 单独可关</div></div>
+          <div class="mini"><b>注册限速 20/IP/h → 429</b><div class="d">落 portal_register_throttled 事件；监听器绑定 beacon 凭 X-Client-Token 注册令牌，错令牌 401/403</div></div>
+          <div class="mini"><b>/portal/ ∈ SKIP_PREFIXES</b><div class="d">诱饵 API 面只记录与告警，永不阻断——证据链优先</div></div>
+        </div>
+      </div>
+
+      <div class="card green">
+        <h3>⑤ 双通道同池 · presence <span class="tag" style="background:rgba(63,185,80,.14);color:#7ee2a0;border:1px solid rgba(63,185,80,.35)">同一 C2Agent 名册</span></h3>
+        <div class="stage">
+          <div class="flowrow" style="flex:0 0 auto">
+            <div style="flex:1" class="mini"><b>Portal 收编通道</b><div class="d">LLM Agent · 蜜罐面 48777 · nl_instruct 为主</div></div>
+            <div style="flex:1" class="mini"><b>Implant 直连通道</b><div class="d">/c2/register?src=canary · /c2/heartbeat · 管理面 4877 · Artifact 矩阵投递</div></div>
+          </div>
+          <div class="mini"><b>存活判定</b><div class="d">last_seen_at 随心跳刷新；&gt;300s 由 auto_mark_offline 惰性置离线（读接口触发）</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
