@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>AgentCapture 系统架构示意图</title>
+<style>
+  :root {
+    --bg: #0b0f19; --frame: #0d1220; --card: #101828; --card2: #141d31; --line: rgba(148,163,184,.22);
+    --fg: #e6edf6; --muted: #8b98ab;
+    --green: #3fb950; --blue: #4493f8; --violet: #a371f7; --amber: #d29922; --cyan: #39c5cf;
+    --g-green: rgba(63,185,80,.55); --g-blue: rgba(68,147,248,.6); --g-amber: rgba(210,153,34,.6);
+    --g-violet: rgba(163,113,247,.55); --g-gray: rgba(139,152,171,.4); --g-cyan: rgba(57,197,207,.55);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 1120px; padding: 26px 36px;
+    background: #0a0e18; color: var(--fg);
+    font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+  }
+  h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; }
+  .basis { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .basis code { font-family: "Fira Code", monospace; color: #a5b4c8; }
+  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 18px 20px; margin-top: 12px; position: relative; height: 980px; }
+  .legend { position: absolute; right: 22px; bottom: 16px; border: 1px solid var(--line); border-radius: 10px; background: rgba(16,24,40,.9); padding: 9px 14px; font-size: 11px; color: var(--muted); z-index: 5; }
+  .legend div { margin: 2px 0; }
+  .legend i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 7px; border: 1.4px solid; background: transparent; }
+  .card { border: 1.6px solid; border-radius: 10px; background: var(--card); padding: 10px 13px; }
+  .card h3 { font-size: 13.5px; font-weight: 700; margin-bottom: 5px; }
+  .card h3 .mono { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .card .d { font-size: 10.8px; color: var(--muted); line-height: 1.55; }
+  .card .d b { color: #c9d4e3; font-weight: 600; }
+  .green { border-color: var(--g-green); } .green h3 { color: #7ee2a0; }
+  .blue { border-color: var(--g-blue); } .blue h3 { color: #79b8ff; }
+  .amber { border-color: var(--g-amber); } .amber h3 { color: #e3b341; }
+  .violet { border-color: var(--g-violet); } .violet h3 { color: #d2a8ff; }
+  .gray { border-color: var(--g-gray); } .gray h3 { color: #b6c2d2; }
+  .cyan { border-color: var(--g-cyan); } .cyan h3 { color: #67e8f9; }
+  .mini { border: 1px solid rgba(121,184,255,.35); border-radius: 7px; background: var(--card2); padding: 6px 9px; }
+  .mini b { font-size: 11.5px; color: #dbe7f5; }
+  .mini .d { font-size: 10px; color: var(--muted); line-height: 1.45; margin-top: 1px; }
+  .mono { font-family: "Fira Code", monospace; }
+  .strip { border: 1.4px solid; border-radius: 8px; padding: 8px 12px; }
+  .strip b { font-size: 12px; }
+  .strip .d { font-size: 10.6px; color: var(--muted); line-height: 1.55; }
+  .group { border: 1.4px dashed rgba(148,163,184,.4); border-radius: 10px; padding: 9px 11px 11px; }
+  .group > .gt { font-size: 11px; color: #9aa7b8; margin-bottom: 7px; font-family: "Fira Code", monospace; }
+  .inner { display: grid; gap: 8px; }
+  .inner4 { grid-template-columns: repeat(4, 1fr); }
+  .inner5 { grid-template-columns: repeat(5, 1fr); }
+  .varrow { display: flex; flex-direction: column; align-items: center; font-size: 10.5px; color: var(--muted); padding: 2px 0; }
+  .varrow .a { font-size: 15px; color: #79b8ff; line-height: 1; }
+  .top { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .arrows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 6px 0; }
+  .arrows div { text-align: center; font-size: 10.5px; color: var(--muted); }
+  .arrows .a { font-size: 15px; color: #79b8ff; line-height: 1.1; }
+  .main { display: grid; grid-template-columns: 1fr 330px; gap: 16px; }
+  .core { border: 1.6px solid var(--g-blue); border-radius: 12px; background: rgba(13,20,36,.5); padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; justify-content: space-between; }
+  .core > .head { font-size: 13.5px; color: #79b8ff; font-weight: 700; }
+  .core > .head .mono { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .rcol { display: flex; flex-direction: column; gap: 12px; }
+  .rcol .card { flex: 1; }
+  /* schematic link rows */
+  .links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 10px; }
+  .link { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; }
+  .link .t { font-size: 11px; color: #c9d4e3; margin-bottom: 4px; }
+  .link .t b { color: #93c5fd; }
+  .link pre { font-family: "Fira Code", monospace; font-size: 10px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
+  .link .cmd { color: #a5d6ff; }
+</style>
+</head>
+<body>
+  <h1>AgentCapture 系统架构示意图</h1>
+  <div class="basis">嵌入式蜜罐 Deception Layer · 检测 — 处置 — 收编 — 溯源 · 依据 <code>docs/architecture.md</code>、<code>docs/integration.md</code>、<code>app/main.py</code> 与 <code>app/middleware/</code> 梳理 · <span class="mono">2026-10-16</span></div>
+
+  <div class="frame">
+    <div class="legend">
+      <div style="font-weight:700;color:#c9d4e3;margin-bottom:6px">图例</div>
+      <div><i style="border-color:var(--g-green)"></i> 攻击面 / 采集源</div>
+      <div><i style="border-color:var(--g-blue)"></i> 管理面核心</div>
+      <div><i style="border-color:var(--g-violet)"></i> 反制 / 收编</div>
+      <div><i style="border-color:var(--g-cyan)"></i> 接入 / 处置</div>
+      <div><i style="border-color:var(--g-amber)"></i> 存储</div>
+      <div><i style="border-color:var(--g-gray)"></i> 外部系统 / 前端</div>
+      <div style="margin-top:6px">→ 数据 / 调用方向（⇅ = 双向）</div>
+    </div>
+
+    <!-- 攻击面与采集源 -->
+    <div class="top">
+      <div class="card green">
+        <h3>业务 Nginx（互联网入口）</h3>
+        <div class="d">真实业务零改动 · 欺骗路径前缀转发<br>X-Forwarded-For 传递 · <b>sub_filter 注入</b> beacon.js<br>方式一 / 方式三 · 回退 = 删段 reload</div>
+      </div>
+      <div class="card green">
+        <h3>Web 蜜罐面（ThinkPHP 门面）<span class="mono">:48777</span></h3>
+        <div class="d">指纹页 · RCE 仿真 · 假后台登录<br><b>六大反制面</b>：Portal / MCP / 指令文件 / 元数据 / Wiki / 数据集<br>observe-only · 独立风险引擎实例</div>
+      </div>
+      <div class="card green">
+        <h3>协议蜜罐矩阵</h3>
+        <div class="d">SSH :2222 真协议栈 + <b>假文件系统</b> · 会话转录<br>MySQL :33060 · Redis :63790<br>FTP :2121 · ES :19200<br>凭证捕获 → credential_observations</div>
+      </div>
+      <div class="card green">
+        <h3>克隆站 · Docker 蜜罐</h3>
+        <div class="d">deployed_server :8080+ 一键克隆<br>登录表单重写为凭证采集 · 按 OS 投递载荷<br>Docker 镜像蜜罐：<b>诱饵代理</b>（欺骗路由 + beacon 注入）</div>
+      </div>
+    </div>
+
+    <div class="arrows">
+      <div><div class="a">⇅</div>欺骗前缀转发（XFF）</div>
+      <div><div class="a">⇅</div>HTTP :48777（蜜罐面流量）</div>
+      <div><div class="a">⇅</div>TCP :2222 / :33060 / …</div>
+      <div><div class="a">⇅</div>/_clone 回传 · 诱饵代理流量</div>
+    </div>
+
+    <!-- 主行：核心 + 右列 -->
+    <div class="main">
+      <div class="core">
+        <div class="head">AgentCapture 核心（FastAPI · SQLAlchemy · 双平面同进程）<span class="mono">管理面 :4877 · 挑战 / 隔离 / 阻断全量执行</span></div>
+
+        <div class="strip cyan" style="border-color:var(--g-cyan)">
+          <b>接入层</b>
+          <div class="d"><b>CaptureAndInject</b>：会话 Cookie 签发 · canary 蜜标 · 风险评分 · 页面注入（canary 注释 / 隐藏蜜饵 / beacon.js / Prompt 注入）&nbsp;&nbsp;|&nbsp;&nbsp;<b>AdminAccessPath</b>：安全路径重写&nbsp;&nbsp;|&nbsp;&nbsp;<b>Guard 反代</b>：台账系统强制执行（block / challenge / isolate + 注入转发）</div>
+        </div>
+
+        <div class="group" style="border-color:rgba(163,113,247,.5)">
+          <div class="gt">// 反制与收编 —— observe-only，永不阻断</div>
+          <div class="inner inner4">
+            <div class="mini"><b>Portal 功能性伪装</b><div class="d">伪装 Developer API 文档 · content → register → heartbeat 三级接入 · 摩擦最小</div></div>
+            <div class="mini"><b>C2 名册与任务</b><div class="d">对话式 + 命令式双控制台 · 任务队列 · 审批流 · 木马捆绑 · MSF 对接</div></div>
+            <div class="mini"><b>蜜饵链</b><div class="d">API 路由蜜饵 → 文件蜜饵 → 凭证蜜饵 · 绑定成链 · 会话水印溯源</div></div>
+            <div class="mini"><b>Agent 注入回显</b><div class="d">/_agent/bait·report·verify · 8 类模板分级触发 · canary 回显铁证</div></div>
+          </div>
+        </div>
+
+        <div class="group" style="border-color:rgba(68,147,248,.5)">
+          <div class="gt">// 检测与决策 —— 每请求评分 · 五档执行</div>
+          <div class="inner inner5">
+            <div class="mini"><b>风险引擎</b><div class="d">UA / AI-Agent 指纹 · 路径 / 载荷特征 · 速率 · canary 回显</div></div>
+            <div class="mini"><b>五档决策</b><div class="d">allow / observe / challenge / isolate / block</div></div>
+            <div class="mini"><b>行为序列指纹</b><div class="d">会话自动化评分 · 高/强自动化信号</div></div>
+            <div class="mini"><b>事件落库</b><div class="d">32 分区索引 · 按天保留</div></div>
+            <div class="mini"><b>接入自检</b><div class="d">台账 verify token → 状态自翻转</div></div>
+          </div>
+        </div>
+
+        <div class="group" style="border-color:rgba(210,153,34,.5)">
+          <div class="gt">// 数据与运营</div>
+          <div class="inner inner4">
+            <div class="mini"><b>态势聚合</b><div class="d">威胁链路五级漏斗 · 高频凭证统计 · 来源画像 · CSV 取证</div></div>
+            <div class="mini"><b>会话回放</b><div class="d">逐命令终端回放 · .pcap 导出</div></div>
+            <div class="mini"><b>接入台账</b><div class="d">域名 / 上游 / 策略登记 · 接入自检</div></div>
+            <div class="mini"><b>节点调度 + 保留</b><div class="d">X-Node-Token 心跳 / 任务 · events 按天清理</div></div>
+          </div>
+        </div>
+
+        <div class="strip" style="border-color:var(--line)">
+          <b>横切</b> <span class="d" style="font-size:10.6px">auth：PBKDF2-SHA256 · 强制改密门禁 &nbsp;|&nbsp; challenge：JS 挑战页（带 API 令牌绕行）&nbsp;|&nbsp; audit：执行历史 · 登录日志 &nbsp;|&nbsp; i18n：中 / 英双语 &nbsp;|&nbsp; threat intel：白名单 + ThreatBook</span>
+        </div>
+      </div>
+
+      <div class="rcol">
+        <div class="card gray">
+          <h3>管理控制台（Jinja2 SSR）</h3>
+          <div class="d">30+ 页面 · 中英双语 · 明暗主题<br>态势大屏 · 攻击流量 · 反制溯源 · C2<br>蜜饵 / 蜜罐部署 · 用户 / 审计 / 登录日志</div>
+        </div>
+        <div class="card gray">
+          <h3>开放 API <span class="mono">/api/v1</span></h3>
+          <div class="d">API Key 认证（权限位）<br>攻击来源 / 详情 / 凭证数据输出<br>供 SIEM / 自研平台消费</div>
+        </div>
+        <div class="card amber">
+          <h3>存储中心</h3>
+          <div class="d">SQLite WAL（默认）/ PostgreSQL<br>events · honeypot_sessions · credential_observations<br>接入台账 · 审计 · 隔离名单</div>
+        </div>
+        <div class="card gray">
+          <h3>AI-SOC / Syslog 采集器</h3>
+          <div class="d">统一 JSON 单行数据接口<br>RFC5424 / RFC3164 · UDP + TCP<br>severity 按风险映射 · 供 AI SOC 消费</div>
+        </div>
+        <div class="card gray">
+          <h3>告警通道</h3>
+          <div class="d">webhook · 钉钉 · 飞书 · SMTP<br>5 分钟滑窗去重 · dry-run 干跑<br>策略映射 · 测试发送</div>
+        </div>
+        <div class="card gray">
+          <h3>分布式节点</h3>
+          <div class="d">X-Node-Token 心跳 / 领取 / 回执<br>多站点 · 多地域集中运营<br>节点离线自动标记</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 接入示意（schematic links） -->
+    <div class="links">
+      <div class="link">
+        <div class="t"><b>方式一 · 路径级反代挂载</b>（业务 Nginx → 管理面）</div>
+        <pre><span class="cmd">location ~ ^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/)</span>
+<span class="cmd">  proxy_pass http://127.0.0.1:4877;</span>   <span style="color:#4a5f83"># 欺骗前缀 → 管理面</span>
+curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
+      </div>
+      <div class="link">
+        <div class="t"><b>接入自检</b>（台账自动翻为「监测中」）</div>
+        <pre><span class="cmd">curl -s https://your.site/collect/internet-verify?token=&lt;HMAC&gt;</span>
+<span style="color:#4a5f83"># 命中即证明欺骗前缀已实际进入采集管道</span></pre>
+      </div>
+      <div class="link">
+        <div class="t"><b>收编链路</b>（功能性伪装三步）</div>
+        <pre><span class="cmd">GET /portal/api/content?ticket=&lt;canary&gt;</span> → <b>注册 agent_id</b>
+<span class="cmd">POST /portal/api/client-heartbeat</span> → 领取操作员任务</pre>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
