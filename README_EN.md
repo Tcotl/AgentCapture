@@ -150,7 +150,9 @@ All five were recruited online: each agent autonomously completed the full onboa
 
 ## Architecture
 
-![AgentCapture Architecture](docs/architecture-en.png)
+![AgentCapture System Architecture](docs/architecture-schematic-en.png)
+
+> Schematic (interactive source: [docs/architecture-schematic-en.src.html](docs/architecture-schematic-en.src.html)) — top to bottom: attack surfaces & collection sources (business Nginx / web honeypot plane / protocol honeypots / clone sites & Docker honeypots) → the management-plane core (access layer · counter-recruitment · detection & decisions · data & ops · cross-cutting) → external consumers (console / open API / storage / AI-SOC / alerts / nodes); the bottom strip shows the three key integration flows (method-1 mount, onboarding self-check, recruitment chain).
 
 Component data flow:
 
