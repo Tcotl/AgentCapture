@@ -150,6 +150,10 @@ AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入�
 
 ## 系统架构
 
+![AgentCapture 系统架构示意图](docs/architecture-schematic.png)
+
+> 示意图（交互源文件：[docs/architecture-schematic.src.html](docs/architecture-schematic.src.html)）——自上而下：攻击面与采集源（业务 Nginx / Web 蜜罐面 / 协议蜜罐 / 克隆站与 Docker 蜜罐）→ 管理面核心（接入层 · 反制与收编 · 检测与决策 · 数据与运营 · 横切）→ 外部消费（控制台 / 开放 API / 存储 / AI-SOC / 告警 / 节点）；底部为方式一接入、接入自检与收编链路的三条关键调用示意。
+
 ![AgentCapture 系统结构图](docs/architecture-cn.png)
 
 组件数据流：
