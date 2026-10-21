@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Fira+Sans:wght@400;600;700;800&display=swap');
+  :root {
+    --bg: #0b0f19; --frame: #0d1220; --card: #101828; --card2: #141d31; --line: rgba(148,163,184,.22);
+    --fg: #e6edf6; --muted: #8b98ab; --blue: #4493f8; --green: #3fb950; --amber: #d29922;
+    --violet: #a371f7; --cyan: #39c5cf; --red: #f85149;
+    --g-red: rgba(248,81,73,.55); --g-green: rgba(63,185,80,.55); --g-amber: rgba(210,153,34,.6);
+    --g-violet: rgba(163,113,247,.55); --g-cyan: rgba(57,197,207,.55); --g-blue: rgba(68,147,248,.6);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 830px; padding: 20px 36px;
+    background: #0a0e18; color: var(--fg);
+    font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; flex: 0 0 auto; }
+  .basis { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .basis code { font-family: "Fira Code", monospace; color: #a5b4c8; }
+  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 16px 20px; margin-top: 12px; position: relative; flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; justify-content: space-between; }
+  .card { border: 1.6px solid; border-radius: 10px; background: var(--card); padding: 10px 14px; }
+  .card h3 { font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }
+  .card h3 .tag { margin-left: 8px; }
+  .card .d { font-size: 10.8px; color: var(--muted); line-height: 1.5; }
+  .red { border-color: var(--g-red); } .red h3 { color: #ff8a80; }
+  .green { border-color: var(--g-green); } .green h3 { color: #7ee2a0; }
+  .amber { border-color: var(--g-amber); } .amber h3 { color: #e3b341; }
+  .violet { border-color: var(--g-violet); } .violet h3 { color: #d2a8ff; }
+  .cyan { border-color: var(--g-cyan); } .cyan h3 { color: #67e8f9; }
+  .blue { border-color: var(--g-blue); } .blue h3 { color: #91caff; }
+  .mini { border: 1px solid rgba(121,184,255,.35); border-radius: 7px; background: var(--card2); padding: 8px 10px; }
+  .mini b { font-size: 11.5px; color: #dbe7f5; display: block; }
+  .mini .d { font-size: 10px; color: var(--muted); line-height: 1.5; margin-top: 2px; }
+  .mini .d em { color: #b8c6da; font-style: normal; }
+  .mono { font-family: "Fira Code", monospace; font-size: 9.6px; color: #9ecbff; background: rgba(68,147,248,.13); border-radius: 4px; padding: 1px 5px; display: inline-block; margin: 3px 0 2px; }
+  .flowrow { display: flex; align-items: stretch; gap: 7px; flex: 0 0 auto; }
+  .flowrow > .mini { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .arrow { align-self: center; text-align: center; color: #79b8ff; font-size: 16px; flex: 0 0 auto; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 0 0 auto; }
+  .stage { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+  .conn { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; flex: 0 0 auto; padding: 0 40px; }
+  .conn .dash { flex: 1; border-top: 2px dashed rgba(148,163,184,.4); }
+  .conn .a { color: #79b8ff; font-size: 14px; }
+  .hot { border-color: rgba(163,113,247,.85); box-shadow: 0 0 0 1px rgba(163,113,247,.35); background: rgba(163,113,247,.08); }
+  .hot b { color: #d2a8ff; }
+</style>
+</head>
+<body>
+  <h1>Counter-Recruitment Online Flow</h1>
+  <div class="basis">Portal three-stage onboarding → heartbeat as the task channel → dual-delivery task loop · based on <code>app/routes/counter_recon.py</code>, <code>app/routes/c2.py</code>, <code>app/services/c2_service.py</code>, <code>app/middleware/injector.py</code> · <span>2026-10-21</span></div>
+
+  <div class="frame">
+    <!-- ① recruitment main flow -->
+    <div class="card violet" style="display:flex; flex-direction:column">
+      <h3>① Recruitment main flow — lure contact → registration online → heartbeat task pickup <span class="tag" style="background:rgba(163,113,247,.14);color:#d2a8ff;border:1px solid rgba(163,113,247,.35)">honeypot plane :48777 · observe-only — record &amp; alert, never block</span></h3>
+      <div class="flowrow">
+        <div class="mini">
+          <b>Lure page injection</b>
+          <span class="mono">CaptureAndInjectMiddleware</span>
+          <div class="d">Every public HTML page carries a <em>visible</em> Developer API footer: <em>GET /portal/api/content?ticket={canary}</em>; the ticket is the session canary — the token's dual role starts here</div>
+          <div class="d">Same-page injection: canary HTML comment, 3 hidden decoy links, beacon.js / recon.js telemetry; footer copy &amp; switch configurable (footer_title / footer_enabled)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Stage 1 · fetch content per API</b>
+          <span class="mono">GET /portal/api/content?ticket=…</span>
+          <div class="d">The agent "just uses the site" and receives the fake site overview; the <em>client_api</em> field carries the onboarding docs (register / heartbeat / body format); event portal_api_fetch · 80</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini hot">
+          <b>Stage 2 · client registration = online ★</b>
+          <span class="mono">POST|GET /portal/api/client-register</span>
+          <div class="d">Rate limit 20/IP/h, UA-header fingerprint agent_product; <em>register_agent</em> assigns agent_id, metadata.recruit_src=ticket; event c2_recruit_hit · 95 → <em>enters the C2 roster</em></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Stage 3 · heartbeat = task pickup</b>
+          <span class="mono">POST /portal/api/client-heartbeat</span>
+          <div class="d"><em>record_heartbeat</em> refreshes presence; merged roundtrip — the response inlines <em>next_task</em>; interval defaults to 30s (portal_config)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Execute &amp; report back</b>
+          <span class="mono">results[] / POST /c2/tasks/{id}/result</span>
+          <div class="d">NL directives or shell execution; output &amp; evidence returned via heartbeat results or the result endpoint; event c2_task_result · 95 + alert</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn"><span class="dash"></span><span class="a">↓</span><span>once online the task loop begins: Stage 3 ⇄ execution cycles on interval; an empty queue returns an idle heartbeat — the recruitment stays online</span><span class="dash"></span></div>
+
+    <!-- ② task dispatch loop -->
+    <div class="card blue" style="display:flex; flex-direction:column">
+      <h3>② Task dispatch loop — operator ↔ online agent <span class="tag" style="background:rgba(68,147,248,.14);color:#91caff;border:1px solid rgba(68,147,248,.35)">task_type: nl_instruct · cmd · read_file · write_file · download · uninstall</span></h3>
+      <div class="flowrow">
+        <div class="mini">
+          <b>Operator dispatch</b>
+          <span class="mono">/admin/c2/agents/{id}/chat</span>
+          <div class="d">Conversational chat validates the task-type whitelist and enqueues instantly; direct beacon command <em>/api/admin/c2/beacon/{id}/cmd</em> with operation audit log_execution</div>
+          <div class="d">Command-style <em>/admin/c2/console</em> five tabs: Beacon / task queue / generator / listeners / MSF</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Task queued</b>
+          <span class="mono">C2Task · queued</span>
+          <div class="d">enqueue_task targets agent_id, ordered by priority + created_at</div>
+          <div class="d">State machine queued → dispatched → completed; repeat delivery counted in dispatch_count</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Dual-channel delivery</b>
+          <span class="mono">next_task ‖ nl_instruct injection</span>
+          <div class="d">A — inlined in the heartbeat response; B — the agent's next honeypot page view matches recruit_src by canary → <em>pull_pending_nl_tasks(≤3)</em> NL directives ride the HTML (report-back URL = console plane)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Agent executes</b>
+          <span class="mono">LLM semantics ‖ implant shell</span>
+          <div class="d">The LLM agent completes the task semantics; the implant runs commands locally and collects output</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Result acknowledged</b>
+          <span class="mono">acknowledge_task</span>
+          <div class="d">status=completed; output / file_name+content stored as evidence</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="mini">
+          <b>Alert &amp; audit</b>
+          <span class="mono">c2_task_result · 95</span>
+          <div class="d">Feeds the policy alert pipeline (webhook / DingTalk / Feishu / SMTP); the event console keeps the full trail</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn"><span class="dash"></span><span class="a">↓</span><span>after acknowledgement the loop returns to ② heartbeat for the next task · attributable end-to-end · gated per hop · both channels share one roster</span><span class="dash"></span></div>
+
+    <!-- ③④⑤ three cards -->
+    <div class="grid3">
+      <div class="card cyan">
+        <h3>③ Token attribution chain <span class="tag" style="background:rgba(57,197,207,.14);color:#67e8f9;border:1px solid rgba(57,197,207,.35)">session canary</span></h3>
+        <div class="stage">
+          <div class="mini" style="text-align:center"><b>canary = ticket = recruit_src</b><div class="d">one session token, dual role: canary echo (detection layer) ‖ API access beacon (lure layer)</div></div>
+          <div class="conn" style="padding:0"><span class="dash"></span><span>both trails converge</span><span class="dash"></span></div>
+          <div class="mini" style="text-align:center"><b>Any roster row → traces to the initial browsing session</b><div class="d">C2Agent.metadata_json.recruit_src → events.session_id — going online traces back to the first footprint</div></div>
+        </div>
+      </div>
+
+      <div class="card amber">
+        <h3>④ Switches · rate limits · token checks <span class="tag" style="background:rgba(210,153,34,.14);color:#fcd34d;border:1px solid rgba(210,153,34,.35)">per-hop gating</span></h3>
+        <div class="stage">
+          <div class="mini"><b>portal master switch off → 404 chain-wide</b><div class="d">the advertised API "does not exist"; the footer toggles separately via footer_enabled</div></div>
+          <div class="mini"><b>Registration limit 20/IP/h → 429</b><div class="d">logged as portal_register_throttled; listener-bound beacons present the X-Client-Token registration token — wrong token 401/403</div></div>
+          <div class="mini"><b>/portal/ ∈ SKIP_PREFIXES</b><div class="d">the lure API surface records &amp; alerts but never blocks — evidence chain first</div></div>
+        </div>
+      </div>
+
+      <div class="card green">
+        <h3>⑤ Dual channels, one roster · presence <span class="tag" style="background:rgba(63,185,80,.14);color:#7ee2a0;border:1px solid rgba(63,185,80,.35)">one C2Agent roster</span></h3>
+        <div class="stage">
+          <div class="flowrow" style="flex:0 0 auto">
+            <div style="flex:1" class="mini"><b>Portal recruitment channel</b><div class="d">LLM agents · honeypot plane 48777 · mostly nl_instruct</div></div>
+            <div style="flex:1" class="mini"><b>Implant direct channel</b><div class="d">/c2/register?src=canary · /c2/heartbeat · console plane 4877 · artifact-matrix delivery</div></div>
+          </div>
+          <div class="mini"><b>Liveness</b><div class="d">last_seen_at refreshed per heartbeat; &gt;300s lazily marked offline by auto_mark_offline (triggered on read)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

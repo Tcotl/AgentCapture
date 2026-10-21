@@ -103,6 +103,12 @@ All five were recruited online: each agent autonomously completed the full onboa
 
 > Terminology note: explicit command-style prompt injections were refused by every mainstream agent in live tests; the recruitment capability comes from functional camouflage (the API onboarding flow), not from instruction compliance.
 
+### Recruitment online flow
+
+![Recruitment online flow](docs/counter-online-flow-en.png)
+
+> Feature walkthrough of the recruitment going online: the three-stage portal onboarding (content fetch → client registration = online → heartbeat task pickup), the dual-delivery task dispatch loop, per-hop gating (switch / rate limit / listener token), and the session-canary attribution chain.
+
 ## Interface Preview
 
 > All screenshots are captured live from a running test deployment in **English UI mode** (real browser window proportions, 2946×1556 @2x; not mockups). The Chinese README shows the same pages in Chinese.
