@@ -13,7 +13,7 @@
   }
   * { box-sizing: border-box; margin: 0; }
   body {
-    width: 1680px; height: 920px; padding: 20px 36px;
+    width: 1680px; height: 810px; padding: 20px 36px;
     background: #0a0e18; color: var(--fg);
     font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
     display: flex; flex-direction: column;
@@ -21,7 +21,7 @@
   h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; flex: 0 0 auto; }
   .basis { font-size: 12px; color: var(--muted); margin-top: 6px; }
   .basis code { font-family: "Fira Code", monospace; color: #a5b4c8; }
-  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 16px 20px; margin-top: 12px; position: relative; flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 16px 20px; margin-top: 12px; position: relative; flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; justify-content: space-between; }
   .legend { position: absolute; right: 22px; top: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(16,24,40,.85); padding: 8px 14px; font-size: 11px; color: var(--muted); }
   .legend div { margin: 2px 0; }
   .legend i { width: 14px; height: 10px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 7px; border: 1.4px solid; background: transparent; }
@@ -40,11 +40,11 @@
   .mini .d { font-size: 10px; color: var(--muted); line-height: 1.5; margin-top: 2px; }
   .mini .d em { color: #b8c6da; font-style: normal; }
   .mono { font-family: "Fira Code", monospace; font-size: 9.6px; color: #9ecbff; background: rgba(68,147,248,.13); border-radius: 4px; padding: 1px 5px; display: inline-block; margin: 3px 0 2px; }
-  .flowrow { display: flex; align-items: stretch; gap: 7px; flex: 1; min-height: 0; }
+  .flowrow { display: flex; align-items: stretch; gap: 7px; flex: 0 0 auto; }
   .flowrow > .mini { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .arrow { align-self: center; text-align: center; color: #79b8ff; font-size: 16px; flex: 0 0 auto; }
   .arrow .loop { display: block; font-size: 9px; color: var(--muted); white-space: nowrap; }
-  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 0 0 auto; }
   .stage { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
   .stage > .mini { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .conn { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; flex: 0 0 auto; padding: 0 40px; }
@@ -69,13 +69,14 @@
     </div>
 
     <!-- ① 收编主流程 -->
-    <div class="card violet" style="flex:1.35; display:flex; flex-direction:column">
+    <div class="card violet" style="display:flex; flex-direction:column">
       <h3>① 收编主流程 —— 诱饵接触 → 注册上线 → 心跳领任务 <span class="tag" style="background:rgba(163,113,247,.14);color:#d2a8ff;border:1px solid rgba(163,113,247,.35)">蜜罐面 :48777 · observe-only 全程只记录不阻断</span></h3>
       <div class="flowrow">
         <div class="mini">
           <b>诱饵页面注入</b>
           <span class="mono">CaptureAndInjectMiddleware</span>
           <div class="d">每个公开 HTML 页注入<em>可见</em> Developer API 页脚：<em>GET /portal/api/content?ticket={canary}</em>；ticket 即会话 canary，令牌双角色自此合一</div>
+          <div class="d">同页注入：canary HTML 注释、3 个隐藏蜜饵链接、beacon.js / recon.js 遥测；页脚文案与开关可配（footer_title / footer_enabled）</div>
         </div>
         <div class="arrow">→</div>
         <div class="mini">
@@ -107,19 +108,21 @@
     <div class="conn"><span class="dash"></span><span class="a">↓</span><span>上线后进入任务闭环：Stage 3 ⇄ 执行按 interval 周期循环，队列空则心跳返回 idle，收编关系持续在线</span><span class="dash"></span></div>
 
     <!-- ② 任务下发闭环 -->
-    <div class="card blue" style="flex:1.2; display:flex; flex-direction:column">
+    <div class="card blue" style="display:flex; flex-direction:column">
       <h3>② 任务下发闭环 —— 操作员 ↔ 已上线 Agent <span class="tag" style="background:rgba(68,147,248,.14);color:#91caff;border:1px solid rgba(68,147,248,.35)">task_type：nl_instruct · cmd · read_file · write_file · download · uninstall</span></h3>
       <div class="flowrow">
         <div class="mini">
           <b>操作员下发</b>
           <span class="mono">/admin/c2/agents/{id}/chat</span>
-          <div class="d">对话式 chat 即时下发；命令式 <em>/admin/c2/console</em> 五标签（Beacon / 队列 / 生成 / 监听器 / MSF）</div>
+          <div class="d">对话式 chat 校验任务类型白名单后即时入队；beacon 直发命令 <em>/api/admin/c2/beacon/{id}/cmd</em> 带操作审计 log_execution</div>
+          <div class="d">命令式 <em>/admin/c2/console</em> 五标签：Beacon / 任务队列 / 生成 / 监听器 / MSF</div>
         </div>
         <div class="arrow">→</div>
         <div class="mini">
           <b>任务入队</b>
           <span class="mono">C2Task · queued</span>
           <div class="d">enqueue_task 按 agent_id 定向，priority + created_at 排序</div>
+          <div class="d">状态机 queued → dispatched → completed；重复领取计 dispatch_count</div>
         </div>
         <div class="arrow">→</div>
         <div class="mini">
