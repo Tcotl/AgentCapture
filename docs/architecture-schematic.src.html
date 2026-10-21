@@ -13,14 +13,14 @@
   }
   * { box-sizing: border-box; margin: 0; }
   body {
-    width: 1680px; height: 1120px; padding: 26px 36px;
+    width: 1680px; height: 1000px; padding: 24px 36px;
     background: #0a0e18; color: var(--fg);
     font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
   }
   h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; }
   .basis { font-size: 12px; color: var(--muted); margin-top: 6px; }
   .basis code { font-family: "Fira Code", monospace; color: #a5b4c8; }
-  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 18px 20px; margin-top: 12px; position: relative; height: 980px; }
+  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 18px 20px; margin-top: 12px; position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .card { border: 1.6px solid; border-radius: 10px; background: var(--card); padding: 10px 13px; }
   .card h3 { font-size: 13.5px; font-weight: 700; margin-bottom: 5px; }
   .card h3 .mono { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; }
@@ -50,8 +50,9 @@
   .arrows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 6px 0; }
   .arrows div { text-align: center; font-size: 10.5px; color: var(--muted); }
   .arrows .a { font-size: 15px; color: #79b8ff; line-height: 1.1; }
-  .main { display: grid; grid-template-columns: 1fr 330px; gap: 16px; }
-  .core { border: 1.6px solid var(--g-blue); border-radius: 12px; background: rgba(13,20,36,.5); padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; justify-content: space-between; }
+  .main { display: grid; grid-template-columns: 1fr 330px; gap: 16px; flex: 1; min-height: 0; }
+  .core { border: 1.6px solid var(--g-blue); border-radius: 12px; background: rgba(13,20,36,.5); padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; justify-content: space-between; min-height: 0; }
+  .core .group { flex: 1; justify-content: center; }
   .core > .head { font-size: 13.5px; color: #79b8ff; font-weight: 700; }
   .core > .head .mono { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 8px; }
   .rcol { display: flex; flex-direction: column; gap: 12px; }
