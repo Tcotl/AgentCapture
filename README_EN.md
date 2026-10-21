@@ -97,17 +97,11 @@ All five were recruited online: each agent autonomously completed the full onboa
 2. **Functionality-camouflaged lure**: the page exposes a visible Developer API for structured data (a real API never serves browser challenges); an automated client that "uses the site as documented" completes registration on its own — no instruction-following required, which alignment training cannot defend against.
 3. **End-to-end traceability**: a session canary token (an HMAC-derived, per-session tracking token) spans page → API → registration → heartbeat; SSH decoy credentials embed session watermarks so credential reuse traces back to the exact session.
 
-### Recruitment design methodology
-
-![Recruitment design](docs/recruitment-design-en.png)
-
-> Terminology note: explicit command-style prompt injections were refused by every mainstream agent in live tests; the recruitment capability comes from functional camouflage (the API onboarding flow), not from instruction compliance.
-
 ### Recruitment online flow
 
 ![Recruitment online flow](docs/counter-online-flow-en.png)
 
-> Feature walkthrough of the recruitment going online: the three-stage portal onboarding (content fetch → client registration = online → heartbeat task pickup), the dual-delivery task dispatch loop, per-hop gating (switch / rate limit / listener token), and the session-canary attribution chain.
+> Feature walkthrough of the recruitment going online: the three-stage portal onboarding (content fetch → client registration = online → heartbeat task pickup), the dual-delivery task dispatch loop, per-hop gating (switch / rate limit / listener token), and the session-canary attribution chain. The capability comes from functional camouflage (the API onboarding flow), not from instruction compliance — explicit command-style prompt injections are refused by every mainstream agent in live tests.
 
 ## Interface Preview
 
