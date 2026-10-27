@@ -1,0 +1,143 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog with context %}
+{% block content %}
+{{ page_header('WF', _('接入拓扑'), _('互联网资产接入拓扑：按系统节点管理其对外蜜饵与 API 配置——单节点添加、删除，保存即时生效。'), [_('资产节点'), _('蜜饵配置')]) }}
+
+<style>
+  .topo { display: grid; grid-template-columns: 200px 44px 1fr 44px 200px; gap: 0; align-items: stretch; }
+  .topo-center { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .topo-side { display: flex; flex-direction: column; justify-content: center; }
+  .topo-side .card, .topo-center .sys { width: 100%; }
+  .sys { border: 1.4px solid rgba(68,147,248,.5); }
+  .sys-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sys-head b { font-size: 13.5px; }
+  .sys-domain { font-size: 11px; color: var(--muted); font-family: "Fira Code", monospace; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 10px; }
+  .chip-cfg { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; font-size: 11px; background: var(--card2); }
+  .chip-cfg .t-cred { color: #fda4af; } .chip-cfg .t-file { color: #fcd34d; } .chip-cfg .t-api { color: #6ee7b7; }
+  .chip-cfg form { margin: 0; display: inline-flex; }
+  .chip-cfg button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0; line-height: 1; }
+  .chip-cfg button:hover { color: var(--danger); }
+  .link-cell { display: flex; align-items: center; justify-content: center; }
+  .link-line { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(121,184,255,.15), #79b8ff); position: relative; }
+  .link-line::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid #79b8ff; }
+  .link-line.to-internet { background: linear-gradient(90deg, #79b8ff, rgba(121,184,255,.15)); }
+  .link-line.to-internet::after { right: auto; left: -1px; border-left: none; border-right: 7px solid #79b8ff; }
+  .empty-systems { padding: 40px; text-align: center; }
+  .icon { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin: 0 auto 8px; border: 1.4px solid; background: var(--card); }
+  .icon svg { width: 22px; height: 22px; }
+</style>
+
+{% set ns = namespace(api_configs=0) %}
+{% for sys in systems %}{% for cfg in sys.configs %}{% if cfg.type == 'api_route' %}{% set ns.api_configs = ns.api_configs + 1 %}{% endif %}{% endfor %}{% endfor %}
+{% for cfg in unassigned %}{% if cfg.type == 'api_route' %}{% set ns.api_configs = ns.api_configs + 1 %}{% endif %}{% endfor %}
+
+<div class="cards" style="margin-bottom:16px">
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('资产节点') }}</div><div class="stat-card-value">{{ systems|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('已绑定配置') }}</div><div class="stat-card-value">{{ total_configs - unassigned|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('未关联配置') }}</div><div class="stat-card-value">{{ unassigned|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('API 路由配置') }}</div><div class="stat-card-value">{{ ns.api_configs }}</div></div>
+</div>
+
+<div class="panel" style="padding:18px">
+  {{ section_header(_('接入拓扑'), _('互联网 → 资产节点（业务系统）→ AgentCapture 平台。点击节点下方「配置」管理该节点绑定的蜜饵与 API。')) }}
+  <div class="topo" style="margin-top:14px">
+    <div class="topo-side">
+      <div class="card green" style="text-align:center">
+        <div class="icon" style="margin:0 auto 8px;border-color:var(--g-green)"><svg viewBox="0 0 24 24" fill="none" stroke="#7ee2a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+        <h3 style="margin-bottom:4px">{{ _('互联网 / 攻击者') }}</h3>
+        <div class="d">{{ _('扫描 · 探测 · 撞库 · Agent 探测') }}</div>
+      </div>
+    </div>
+
+    <div class="link-cell"><div class="link-line to-internet"></div></div>
+
+    <div class="topo-center">
+      {% for sys in systems %}
+      <div class="card sys">
+        <div class="sys-head">
+          <b>{{ sys.name }}</b>
+          <span class="sys-domain">{{ sys.domain }}</span>
+          {% if sys.is_enabled %}<span class="badge badge-success">{{ _('运行中') }}</span>{% else %}<span class="badge badge-warning">{{ _('已暂停') }}</span>{% endif %}
+          <span class="badge badge-info">{{ sys.status }}</span>
+        </div>
+        <div class="chips">
+          {% for cfg in sys.configs %}
+          <span class="chip-cfg">
+            {% if cfg.type == 'credential' %}<span class="t-cred">凭证</span>
+            {% elif cfg.type == 'file' %}<span class="t-file">文件</span>
+            {% else %}<span class="t-api">API</span>{% endif %}
+            <code style="font-size:10.5px">{{ cfg.path }}</code>
+            <form method="post" action="/admin/internet-topology/configs/{{ cfg.id }}/delete" data-confirm="{{ _('删除该配置？绑定的蜜饵将同步移除。') }}">
+              <button type="submit" title="{{ _('删除配置') }}">×</button>
+            </form>
+          </span>
+          {% else %}
+          <span class="muted" style="font-size:11.5px">{{ _('暂无绑定配置——点击「添加配置」部署该节点的蜜饵 / API。') }}</span>
+          {% endfor %}
+        </div>
+        <div class="actions-inline" style="justify-content:flex-start">
+          <button type="button" class="chip primary btn-sm" onclick="openInternetModal('cfg-modal-{{ sys.id }}')">＋ {{ _('添加配置') }}</button>
+          <a class="chip btn-sm" href="/admin/internet-systems">{{ _('资产详情') }}</a>
+        </div>
+      </div>
+      {% else %}
+      <div class="card sys empty-systems">
+        <p class="muted" style="margin:0">{{ _('尚未登记互联网资产——先在') }} <a href="/admin/internet-systems">{{ _('嵌入式蜜罐管理') }}</a> {{ _('中登记业务系统，再回到本页管理其蜜饵 / API 配置。') }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="link-cell"><div class="link-line"></div></div>
+
+    <div class="topo-side">
+      <div class="card blue" style="text-align:center">
+        <div class="icon" style="margin:0 auto 8px;border-color:var(--g-blue)"><svg viewBox="0 0 24 24" fill="none" stroke="#79b8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg></div>
+        <h3 style="margin-bottom:4px">{{ _('AgentCapture 平台') }}</h3>
+        <div class="d">{{ _('风险引擎 · 蜜饵链 · 凭证捕获 · C2 名册') }}</div>
+      </div>
+    </div>
+  </div>
+
+  {% if unassigned %}
+  <div style="margin-top:16px">
+    {{ section_header(_('未关联配置'), _('以下蜜饵部署未绑定到任何资产节点，可在对应系统卡片中重新创建绑定。')) }}
+    <div class="table-wrap"><table>
+      <thead><tr><th>{{ _('类型') }}</th><th>{{ _('名称') }}</th><th>{{ _('路径') }}</th><th>{{ _('原部署位置') }}</th></tr></thead>
+      <tbody>
+        {% for cfg in unassigned %}
+        <tr>
+          <td>{{ cfg.type }}</td>
+          <td>{{ cfg.name }}</td>
+          <td><code style="font-size:11px">{{ cfg.path }}</code></td>
+          <td class="muted">{{ cfg.host or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+  {% endif %}
+</div>
+
+{% for sys in systems %}
+{% call modal_dialog('cfg-modal-' ~ sys.id, _('添加配置 · ') ~ sys.domain, _('选择配置类型：API 路由蜜饵（伪装接口）、文件蜜饵（诱饵文档）或凭证蜜饵（假账号密码）。保存后绑定到该节点，路径即刻生效。')) %}
+<form method="post" action="/admin/internet-topology/configs/create" class="stack">
+  <input type="hidden" name="system_id" value="{{ sys.id }}">
+  <label class="field-label"><span>{{ _('配置类型') }}</span>
+    <select name="decoy_type" onchange="this.form['name'].placeholder = this.value === 'api_route' ? '{{ _('如 internal-api') }}' : (this.value === 'credential' ? '{{ _('如 备份账号') }}' : '{{ _('如 运维手册') }}')">
+      <option value="api_route">{{ _('API 路由蜜饵') }}</option>
+      <option value="file">{{ _('文件蜜饵') }}</option>
+      <option value="credential">{{ _('凭证蜜饵') }}</option>
+    </select>
+  </label>
+  <label class="field-label"><span>{{ _('配置名称 *') }}</span><input name="name" required placeholder="{{ _('如 内部重建 API') }}"></label>
+  <label class="field-label"><span>{{ _('API 路由（仅 API 路由蜜饵需要）') }}</span><input name="route_path" placeholder="{{ _('如 /api/internal/reindex') }}"></label>
+  <label class="field-label"><span>{{ _('说明') }}</span><input name="description" placeholder="{{ _('用途说明（可选）') }}"></label>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>{{ _('取消') }}</button>
+    <button type="submit" class="primary">{{ _('创建并绑定到该节点') }}</button>
+  </div>
+</form>
+{% endcall %}
+{% endfor %}
+{% endblock %}

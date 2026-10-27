@@ -353,6 +353,7 @@ NAV_GROUPS = [
             ("嵌入式蜜罐管理", "/admin/internet-systems"),
             ("端口服务蜜罐管理", "/admin/services"),
             ("节点管理", "/admin/nodes"),
+            ("接入拓扑", "/admin/internet-topology"),
         ],
     },
     {
@@ -403,6 +404,7 @@ NAV_ICONS = {
     "/admin/honeypots": "radar",
     "/admin/counter-offense/mcp": "terminal",
     "/admin/counter-offense/behavior": "activity",
+    "/admin/internet-topology": "git-branch",
     "/admin/playbooks": "zap",
     "/admin/attacker-profiles": "users",
     "/admin/c2/console": "terminal",
@@ -435,6 +437,7 @@ NAV_DESCRIPTIONS = {
     "/admin/honeypots": "三类蜜罐部署总览：Web 应用（默认启用）/ 嵌入式 / 端口服务",
     "/admin/counter-offense/mcp": "MCP 工具服务蜜罐配置",
     "/admin/counter-offense/behavior": "会话行为自动化特征分析参数",
+    "/admin/internet-topology": "互联网资产接入拓扑：按系统管理蜜饵与 API 配置",
     "/admin/playbooks": "一键应用成套反制姿态",
     "/admin/attacker-profiles": "按来源聚合的攻击者持久画像",
     "/admin/alerts": "通知渠道与告警策略",
@@ -5940,6 +5943,155 @@ def undeploy_template(node_id: int, request: Request, db: Session = Depends(get_
         target_ref=node_name,
     )
     return _redirect(f"/admin/templates?undeploy_ok=1&undeploy_node={node_name}")
+
+
+@router.get("/admin/internet-topology", response_class=HTMLResponse)
+def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
+    """接入拓扑 — per-system view of internet assets with the decoy / API
+    configs bound to each node (add / delete per node)."""
+    user = _require_user(request, db)
+    systems = db.scalars(select(InternetSystem).order_by(InternetSystem.name)).all()
+    deployments = db.scalars(
+        select(DecoyDeployment).order_by(DecoyDeployment.id.desc())
+    ).all()
+    templates = {
+        t.id: t for t in db.scalars(select(DecoyTemplate)).all()
+    }
+    by_host: dict[str, list[dict]] = {}
+    unassigned: list[dict] = []
+    domains = {sys_item.domain.lower() for sys_item in systems}
+    for dep in deployments:
+        host = (dep.deployed_host or "").lower()
+        tpl = templates.get(dep.template_id) if dep.template_id else None
+        row = {
+            "id": dep.id,
+            "type": getattr(tpl, "decoy_type", "api_route") if tpl else "api_route",
+            "name": getattr(tpl, "name", dep.fetch_path),
+            "path": dep.fetch_path,
+            "auto": bool(tpl and tpl.name.startswith("[topology] ")),
+            "host": dep.deployed_host or "",
+        }
+        if host in domains:
+            by_host.setdefault(host, []).append(row)
+        else:
+            unassigned.append(row)
+    system_rows = []
+    for sys_item in systems:
+        configs = by_host.get(sys_item.domain.lower(), [])
+        system_rows.append({
+            "id": sys_item.id,
+            "name": sys_item.name,
+            "domain": sys_item.domain,
+            "upstream_url": sys_item.upstream_url,
+            "status": sys_item.status,
+            "is_enabled": sys_item.is_enabled,
+            "configs": configs,
+        })
+    return _render(
+        request,
+        "admin/internet_topology.html",
+        {
+            "title": "接入拓扑",
+            "current_user": user,
+            "systems": system_rows,
+            "unassigned": unassigned,
+            "total_configs": len(deployments),
+        },
+    )
+
+
+@router.post("/admin/internet-topology/configs/create")
+async def internet_topology_create_config(
+    request: Request,
+    system_id: int = Form(...),
+    decoy_type: str = Form("api_route"),
+    name: str = Form(...),
+    route_path: str = Form(""),
+    description: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    sys_item = db.get(InternetSystem, system_id)
+    if not sys_item:
+        raise HTTPException(status_code=404, detail="system not found")
+    decoy_type = _normalize_decoy_type(decoy_type)
+    name = name.strip()[:120]
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    marker = f"[topology] {sys_item.domain} · "
+    if decoy_type == "api_route":
+        route = _normalize_decoy_route(route_path, name)
+        file_name = route.rsplit("/", 1)[-1] or "api-route"
+        content_template = '{"code": 404, "message": "not found"}'
+        target_service_key = "web-api-route"
+    elif decoy_type == "credential":
+        route = ""
+        file_name = f"{name}.credential"
+        content_template = "$username$ / $password$ @ $honeypot$"
+        target_service_key = "ssh"
+    else:
+        route = ""
+        file_name = f"{name}.txt"
+        content_template = (
+            f"# {name}\n内部资料（演练蜜饵）：本文件内容含水印标记，泄露可溯源。\n"
+        )
+        target_service_key = "web"
+    template = DecoyTemplate(
+        name=f"{marker}{name}",
+        file_name=file_name,
+        description=description or f"接入拓扑 · {sys_item.domain}",
+        content_template=content_template,
+        username_dictionary="root,admin,service",
+        password_length=16,
+        target_service_key=target_service_key,
+        decoy_type=decoy_type,
+        route_path=route,
+        exposure_channel="topology",
+    )
+    db.add(template)
+    db.commit()
+    item = _create_decoy_deployment_record(
+        db, template, node_id=None, deployed_host=sys_item.domain
+    )
+    db.commit()
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="create",
+        module="internet-topology",
+        target_type="deployment",
+        target_ref=item.fetch_path,
+        detail_json={"system": sys_item.domain, "decoy_type": decoy_type, "name": name},
+    )
+    return _redirect("/admin/internet-topology")
+
+
+@router.post("/admin/internet-topology/configs/{deployment_id}/delete")
+def internet_topology_delete_config(
+    deployment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _require_admin(request, db)
+    dep = db.get(DecoyDeployment, deployment_id)
+    if dep:
+        tpl = db.get(DecoyTemplate, dep.template_id) if dep.template_id else None
+        auto_tpl = bool(tpl and tpl.name.startswith("[topology] "))
+        fetch_path = dep.fetch_path
+        db.delete(dep)
+        if auto_tpl and tpl:
+            db.delete(tpl)
+        db.commit()
+        log_execution(
+            db,
+            actor_username=user.username,
+            action="delete",
+            module="internet-topology",
+            target_type="deployment",
+            target_ref=fetch_path,
+            detail_json={"auto_template_removed": auto_tpl},
+        )
+    return _redirect("/admin/internet-topology")
 
 
 @router.get("/admin/internet-systems", response_class=HTMLResponse)
