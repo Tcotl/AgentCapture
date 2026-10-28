@@ -5,8 +5,10 @@
 .c2-mono { font-family:"Fira Code", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
 
 /* ===== chat console layout ===== */
-.chat-layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:14px; margin-top:14px; align-items:start; }
-@media (max-width:1180px) { .chat-layout { grid-template-columns:1fr; } }
+.chat-layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:14px; margin-top:14px; align-items:stretch; }
+.chat-layout > aside > .panel { flex:1 1 auto; }
+.chat-layout > .panel, .chat-layout > aside > .panel { margin-top:0; }
+@media (max-width:1180px) { .chat-layout { grid-template-columns:1fr; } .chat-layout > aside > .panel { flex:0 0 auto; } }
 
 .chat-panel { display:flex; flex-direction:column; padding:0; overflow:hidden; }
 
@@ -18,7 +20,7 @@
 .presence-meta { font-size:11.5px; color:var(--muted-foreground); }
 
 /* transcript */
-.chat-log { min-height:320px; max-height:56vh; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; scroll-behavior:smooth; }
+.chat-log { flex:1 1 auto; min-height:320px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; scroll-behavior:smooth; }
 .chat-exchange { display:flex; flex-direction:column; gap:6px; }
 .chat-row { display:flex; justify-content:flex-end; }
 .chat-row.agent { justify-content:flex-start; }
@@ -147,7 +149,7 @@
     </div>
   </section>
 
-  <aside style="display:flex;flex-direction:column;gap:14px">
+  <aside style="display:flex;flex-direction:column;gap:14px;min-width:0">
     <section class="panel">
       {{ section_header(_('端点信息'), '') }}
       <div class="side-card">
