@@ -34,7 +34,12 @@
   [data-theme="light"] { --topo-dot: rgba(15, 23, 42, .14); }
   #topo-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
   #topo-svg.panning { cursor: grabbing; }
-  #topo-svg .edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .5; stroke-width: 1.6; stroke-dasharray: 7 6; }
+  #topo-svg .edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .38; stroke-width: 1.5; stroke-dasharray: 7 6; }
+  #topo-svg .edge-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
+    stroke-linecap: round; stroke-dasharray: 9 91; animation: topo-flow 2.4s linear infinite; }
+  @keyframes topo-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { #topo-svg .edge-flow { display: none; } }
+  [data-theme="light"] #topo-svg .edge-flow { stroke: rgba(37, 99, 235, .78); }
   #topo-svg .node { cursor: grab; }
   #topo-svg .node:active { cursor: grabbing; }
   #topo-svg .node rect.body { fill: var(--card); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
@@ -286,11 +291,29 @@
         'L' + x2 + ' ' + y2;
     }
     function drawEdges() {
-      edgeLayer.innerHTML = '';
-      sysNodes.forEach(function (n) {
+      // per node: [inbound base, inbound flow, outbound base, outbound flow];
+      // flow paths carry a marching-dash pulse (capture direction, staggered);
+      // update d in place so dragging never restarts the animations
+      var edges = edgeLayer.__pairs || (edgeLayer.__pairs = []);
+      sysNodes.forEach(function (n, i) {
         var cyL = n.y + n.h / 2;
-        el('path', { class: 'edge', d: orthPath(INT.cx + 52, INT.cy, n.x, cyL) }, edgeLayer);
-        el('path', { class: 'edge', d: orthPath(n.x + n.w, cyL, CORE.cx - 46, CORE.cy) }, edgeLayer);
+        var dIn = orthPath(INT.cx + 52, INT.cy, n.x, cyL);
+        var dOut = orthPath(n.x + n.w, cyL, CORE.cx - 46, CORE.cy);
+        var pair = edges[i];
+        if (!pair) {
+          pair = edges[i] = [
+            el('path', { class: 'edge' }, edgeLayer),
+            el('path', { class: 'edge-flow' }, edgeLayer),
+            el('path', { class: 'edge' }, edgeLayer),
+            el('path', { class: 'edge-flow' }, edgeLayer),
+          ];
+          pair[1].style.animationDelay = (-((i * 0.8) % 2.4)).toFixed(2) + 's';
+          pair[3].style.animationDelay = (-((i * 0.8 + 1.1) % 2.4)).toFixed(2) + 's';
+        }
+        pair[0].setAttribute('d', dIn);
+        pair[1].setAttribute('d', dIn);
+        pair[2].setAttribute('d', dOut);
+        pair[3].setAttribute('d', dOut);
       });
     }
 
