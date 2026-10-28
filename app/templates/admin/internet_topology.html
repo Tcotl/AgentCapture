@@ -50,11 +50,24 @@
   @media (prefers-reduced-motion: reduce) { #topo-svg .core-glow { animation: none; } }
   #topo-svg .node { cursor: grab; }
   #topo-svg .node:active { cursor: grabbing; }
-  #topo-svg .node rect.body { fill: var(--card); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
-    transition: stroke .15s ease; }
+  /* 3D card: gradient face + extruded side slab + drop shadow (lift on select) */
+  :root { --topo-card-hi: #17253f; --topo-side: rgba(2, 6, 23, .55); }
+  [data-theme="light"] { --topo-card-hi: #ffffff; --topo-side: rgba(15, 23, 42, .22); }
+  #node-body-grad stop.nb1 { stop-color: var(--topo-card-hi); }
+  #node-body-grad stop.nb2 { stop-color: var(--card); }
+  #topo-svg .node rect.side3d { fill: var(--topo-side); }
+  #topo-svg .node rect.body { fill: url(#node-body-grad); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
+    transition: stroke .15s ease, filter .15s ease;
+    filter: drop-shadow(0 4px 5px rgba(2, 6, 23, .30)); }
+  [data-theme="light"] #topo-svg .node rect.body { filter: drop-shadow(0 4px 5px rgba(15, 23, 42, .14)); }
   #topo-svg .node:hover rect.body { stroke: var(--ring); }
-  #topo-svg .node.sel rect.body { stroke: var(--ring); stroke-width: 2; }
+  #topo-svg .node.sel rect.body { stroke: var(--ring); stroke-width: 2;
+    filter: drop-shadow(0 8px 10px rgba(2, 6, 23, .40)); }
+  [data-theme="light"] #topo-svg .node.sel rect.body { filter: drop-shadow(0 8px 10px rgba(15, 23, 42, .20)); }
   #topo-svg .node.droptgt rect.body { stroke: var(--success); stroke-width: 2; stroke-dasharray: 6 4; }
+  #node-chip-grad stop.nc1 { stop-color: rgba(68, 147, 248, .40); }
+  #node-chip-grad stop.nc2 { stop-color: rgba(68, 147, 248, .10); }
+  #topo-svg .node rect.chip { fill: url(#node-chip-grad); }
   #topo-svg text { fill: var(--foreground); font-family: "Fira Sans", system-ui, sans-serif; pointer-events: none; }
   #topo-svg .name { font-size: 13.5px; font-weight: 700; }
   #topo-svg .meta { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", monospace; }
@@ -415,13 +428,24 @@
     drawCore();
     drawEdges();
 
+    // shared node gradients (stops themed via CSS vars, see .nb1/.nb2)
+    var nodeDefs = el('defs', {});
+    var bodyGrad = el('linearGradient', { id: 'node-body-grad', x1: '0%', y1: '0%', x2: '55%', y2: '100%' }, nodeDefs);
+    el('stop', { offset: '0%', 'class': 'nb1' }, bodyGrad);
+    el('stop', { offset: '100%', 'class': 'nb2' }, bodyGrad);
+    var chipGrad = el('linearGradient', { id: 'node-chip-grad', x1: '0%', y1: '0%', x2: '0%', y2: '100%' }, nodeDefs);
+    el('stop', { offset: '0%', 'class': 'nc1' }, chipGrad);
+    el('stop', { offset: '100%', 'class': 'nc2' }, chipGrad);
+
     sysNodes.forEach(function (n) {
       var g = el('g', { class: 'node', id: 'node-' + n.sys.id });
       g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      // extruded side slab (bottom-right sliver = card thickness)
+      el('rect', { x: 3, y: 5, width: n.w - 3, height: n.h, rx: 12, class: 'side3d' }, g);
       el('rect', { x: 0, y: 0, width: n.w, height: n.h, class: 'body', rx: 12 }, g);
-      // icon chip (netviz style)
+      // icon chip (netviz style, accent-gradient face)
       el('rect', { x: 12, y: 12, width: 38, height: 38, rx: 10, class: 'chip',
-        style: 'fill:rgba(68,147,248,.12);stroke:rgba(68,147,248,.35);stroke-width:1.4' }, g);
+        style: 'stroke:rgba(68,147,248,.4);stroke-width:1.4' }, g);
       el('rect', { x: 20, y: 20, width: 22, height: 9, rx: 2, style: 'fill:none;stroke:#4493f8;stroke-width:1.5' }, g);
       el('rect', { x: 20, y: 33, width: 22, height: 9, rx: 2, style: 'fill:none;stroke:#4493f8;stroke-width:1.5' }, g);
       el('circle', { cx: 24, cy: 24.5, r: 1.3, style: 'fill:#4493f8' }, g);
