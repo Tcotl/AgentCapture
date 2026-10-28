@@ -40,6 +40,11 @@
   @keyframes topo-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { #topo-svg .edge-flow { display: none; } }
   [data-theme="light"] #topo-svg .edge-flow { stroke: rgba(37, 99, 235, .78); }
+  #topo-svg .globe-glow { animation: globe-glow 3.4s ease-in-out infinite; }
+  @keyframes globe-glow { 0%, 100% { opacity: .08; } 50% { opacity: .22; } }
+  @media (prefers-reduced-motion: reduce) { #topo-svg .globe-glow { animation: none; } }
+  #topo-svg .globe-wire { stroke: #7cf0bb; stroke-opacity: .32; fill: none; stroke-width: 1; }
+  [data-theme="light"] #topo-svg .globe-wire { stroke: #0c5e44; stroke-opacity: .34; }
   #topo-svg .node { cursor: grab; }
   #topo-svg .node:active { cursor: grabbing; }
   #topo-svg .node rect.body { fill: var(--card); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
@@ -318,11 +323,34 @@
     }
 
     function drawInternet() {
+      // shaded 3D globe: radial-gradient sphere + clipped lat/long wireframe
+      // + specular highlight + breathing halo (see .globe-glow keyframes)
+      var defs = el('defs', {});
+      var grad = el('radialGradient', { id: 'globe-grad', cx: '34%', cy: '30%', r: '78%' }, defs);
+      el('stop', { offset: '0%', 'stop-color': '#8df5c4', 'stop-opacity': '0.55' }, grad);
+      el('stop', { offset: '40%', 'stop-color': '#34d399', 'stop-opacity': '0.30' }, grad);
+      el('stop', { offset: '78%', 'stop-color': '#0b7a55', 'stop-opacity': '0.38' }, grad);
+      el('stop', { offset: '100%', 'stop-color': '#04241a', 'stop-opacity': '0.72' }, grad);
+      var blur = el('filter', { id: 'globe-blur', x: '-45%', y: '-45%', width: '190%', height: '190%' }, defs);
+      el('feGaussianBlur', { stdDeviation: 6 }, blur);
+      var clip = el('clipPath', { id: 'globe-clip' }, defs);
+      el('circle', { cx: INT.cx, cy: INT.cy, r: 45 }, clip);
+
       var g = el('g', {});
-      el('circle', { cx: INT.cx, cy: INT.cy, r: 46, style: 'fill:rgba(52,211,153,.08);stroke:#34d399;stroke-width:1.8;fill-opacity:1' }, g);
-      el('path', { d: 'M' + (INT.cx - 36) + ' ' + INT.cy + 'h72 M' + INT.cx + ' ' + (INT.cy - 36) +
-        'a52 52 0 0 1 14 36 52 52 0 0 1 -14 36 52 52 0 0 1 -14 -36 52 52 0 0 1 14 -36z',
-        style: 'fill:none;stroke:#34d399;stroke-width:1.8' }, g);
+      el('circle', { cx: INT.cx, cy: INT.cy, r: 56, class: 'globe-glow',
+        style: 'fill:none;stroke:#34d399;stroke-width:6;opacity:.1;filter:url(#globe-blur)' }, g);
+      el('circle', { cx: INT.cx, cy: INT.cy, r: 46,
+        style: 'fill:url(#globe-grad);stroke:#34d399;stroke-opacity:.65;stroke-width:1.4' }, g);
+      var wire = el('g', { 'class': 'globe-wire', 'clip-path': 'url(#globe-clip)' }, g);
+      [14, 30, 42].forEach(function (rx) {
+        el('ellipse', { cx: INT.cx, cy: INT.cy, rx: rx, ry: 45.5 }, wire);
+      });
+      [[-32, 30], [-16, 40], [0, 45], [16, 40], [32, 30]].forEach(function (p) {
+        el('ellipse', { cx: INT.cx, cy: INT.cy + p[0], rx: p[1], ry: Math.max(2.5, p[1] * 0.3) }, wire);
+      });
+      el('ellipse', { cx: INT.cx - 15, cy: INT.cy - 17, rx: 15, ry: 9,
+        transform: 'rotate(-24 ' + (INT.cx - 15) + ' ' + (INT.cy - 17) + ')',
+        style: 'fill:#ffffff;opacity:.38' }, g);
       var t = el('text', { x: INT.cx, y: INT.cy + 76, 'text-anchor': 'middle', class: 'name' }, g);
       t.textContent = {{ _('互联网 / 攻击者') | tojson }};
       var t2 = el('text', { x: INT.cx, y: INT.cy + 94, 'text-anchor': 'middle', class: 'meta' }, g);
