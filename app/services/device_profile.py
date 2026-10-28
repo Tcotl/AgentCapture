@@ -327,7 +327,81 @@ def upsert_profile_from_task(db: Session, task: C2Task):
     if task.status != "completed" or not (task.output or "").strip():
         return None
     data = parse_profile_output(section, task.output)
-    return upsert_profile_row(db, task.agent_id, section, data, task.id)
+    row = upsert_profile_row(db, task.agent_id, section, data, task.id)
+    _enrich_c2_agent(db, task.agent_id, section, data["fields"])
+    return row
+
+
+# ---------------------------------------------------------------------------
+# Identity back-fill: mirror collected hostname / OS / user onto the agent or
+# host record so rosters (which read C2Agent / ManagedHost columns) reflect
+# what the collection learned.  Fill-if-empty: a real heartbeat value always
+# wins over a parsed profile guess.
+# ---------------------------------------------------------------------------
+
+_C2_FIELD_MAP = {
+    "basic": {"hostname": "hostname", "current_user": "username"},
+    "user": {"current_user": "username"},
+    "system": {"os": "os_name", "arch": "arch"},
+}
+_MANAGED_FIELD_MAP = {
+    "basic": {"hostname": "hostname", "current_user": "username"},
+    "user": {"current_user": "username"},
+    "system": {"os": "os_version", "arch": "architecture"},
+}
+
+
+def _fill_if_empty(target, attr: str, value) -> bool:
+    current = getattr(target, attr, None)
+    if current in (None, "") or (attr in ("arch", "architecture") and current == "unknown"):
+        setattr(target, attr, value)
+        return True
+    return False
+
+
+def _enrich_c2_agent(db: Session, agent_id: str, section: str, fields: dict) -> int:
+    mapping = _C2_FIELD_MAP.get(section)
+    if not mapping or not fields:
+        return 0
+    agent = db.scalar(select(C2Agent).where(C2Agent.agent_id == agent_id))
+    if not agent:
+        return 0
+    changed = 0
+    for src, attr in mapping.items():
+        value = (fields.get(src) or "").strip()
+        if not value:
+            continue
+        if attr == "arch":
+            value = value[:16]
+        else:
+            value = value[:120]
+        if _fill_if_empty(agent, attr, value):
+            changed += 1
+    if changed:
+        db.commit()
+    return changed
+
+
+def _enrich_managed_host(db: Session, host, section: str, fields: dict) -> int:
+    mapping = _MANAGED_FIELD_MAP.get(section)
+    if not mapping or not fields:
+        return 0
+    changed = 0
+    for src, attr in mapping.items():
+        value = (fields.get(src) or "").strip()
+        if not value:
+            continue
+        if attr == "architecture":
+            value = value[:60]
+        elif attr == "os_version":
+            value = value[:150]
+        else:
+            value = value[:120]
+        if _fill_if_empty(host, attr, value):
+            changed += 1
+    if changed:
+        db.commit()
+    return changed
 
 
 # ---------------------------------------------------------------------------
@@ -410,7 +484,9 @@ def upsert_profile_from_managed_task(db: Session, task):
     if not host:
         return None
     data = parse_profile_output(section, output)
-    return upsert_profile_row(db, managed_agent_key(host), section, data, task.id)
+    row = upsert_profile_row(db, managed_agent_key(host), section, data, task.id)
+    _enrich_managed_host(db, host, section, data["fields"])
+    return row
 
 
 def get_profile_map(db: Session, agent_id: str) -> dict[str, dict]:
