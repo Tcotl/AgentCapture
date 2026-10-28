@@ -557,8 +557,9 @@
         var k = worldPerPx();
         var dxw = (ev.clientX - drag.cx) * k.x, dyw = (ev.clientY - drag.cy) * k.y;
         if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
-        n.x = Math.max(10, Math.min(W - n.w - 10, drag.ox + dxw));
-        n.y = Math.max(10, Math.min(H - n.h - 10, drag.oy + dyw));
+        // no bounds: nodes follow the pointer freely (pan to recover strays)
+        n.x = drag.ox + dxw;
+        n.y = drag.oy + dyw;
         g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
         drawEdges();
       });
@@ -621,8 +622,9 @@
         var k = worldPerPx();
         var dxw = (ev.clientX - drag.cx) * k.x, dyw = (ev.clientY - drag.cy) * k.y;
         if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
-        n.x = Math.max(10, Math.min(W - n.w - 10, drag.ox + dxw));
-        n.y = Math.max(10, Math.min(H - n.h - 10, drag.oy + dyw));
+        // no bounds: nodes follow the pointer freely (pan to recover strays)
+        n.x = drag.ox + dxw;
+        n.y = drag.oy + dyw;
         g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
         drawEdges();
       });
