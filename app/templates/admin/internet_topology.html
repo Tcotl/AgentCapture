@@ -56,6 +56,8 @@
   [data-theme="light"] #topo-svg .edge-flow { stroke: rgba(37, 99, 235, .78); }
   .globe-canvas { position: absolute; transform: translate(-50%, -50%);
     pointer-events: none; z-index: 1; }
+  #topo-svg .snap-guide { stroke: #f43f5e; stroke-width: 1; stroke-dasharray: 4 4;
+    pointer-events: none; }
   #topo-svg .core-glow { animation: core-glow 3s ease-in-out infinite; }
   @keyframes core-glow { 0%, 100% { opacity: .10; } 50% { opacity: .26; } }
   @media (prefers-reduced-motion: reduce) { #topo-svg .core-glow { animation: none; } }
@@ -364,6 +366,67 @@
     });
 
     var edgeLayer = el('g', { style: 'pointer-events:none' });
+    // ── smart snap-align: dragged nodes snap to other nodes' centers and
+    // edges; red guide lines show the active alignment while dragging ──
+    var guideLayer = null;
+    var SNAP_TOL = 9; // screen px, converted per-frame
+
+    function snapGuides(n, w, h) {
+      var k = (worldPerPx().x + worldPerPx().y) / 2;
+      var tol = SNAP_TOL * k;
+      var targets = [];
+      function collect(arr, self) {
+        arr.forEach(function (o) { if (o !== self) targets.push(o); });
+      }
+      collect(sysNodes, n.hp ? null : n);
+      collect(agentNodes, n.a ? n : null);
+      collect(hpNodes, n.hp ? n : null);
+      if (n.anchorKey !== 'int') {
+        targets.push({ x: INT.cx + INT.ox - 46, y: INT.cy + INT.oy - 46, w: 92, h: 92 });
+      }
+      if (n.anchorKey !== 'core') {
+        targets.push({ x: CORE.cx + CORE.ox - 40, y: CORE.cy + CORE.oy - 40, w: 80, h: 80 });
+      }
+
+      var guides = [];
+      // nearest (mine, theirs) pair per axis across centers + edges
+      function bestAxis(mineList, theirList) {
+        var bv = null, bt = null, bd = tol;
+        mineList.forEach(function (mv) {
+          theirList.forEach(function (tv) {
+            var d = Math.abs(mv - tv);
+            if (d < bd) { bd = d; bv = mv; bt = tv; }
+          });
+        });
+        return bv === null ? null : { mine: bv, theirs: bt };
+      }
+      var xT = [], yT = [];
+      targets.forEach(function (o) {
+        xT.push(o.x, o.x + o.w / 2, o.x + o.w);
+        yT.push(o.y, o.y + o.h / 2, o.y + o.h);
+      });
+      var bx = bestAxis([n.x, n.x + w / 2, n.x + w], xT);
+      var by = bestAxis([n.y, n.y + h / 2, n.y + h], yT);
+      var meCx = n.x + w / 2, meCy = n.y + h / 2;
+      if (bx) {
+        n.x += bx.theirs - bx.mine;
+        meCx = bx.theirs;
+        guides.push({ x1: bx.theirs, y1: by ? by.theirs : n.y - 24, x2: bx.theirs, y2: n.y + h + 24 });
+      }
+      if (by) {
+        n.y += by.theirs - by.mine;
+        meCy = by.theirs;
+        guides.push({ x1: bx ? bx.theirs : n.x - 24, y1: by.theirs, x2: n.x + w + 24, y2: by.theirs });
+      }
+      return guides;
+    }
+    function renderGuides(guides) {
+      if (!guideLayer) guideLayer = el('g', { style: 'pointer-events:none' });
+      guideLayer.innerHTML = '';
+      guides.forEach(function (g) {
+        el('line', { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, class: 'snap-guide' }, guideLayer);
+      });
+    }
     function orthPath(x1, y1, x2, y2) {
       if (Math.abs(y2 - y1) < 3) return 'M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2;
       var r = Math.min(14, Math.abs(y2 - y1) / 2);
@@ -701,6 +764,7 @@
         // no bounds: nodes follow the pointer freely (pan to recover strays)
         n.x = drag.ox + dxw;
         n.y = drag.oy + dyw;
+        renderGuides(snapGuides(n, n.w, n.h));
         g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
         drawEdges();
       });
@@ -708,6 +772,7 @@
         if (!drag) return;
         var wasDrag = drag;
         drag = null;
+        renderGuides([]);
         if (wasDrag.moved) {
           fetchSaveLayout();
         } else {
@@ -755,8 +820,9 @@
     }
     // endpoint anchors (internet / platform) are draggable too: offsets
     // shift the drawn group and every edge anchor follows
-    function attachAnchorDrag(state) {
+    function attachAnchorDrag(state, w, h, anchorKey) {
       var drag = null;
+      state.w = w; state.h = h; state.anchorKey = anchorKey;
       state.holder.addEventListener('pointerdown', function (ev) {
         drag = { cx: ev.clientX, cy: ev.clientY, ox: state.ox, oy: state.oy };
         ev.preventDefault();
@@ -766,12 +832,17 @@
         var k = worldPerPx();
         state.ox = drag.ox + (ev.clientX - drag.cx) * k.x;
         state.oy = drag.oy + (ev.clientY - drag.cy) * k.y;
+        var proxy = { x: state.cx + state.ox - w / 2, y: state.cy + state.oy - h / 2, anchorKey: anchorKey };
+        renderGuides(snapGuides(proxy, w, h));
+        state.ox = proxy.x - state.cx + w / 2;
+        state.oy = proxy.y - state.cy + h / 2;
         state.holder.setAttribute('transform', 'translate(' + state.ox + ',' + state.oy + ')');
         drawEdges();
       });
       window.addEventListener('pointerup', function () {
         if (!drag) return;
         drag = null;
+        renderGuides([]);
         fetchSaveLayout();
       });
     }
@@ -791,6 +862,7 @@
         // no bounds: nodes follow the pointer freely (pan to recover strays)
         n.x = drag.ox + dxw;
         n.y = drag.oy + dyw;
+        renderGuides(snapGuides(n, n.w, n.h));
         g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
         drawEdges();
       });
@@ -798,6 +870,7 @@
         if (!drag) return;
         var wasDrag = drag;
         drag = null;
+        renderGuides([]);
         if (wasDrag.moved) fetchSaveLayout();
         else onClick();
       });
@@ -831,8 +904,8 @@
           ? '/admin/c2/agents/' + n.a.id : '/admin/c2/console');
       });
     });
-    attachAnchorDrag(INT);
-    attachAnchorDrag(CORE);
+    attachAnchorDrag(INT, 92, 92, 'int');
+    attachAnchorDrag(CORE, 80, 80, 'core');
     startGlobe();
     window.addEventListener('resize', syncGlobeCanvas);
 
