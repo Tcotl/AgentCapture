@@ -4,10 +4,6 @@
 {{ page_header('WF', _('接入拓扑'), _('互联网资产接入拓扑：按系统节点管理其对外蜜饵与 API 配置——单节点添加、删除，保存即时生效。'), [_('资产节点'), _('蜜饵配置')]) }}
 
 <style>
-  .topo { display: grid; grid-template-columns: 200px 44px 1fr 44px 200px; gap: 0; align-items: stretch; }
-  .topo-center { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .topo-side { display: flex; flex-direction: column; justify-content: center; }
-  .topo-side .card, .topo-center .sys { width: 100%; }
   .sys { border: 1.4px solid rgba(68,147,248,.5); }
   .sys-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .sys-head b { font-size: 13.5px; }
@@ -18,11 +14,6 @@
   .chip-cfg form { margin: 0; display: inline-flex; }
   .chip-cfg button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0; line-height: 1; }
   .chip-cfg button:hover { color: var(--danger); }
-  .link-cell { display: flex; align-items: center; justify-content: center; }
-  .link-line { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(121,184,255,.15), #79b8ff); position: relative; }
-  .link-line::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid #79b8ff; }
-  .link-line.to-internet { background: linear-gradient(90deg, #79b8ff, rgba(121,184,255,.15)); }
-  .link-line.to-internet::after { right: auto; left: -1px; border-left: none; border-right: 7px solid #79b8ff; }
   .empty-systems { padding: 40px; text-align: center; }
   .icon { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin: 0 auto 8px; border: 1.4px solid; background: var(--card); }
   .icon svg { width: 22px; height: 22px; }
@@ -41,64 +32,183 @@
 
 <div class="panel" style="padding:18px">
   {{ section_header(_('接入拓扑'), _('互联网 → 资产节点（业务系统）→ AgentCapture 平台。点击节点下方「配置」管理该节点绑定的蜜饵与 API。')) }}
-  <div class="topo" style="margin-top:14px">
-    <div class="topo-side">
-      <div class="card green" style="text-align:center">
-        <div class="icon" style="margin:0 auto 8px;border-color:var(--g-green)"><svg viewBox="0 0 24 24" fill="none" stroke="#7ee2a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
-        <h3 style="margin-bottom:4px">{{ _('互联网 / 攻击者') }}</h3>
-        <div class="d">{{ _('扫描 · 探测 · 撞库 · Agent 探测') }}</div>
-      </div>
-    </div>
+  <style>
+    #topo-svg { display: block; width: 100%; height: 560px; background:
+      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(37,99,235,.07), transparent 70%), var(--card);
+      border: 1px solid var(--line); border-radius: 12px; touch-action: none; user-select: none; }
+    #topo-svg .edge { fill: none; stroke: #6d9eff; stroke-width: 2; stroke-opacity: .55; }
+    #topo-svg .node { cursor: grab; }
+    #topo-svg .node:active { cursor: grabbing; }
+    #topo-svg .node rect.body { fill: var(--card2); stroke: rgba(121,184,255,.5); stroke-width: 1.4; rx: 12; }
+    #topo-svg .node:hover rect.body { stroke: #79b8ff; }
+    #topo-svg .node text { fill: var(--fg); font-family: "Fira Sans", system-ui, sans-serif; pointer-events: none; }
+    #topo-svg .node .name { font-size: 13px; font-weight: 700; }
+    #topo-svg .node .meta { font-size: 10.5px; fill: var(--muted); font-family: "Fira Code", monospace; }
+    #topo-svg .node .cfg { font-size: 10px; }
+    #topo-svg .icon-cloud { fill: none; stroke: #7ee2a0; stroke-width: 1.8; }
+    #topo-svg .icon-core { fill: none; stroke: #79b8ff; stroke-width: 1.8; }
+    #topo-svg .badge { font-size: 9.5px; }
+    [data-theme="light"] #topo-svg .node rect.body { fill: #ffffff; }
+    [data-theme="light"] #topo-svg .edge { stroke: rgba(37,99,235,.5); }
+    #topo-hint { font-size: 11px; color: var(--muted); margin: 8px 2px 0; }
+  </style>
+  <div id="topo-hint">{{ _('拖拽节点调整布局（自动保存）· 单击资产节点管理其蜜饵 / API 配置') }}</div>
+  <svg id="topo-svg" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMid meet"></svg>
+  <script id="topo-data" type="application/json">{{ topo_data_json | safe }}</script>
+  <script>
+  (function () {
+    var DATA = JSON.parse(document.getElementById('topo-data').textContent);
+    var svg = document.getElementById('topo-svg');
+    var NS = 'http://www.w3.org/2000/svg';
+    var W = 1600, H = 560;
+    var INT = { x: 120, y: H / 2 - 55 };
+    var CORE = { x: W - 320, y: H / 2 - 55 };
+    var sysNodes = DATA.systems.map(function (sys, i) {
+      var saved = DATA.layout[sys.id];
+      var col = Math.floor(i / Math.max(1, Math.ceil(DATA.systems.length / 2)));
+      var row = i % Math.max(1, Math.ceil(DATA.systems.length / 2));
+      var defX = 480 + col * 300, defY = 60 + row * 220;
+      return {
+        sys: sys,
+        x: saved ? saved[0] : defX,
+        y: saved ? saved[1] : defY,
+        w: 240, h: 132,
+      };
+    });
 
-    <div class="link-cell"><div class="link-line to-internet"></div></div>
+    function el(tag, attrs, parent) {
+      var e = document.createElementNS(NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      (parent || svg).appendChild(e);
+      return e;
+    }
 
-    <div class="topo-center">
-      {% for sys in systems %}
-      <div class="card sys">
-        <div class="sys-head">
-          <b>{{ sys.name }}</b>
-          <span class="sys-domain">{{ sys.domain }}</span>
-          {% if sys.is_enabled %}<span class="badge badge-success">{{ _('运行中') }}</span>{% else %}<span class="badge badge-warning">{{ _('已暂停') }}</span>{% endif %}
-          <span class="badge badge-info">{{ sys.status }}</span>
-        </div>
-        <div class="chips">
-          {% for cfg in sys.configs %}
-          <span class="chip-cfg">
-            {% if cfg.type == 'credential' %}<span class="t-cred">凭证</span>
-            {% elif cfg.type == 'file' %}<span class="t-file">文件</span>
-            {% else %}<span class="t-api">API</span>{% endif %}
-            <code style="font-size:10.5px">{{ cfg.path }}</code>
-            <form method="post" action="/admin/internet-topology/configs/{{ cfg.id }}/delete" data-confirm="{{ _('删除该配置？绑定的蜜饵将同步移除。') }}">
-              <button type="submit" title="{{ _('删除配置') }}">×</button>
-            </form>
-          </span>
-          {% else %}
-          <span class="muted" style="font-size:11.5px">{{ _('暂无绑定配置——点击「添加配置」部署该节点的蜜饵 / API。') }}</span>
-          {% endfor %}
-        </div>
-        <div class="actions-inline" style="justify-content:flex-start">
-          <button type="button" class="chip primary btn-sm" onclick="openInternetModal('cfg-modal-{{ sys.id }}')">＋ {{ _('添加配置') }}</button>
-          <a class="chip btn-sm" href="/admin/internet-systems">{{ _('资产详情') }}</a>
-        </div>
-      </div>
-      {% else %}
-      <div class="card sys empty-systems">
-        <p class="muted" style="margin:0">{{ _('尚未登记互联网资产——先在') }} <a href="/admin/internet-systems">{{ _('嵌入式蜜罐管理') }}</a> {{ _('中登记业务系统，再回到本页管理其蜜饵 / API 配置。') }}</p>
-      </div>
-      {% endfor %}
-    </div>
+    // edges layer first (under nodes)
+    var edgeLayer = el('g', {});
+    function drawEdges() {
+      edgeLayer.innerHTML = '';
+      sysNodes.forEach(function (n) {
+        var cx = n.x + n.w, cy = n.y + n.h / 2;
+        var e1 = el('path', { class: 'edge', d:
+          'M' + (INT.x + 190) + ' ' + (INT.y + 55) +
+          ' C ' + (INT.x + 300) + ' ' + (INT.y + 55) + ', ' + (cx - 90) + ' ' + cy + ', ' + cx + ' ' + cy }, edgeLayer);
+        var cx2 = CORE.x, cy2 = CORE.y + 55;
+        el('path', { class: 'edge', d:
+          'M' + (n.x + n.w) + ' ' + cy +
+          ' C ' + (n.x + n.w + 90) + ' ' + cy + ', ' + (cx2 - 110) + ' ' + cy2 + ', ' + cx2 + ' ' + cy2 }, edgeLayer);
+      });
+    }
 
-    <div class="link-cell"><div class="link-line"></div></div>
+    function drawIconInternet(x, y) {
+      var g = el('g', {});
+      el('circle', { cx: x + 95, cy: y + 55, r: 46, class: 'icon-cloud', style: 'fill:rgba(63,185,80,.08)' }, g);
+      el('path', { d: 'M' + (x+59) + ' ' + (y+55) + 'h72 M' + (x+95) + ' ' + (y+19) +
+        'a52 52 0 0 1 14 36 52 52 0 0 1 -14 36 52 52 0 0 1 -14 -36 52 52 0 0 1 14 -36z',
+        class: 'icon-cloud' }, g);
+      var t = el('text', { x: x + 95, y: y + 130, 'text-anchor': 'middle', class: 'name' }, g);
+      t.textContent = {{ _('互联网 / 攻击者') | tojson }};
+      var t2 = el('text', { x: x + 95, y: y + 148, 'text-anchor': 'middle', class: 'meta' }, g);
+      t2.textContent = {{ _('扫描 · 探测 · 撞库 · Agent 探测') | tojson }};
+      return g;
+    }
 
-    <div class="topo-side">
-      <div class="card blue" style="text-align:center">
-        <div class="icon" style="margin:0 auto 8px;border-color:var(--g-blue)"><svg viewBox="0 0 24 24" fill="none" stroke="#79b8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg></div>
-        <h3 style="margin-bottom:4px">{{ _('AgentCapture 平台') }}</h3>
-        <div class="d">{{ _('风险引擎 · 蜜饵链 · 凭证捕获 · C2 名册') }}</div>
-      </div>
-    </div>
-  </div>
+    function drawIconCore(x, y) {
+      var g = el('g', {});
+      var r = el('rect', { x: x + 55, y: y + 15, width: 80, height: 80, rx: 14,
+        style: 'fill:rgba(68,147,248,.08);stroke:#79b8ff;stroke-width:1.8' }, g);
+      el('rect', { x: x + 70, y: y + 30, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#79b8ff;stroke-width:1.6' }, g);
+      el('rect', { x: x + 70, y: y + 60, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#79b8ff;stroke-width:1.6' }, g);
+      el('circle', { cx: x + 78, cy: y + 40, r: 2.5, style: 'fill:#79b8ff' }, g);
+      el('circle', { cx: x + 78, cy: y + 70, r: 2.5, style: 'fill:#79b8ff' }, g);
+      var t = el('text', { x: x + 95, y: y + 125, 'text-anchor': 'middle', class: 'name' }, g);
+      t.textContent = {{ _('AgentCapture 平台') | tojson }};
+      var t2 = el('text', { x: x + 95, y: y + 143, 'text-anchor': 'middle', class: 'meta' }, g);
+      t2.textContent = {{ _('风险引擎 · 蜜饵链 · 凭证捕获 · C2 名册') | tojson }};
+      return g;
+    }
 
+    drawIconInternet(INT.x, INT.y);
+    drawIconCore(CORE.x, CORE.y);
+    drawEdges();
+
+    sysNodes.forEach(function (n) {
+      var g = el('g', { class: 'node' });
+      g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      el('rect', { x: 0, y: 0, width: n.w, height: n.h, class: 'body', rx: 12 }, g);
+      // server icon
+      el('rect', { x: 14, y: 14, width: 26, height: 26, rx: 5,
+        style: 'fill:none;stroke:#79b8ff;stroke-width:1.6' }, g);
+      el('path', { d: 'M20 22h14 M20 27h14 M22 24.5h.01 M22 29.5h.01',
+        style: 'stroke:#79b8ff;stroke-width:1.4;fill:none' }, g);
+      var name = el('text', { x: 50, y: 26, class: 'name' }, g);
+      name.textContent = n.sys.name.length > 13 ? n.sys.name.slice(0, 12) + '…' : n.sys.name;
+      var domain = el('text', { x: 50, y: 42, class: 'meta' }, g);
+      domain.textContent = n.sys.domain;
+      // status badge
+      var st = el('text', { x: 14, y: 62, class: 'badge',
+        style: 'fill:' + (n.sys.enabled ? '#3fb950' : '#d29922') }, g);
+      st.textContent = n.sys.enabled ? '● {{ _('运行中') }}' : '○ {{ _('已暂停') }}';
+      var stx = el('text', { x: 50, y: 62, class: 'badge', style: 'fill:var(--muted)' }, g);
+      stx.textContent = n.sys.status;
+      // config chips (up to 3 + '+N')
+      var cfgY = 82;
+      n.sys.configs.slice(0, 3).forEach(function (cfg) {
+        var color = cfg.type === 'credential' ? '#fda4af' : cfg.type === 'file' ? '#fcd34d' : '#6ee7b7';
+        var dot = el('circle', { cx: 18, cy: cfgY - 4, r: 3.5, style: 'fill:' + color }, g);
+        var t = el('text', { x: 28, y: cfgY, class: 'cfg', style: 'fill:var(--muted)' }, g);
+        var label = cfg.path.length > 30 ? cfg.path.slice(0, 29) + '…' : cfg.path;
+        t.textContent = label;
+        cfgY += 16;
+      });
+      if (n.sys.configs.length > 3) {
+        var more = el('text', { x: 18, y: cfgY, class: 'cfg', style: 'fill:var(--muted)' }, g);
+        more.textContent = '+ ' + (n.sys.configs.length - 3) + ' …';
+        cfgY += 16;
+      }
+      if (!n.sys.configs.length) {
+        var empty = el('text', { x: 18, y: cfgY, class: 'cfg', style: 'fill:var(--muted)' }, g);
+        empty.textContent = '{{ _('暂无绑定配置') }}';
+      }
+      // click hint
+      var hint = el('text', { x: 14, y: n.h - 12, class: 'cfg', style: 'fill:#79b8ff' }, g);
+      hint.textContent = '{{ _('单击节点 → 添加 / 删除配置') }}';
+
+      // drag: move/up live on window so the gesture survives leaving the node bounds
+      var drag = null;
+      g.addEventListener('pointerdown', function (ev) {
+        drag = { dx: ev.clientX, dy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+        ev.preventDefault();
+      });
+      window.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        var ddx = ev.clientX - drag.dx, ddy = ev.clientY - drag.dy;
+        if (Math.abs(ddx) + Math.abs(ddy) > 4) drag.moved = true;
+        var scale = svg.getScreenCTM().a || 1;
+        n.x = Math.max(10, Math.min(W - n.w - 10, drag.ox + ddx / scale));
+        n.y = Math.max(10, Math.min(H - n.h - 10, drag.oy + ddy / scale));
+        g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+        drawEdges();
+      });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        var wasDrag = drag;
+        drag = null;
+        if (wasDrag.moved) {
+          var layout = {};
+          sysNodes.forEach(function (sn) { layout[sn.sys.id] = [Math.round(sn.x), Math.round(sn.y)]; });
+          fetch('/admin/internet-topology/layout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ layout: layout }),
+          }).catch(function () {});
+        } else {
+          var modal = document.getElementById('cfg-modal-' + n.sys.id);
+          if (modal) { modal.hidden = false; document.body.style.overflow = 'hidden'; }
+        }
+      });
+    });
+  })();
+  </script>
   {% if unassigned %}
   <div style="margin-top:16px">
     {{ section_header(_('未关联配置'), _('以下蜜饵部署未绑定到任何资产节点，可在对应系统卡片中重新创建绑定。')) }}

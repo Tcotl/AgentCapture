@@ -5987,6 +5987,31 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
             "is_enabled": sys_item.is_enabled,
             "configs": configs,
         })
+    import json as _json
+
+    from app.models.system_setting import SystemSetting
+
+    layout_row = db.get(SystemSetting, "internet_topology_layout")
+    try:
+        layout = _json.loads(layout_row.value) if layout_row else {}
+    except ValueError:
+        layout = {}
+    canvas_data = {
+        "systems": [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "domain": row["domain"],
+                "status": row["status"],
+                "enabled": row["is_enabled"],
+                "configs": [
+                    {"type": c["type"], "path": c["path"]} for c in row["configs"]
+                ],
+            }
+            for row in system_rows
+        ],
+        "layout": layout,
+    }
     return _render(
         request,
         "admin/internet_topology.html",
@@ -5996,8 +6021,44 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
             "systems": system_rows,
             "unassigned": unassigned,
             "total_configs": len(deployments),
+            # JSON-in-script: neutralize "<" so autoescape/HTML parsing can
+            # never break the payload; values remain intact after JSON.parse.
+            "topo_data_json": _json.dumps(canvas_data, ensure_ascii=False).replace("<", "\\u003c"),
         },
     )
+
+
+@router.post("/admin/internet-topology/layout")
+async def internet_topology_save_layout(request: Request):
+    """Persist the draggable topology node layout (per-system x/y)."""
+    from app.models.system_setting import SystemSetting
+
+    body = await request.json()
+    layout = body.get("layout") if isinstance(body, dict) else None
+    if not isinstance(layout, dict):
+        raise HTTPException(status_code=400, detail="layout required")
+    clean = {}
+    for key, xy in layout.items():
+        try:
+            clean[str(int(key))] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+    with SessionLocal() as db:
+        row = db.get(SystemSetting, "internet_topology_layout")
+        if row is None:
+            row = SystemSetting(
+                key="internet_topology_layout", value="{}", updated_by="topology"
+            )
+            db.add(row)
+        row.value = _json_dumps_clean(clean)
+        db.commit()
+    return {"status": "ok", "saved": len(clean)}
+
+
+def _json_dumps_clean(layout: dict) -> str:
+    import json as _json
+
+    return _json.dumps(layout, ensure_ascii=False)
 
 
 @router.post("/admin/internet-topology/configs/create")
