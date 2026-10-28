@@ -6005,7 +6005,8 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
                 "status": row["status"],
                 "enabled": row["is_enabled"],
                 "configs": [
-                    {"type": c["type"], "path": c["path"]} for c in row["configs"]
+                    {"id": c["id"], "type": c["type"], "name": c["name"], "path": c["path"]}
+                    for c in row["configs"]
                 ],
             }
             for row in system_rows

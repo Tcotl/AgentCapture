@@ -1,22 +1,105 @@
 {% extends 'admin/base.html' %}
-{% from 'admin/_macros.html' import page_header, section_header, empty_state, modal_dialog with context %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state with context %}
 {% block content %}
-{{ page_header('WF', _('接入拓扑'), _('互联网资产接入拓扑：按系统节点管理其对外蜜饵与 API 配置——单节点添加、删除，保存即时生效。'), [_('资产节点'), _('蜜饵配置')]) }}
+{{ page_header('WF', _('接入拓扑'), _('互联网资产接入拓扑：拖拽节点编排布局，从左侧组件面板把蜜饵拖到资产节点上即完成绑定，右侧检查器管理节点配置。'), [_('资产节点'), _('蜜饵配置')]) }}
 
 <style>
-  .sys { border: 1.4px solid rgba(68,147,248,.5); }
-  .sys-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .sys-head b { font-size: 13.5px; }
-  .sys-domain { font-size: 11px; color: var(--muted); font-family: "Fira Code", monospace; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 10px; }
-  .chip-cfg { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; font-size: 11px; background: var(--card2); }
-  .chip-cfg .t-cred { color: #fda4af; } .chip-cfg .t-file { color: #fcd34d; } .chip-cfg .t-api { color: #6ee7b7; }
-  .chip-cfg form { margin: 0; display: inline-flex; }
-  .chip-cfg button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0; line-height: 1; }
-  .chip-cfg button:hover { color: var(--danger); }
-  .empty-systems { padding: 40px; text-align: center; }
-  .icon { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin: 0 auto 8px; border: 1.4px solid; background: var(--card); }
-  .icon svg { width: 22px; height: 22px; }
+  #topo-app { display: flex; gap: 14px; padding: 14px; align-items: stretch; }
+  /* ── left palette (netviz-style blocks) ─────────────────────────── */
+  #topo-palette { flex: 0 0 196px; width: 196px; display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 12px 10px; }
+  .pal-title { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground);
+    font-family: "Fira Code", monospace; margin: 2px 2px 2px; }
+  .pal-block { display: flex; gap: 10px; align-items: center; border: 1px solid var(--border);
+    background: var(--secondary); border-radius: 10px; padding: 8px 10px; cursor: grab; text-align: left;
+    transition: border-color .18s ease, transform .18s ease; color: var(--foreground); width: 100%; }
+  .pal-block:hover { border-color: var(--ring); transform: translateY(-1px); }
+  .pal-block:active { cursor: grabbing; }
+  .pal-block b { display: block; font-size: 12.5px; font-weight: 600; }
+  .pal-block small { display: block; font-size: 10.5px; color: var(--muted-foreground); margin-top: 1px; }
+  .pal-icon { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; }
+  .pal-icon svg { width: 18px; height: 18px; }
+  .pal-icon.api { color: #34d399; background: rgba(52, 211, 153, .12); border: 1px solid rgba(52, 211, 153, .32); }
+  .pal-icon.credential { color: #fb7185; background: rgba(251, 113, 133, .12); border: 1px solid rgba(251, 113, 133, .32); }
+  .pal-icon.file { color: #f59e0b; background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .32); }
+  .pal-note { font-size: 10.5px; color: var(--muted-foreground); line-height: 1.6; margin-top: 4px; padding: 0 2px; }
+  .pal-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted-foreground); padding: 2px; }
+  .pal-legend .lg { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 10px; }
+  /* ── canvas ─────────────────────────────────────────────────────── */
+  #topo-canvas-wrap { position: relative; flex: 1 1 auto; min-width: 0; height: 600px;
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    background-image: radial-gradient(var(--topo-dot) 1.2px, transparent 1.2px);
+    background-size: 24px 24px; }
+  :root { --topo-dot: rgba(148, 163, 184, .20); }
+  [data-theme="light"] { --topo-dot: rgba(15, 23, 42, .14); }
+  #topo-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
+  #topo-svg.panning { cursor: grabbing; }
+  #topo-svg .edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .5; stroke-width: 1.6; stroke-dasharray: 7 6; }
+  #topo-svg .node { cursor: grab; }
+  #topo-svg .node:active { cursor: grabbing; }
+  #topo-svg .node rect.body { fill: var(--card); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
+    transition: stroke .15s ease; }
+  #topo-svg .node:hover rect.body { stroke: var(--ring); }
+  #topo-svg .node.sel rect.body { stroke: var(--ring); stroke-width: 2; }
+  #topo-svg .node.droptgt rect.body { stroke: var(--success); stroke-width: 2; stroke-dasharray: 6 4; }
+  #topo-svg text { fill: var(--foreground); font-family: "Fira Sans", system-ui, sans-serif; pointer-events: none; }
+  #topo-svg .name { font-size: 13.5px; font-weight: 700; }
+  #topo-svg .meta { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", monospace; }
+  #topo-svg .cfg { font-size: 10px; fill: var(--muted-foreground); }
+  #topo-svg .badge { font-size: 10px; }
+  #topo-svg .chip { rx: 10; }
+  #topo-zoom { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+  #topo-zoom button { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--popover); color: var(--foreground); cursor: pointer; display: grid; place-items: center;
+    transition: border-color .15s ease; padding: 0; }
+  #topo-zoom button:hover { border-color: var(--ring); }
+  #topo-zoom svg { width: 15px; height: 15px; }
+  #topo-tip { position: absolute; top: 10px; left: 12px; font-size: 11px; color: var(--muted-foreground);
+    pointer-events: none; background: color-mix(in srgb, var(--card) 78%, transparent);
+    border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
+  /* ── right inspector ────────────────────────────────────────────── */
+  #topo-inspector { flex: 0 0 304px; width: 304px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card); padding: 14px; overflow: auto; max-height: 628px; position: relative; }
+  #topo-inspector[hidden] { display: none; }
+  .insp-close { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 8px;
+    border: 1px solid var(--border); background: none; color: var(--muted-foreground); cursor: pointer;
+    font-size: 14px; line-height: 1; }
+  .insp-close:hover { color: var(--foreground); border-color: var(--ring); }
+  .insp-kicker { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground);
+    font-family: "Fira Code", monospace; margin-bottom: 6px; }
+  .insp-name { font-size: 14.5px; font-weight: 700; margin: 0 0 2px; }
+  .insp-meta { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 2px; }
+  .insp-meta .row { display: flex; gap: 8px; font-size: 11.5px; align-items: baseline; }
+  .insp-meta .k { flex: 0 0 58px; color: var(--muted-foreground); }
+  .insp-meta .v { font-family: "Fira Code", monospace; font-size: 11px; word-break: break-all; }
+  .insp-sub { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground);
+    font-family: "Fira Code", monospace; margin: 14px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .insp-cfg { display: flex; gap: 9px; align-items: flex-start; border: 1px solid var(--border);
+    border-radius: 9px; background: var(--secondary); padding: 8px 10px; margin-bottom: 6px; }
+  .insp-cfg .dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .insp-cfg .dot.api_route { background: #34d399; }
+  .insp-cfg .dot.credential { background: #fb7185; }
+  .insp-cfg .dot.file { background: #f59e0b; }
+  .insp-cfg .inf { flex: 1 1 auto; min-width: 0; }
+  .insp-cfg b { display: block; font-size: 12px; font-weight: 600; }
+  .insp-cfg code { display: block; font-size: 10.5px; color: var(--muted-foreground); word-break: break-all; margin-top: 1px; }
+  .insp-cfg form { margin: 0; flex: 0 0 auto; }
+  .insp-cfg form button { background: none; border: none; color: var(--muted-foreground); cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px; }
+  .insp-cfg form button:hover { color: var(--danger); }
+  .insp-empty { font-size: 11.5px; color: var(--muted-foreground); padding: 6px 2px; }
+  #topo-inspector .stack { display: flex; flex-direction: column; gap: 8px; }
+  #topo-inspector .stack .field-label { display: flex; flex-direction: column; gap: 4px; font-size: 11px;
+    color: var(--muted-foreground); }
+  #topo-inspector .stack input, #topo-inspector .stack select { font-size: 12px; }
+  @media (max-width: 1180px) {
+    #topo-app { flex-wrap: wrap; }
+    #topo-palette { width: 100%; flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .pal-title { width: 100%; }
+    .pal-block { width: auto; }
+    #topo-canvas-wrap { order: 3; flex: 1 1 100%; height: 460px; }
+    #topo-inspector { order: 4; width: 100%; flex: 1 1 100%; max-height: none; }
+  }
 </style>
 
 {% set ns = namespace(api_configs=0) %}
@@ -30,51 +113,115 @@
   <div class="card metric-card"><div class="muted metric-card-label">{{ _('API 路由配置') }}</div><div class="stat-card-value">{{ ns.api_configs }}</div></div>
 </div>
 
-<div class="panel" style="padding:18px">
-  {{ section_header(_('接入拓扑'), _('互联网 → 资产节点（业务系统）→ AgentCapture 平台。点击节点下方「配置」管理该节点绑定的蜜饵与 API。')) }}
-  <style>
-    #topo-svg { display: block; width: 100%; height: 560px; background:
-      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(37,99,235,.07), transparent 70%), var(--card);
-      border: 1px solid var(--line); border-radius: 12px; touch-action: none; user-select: none; }
-    #topo-svg .edge { fill: none; stroke: #6d9eff; stroke-width: 2; stroke-opacity: .55; }
-    #topo-svg .node { cursor: grab; }
-    #topo-svg .node:active { cursor: grabbing; }
-    #topo-svg .node rect.body { fill: var(--card2); stroke: rgba(121,184,255,.5); stroke-width: 1.4; rx: 12; }
-    #topo-svg .node:hover rect.body { stroke: #79b8ff; }
-    #topo-svg .node text { fill: var(--fg); font-family: "Fira Sans", system-ui, sans-serif; pointer-events: none; }
-    #topo-svg .node .name { font-size: 13px; font-weight: 700; }
-    #topo-svg .node .meta { font-size: 10.5px; fill: var(--muted); font-family: "Fira Code", monospace; }
-    #topo-svg .node .cfg { font-size: 10px; }
-    #topo-svg .icon-cloud { fill: none; stroke: #7ee2a0; stroke-width: 1.8; }
-    #topo-svg .icon-core { fill: none; stroke: #79b8ff; stroke-width: 1.8; }
-    #topo-svg .badge { font-size: 9.5px; }
-    [data-theme="light"] #topo-svg .node rect.body { fill: #ffffff; }
-    [data-theme="light"] #topo-svg .edge { stroke: rgba(37,99,235,.5); }
-    #topo-hint { font-size: 11px; color: var(--muted); margin: 8px 2px 0; }
-  </style>
-  <div id="topo-hint">{{ _('拖拽节点调整布局（自动保存）· 单击资产节点管理其蜜饵 / API 配置') }}</div>
-  <svg id="topo-svg" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMid meet"></svg>
-  <script id="topo-data" type="application/json">{{ topo_data_json | safe }}</script>
-  <script>
+<div class="panel" style="padding:0; overflow:hidden">
+  <div id="topo-app">
+    <aside id="topo-palette">
+      <div class="pal-title">{{ _('蜜饵组件') }}</div>
+      <div class="pal-block" draggable="true" tabindex="0" role="button" data-decoy-type="api_route">
+        <span class="pal-icon api"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+        <span><b>{{ _('API 路由蜜饵') }}</b><small>{{ _('伪装接口 · 捕获探测') }}</small></span>
+      </div>
+      <div class="pal-block" draggable="true" tabindex="0" role="button" data-decoy-type="credential">
+        <span class="pal-icon credential"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span>
+        <span><b>{{ _('凭证蜜饵') }}</b><small>{{ _('假账号密码 · 溯源水印') }}</small></span>
+      </div>
+      <div class="pal-block" draggable="true" tabindex="0" role="button" data-decoy-type="file">
+        <span class="pal-icon file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+        <span><b>{{ _('文件蜜饵') }}</b><small>{{ _('诱饵文档 · 下载告警') }}</small></span>
+      </div>
+      <div class="pal-title" style="margin-top:8px">{{_('操作')}}</div>
+      <div class="pal-note">{{ _('把组件拖到资产节点上即可绑定；或单击节点后在右侧检查器中添加。拖动节点调整布局，拖动空白处平移，滚轮缩放。') }}</div>
+      <div class="pal-title" style="margin-top:8px">{{ _('图例') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#34d399"></span>{{ _('API 路由') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#fb7185"></span>{{ _('凭证蜜饵') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#f59e0b"></span>{{ _('文件蜜饵') }}</div>
+      <div class="pal-legend"><span class="lg" style="border:1.5px dashed var(--muted-foreground)"></span>{{ _('捕获链路') }}</div>
+    </aside>
+
+    <div id="topo-canvas-wrap">
+      <svg id="topo-svg" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="topo-tip">{{ _('拖动节点 · 拖动空白平移 · 滚轮缩放') }}</div>
+      <div id="topo-zoom">
+        <button type="button" id="z-in" title="{{ _('放大') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" id="z-out" title="{{ _('缩小') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+        <button type="button" id="z-fit" title="{{ _('重置视图') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+      </div>
+    </div>
+
+    <aside id="topo-inspector" hidden>
+      <button type="button" class="insp-close" id="insp-close" title="{{ _('关闭') }}">✕</button>
+      {% for sys in systems %}
+      <div class="insp-body" id="insp-{{ sys.id }}" hidden>
+        <div class="insp-kicker">{{ _('节点检查器') }}</div>
+        <h4 class="insp-name">{{ sys.name }}</h4>
+        <div class="insp-meta">
+          <div class="row"><span class="k">{{ _('域名') }}</span><span class="v">{{ sys.domain }}</span></div>
+          <div class="row"><span class="k">{{ _('状态') }}</span>
+            <span class="v" style="color:{{ '#34d399' if sys.is_enabled else '#f59e0b' }}">{{ _('运行中') if sys.is_enabled else _('已暂停') }} · {{ sys.status }}</span></div>
+          <div class="row"><span class="k">{{ _('上游') }}</span><span class="v">{{ sys.upstream_url or '—' }}</span></div>
+        </div>
+        <div class="insp-sub">{{ _('绑定配置') }} · {{ sys.configs|length }}</div>
+        {% for cfg in sys.configs %}
+        <div class="insp-cfg">
+          <span class="dot {{ cfg.type }}"></span>
+          <div class="inf"><b>{{ cfg.name }}</b><code>{{ cfg.path }}</code></div>
+          <form method="post" action="/admin/internet-topology/configs/{{ cfg.id }}/delete" data-confirm="{{ _('删除该配置？相关蜜饵部署与自动模板将一并移除。') }}">
+            <button type="submit" title="{{ _('删除') }}">✕</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="insp-empty">{{ _('暂无绑定配置——从左侧拖入蜜饵组件，或使用下方表单。') }}</div>
+        {% endfor %}
+        <div class="insp-sub">{{ _('添加配置') }}</div>
+        <form method="post" action="/admin/internet-topology/configs/create" class="stack">
+          <input type="hidden" name="system_id" value="{{ sys.id }}">
+          <label class="field-label"><span>{{ _('配置类型') }}</span>
+            <select name="decoy_type" id="dtype-{{ sys.id }}">
+              <option value="api_route">{{ _('API 路由蜜饵') }}</option>
+              <option value="file">{{ _('文件蜜饵') }}</option>
+              <option value="credential">{{ _('凭证蜜饵') }}</option>
+            </select>
+          </label>
+          <label class="field-label"><span>{{ _('配置名称 *') }}</span><input name="name" required placeholder="{{ _('如 内部重建 API') }}"></label>
+          <label class="field-label"><span>{{ _('API 路由（仅 API 路由蜜饵需要）') }}</span><input name="route_path" placeholder="{{ _('如 /api/internal/reindex') }}"></label>
+          <label class="field-label"><span>{{ _('说明') }}</span><input name="description" placeholder="{{ _('用途说明（可选）') }}"></label>
+          <button type="submit" class="primary btn-sm">{{ _('创建并绑定到该节点') }}</button>
+        </form>
+      </div>
+      {% endfor %}
+    </aside>
+  </div>
+</div>
+
+{% if unassigned %}
+<div style="margin-top:16px">
+  {{ section_header(_('未关联配置'), _('以下蜜饵部署未绑定到任何资产节点，可在对应系统节点中重新创建绑定。')) }}
+  <div class="table-wrap"><table>
+    <thead><tr><th>{{ _('类型') }}</th><th>{{ _('名称') }}</th><th>{{ _('路径') }}</th><th>{{ _('原部署位置') }}</th></tr></thead>
+    <tbody>
+      {% for cfg in unassigned %}
+      <tr>
+        <td>{{ cfg.type }}</td>
+        <td>{{ cfg.name }}</td>
+        <td><code style="font-size:11px">{{ cfg.path }}</code></td>
+        <td class="muted">{{ cfg.host or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+<script id="topo-data" type="application/json">{{ topo_data_json | safe }}</script>
+<script>
   (function () {
     var DATA = JSON.parse(document.getElementById('topo-data').textContent);
     var svg = document.getElementById('topo-svg');
     var NS = 'http://www.w3.org/2000/svg';
-    var W = 1600, H = 560;
-    var INT = { x: 120, y: H / 2 - 55 };
-    var CORE = { x: W - 320, y: H / 2 - 55 };
-    var sysNodes = DATA.systems.map(function (sys, i) {
-      var saved = DATA.layout[sys.id];
-      var col = Math.floor(i / Math.max(1, Math.ceil(DATA.systems.length / 2)));
-      var row = i % Math.max(1, Math.ceil(DATA.systems.length / 2));
-      var defX = 480 + col * 300, defY = 60 + row * 220;
-      return {
-        sys: sys,
-        x: saved ? saved[0] : defX,
-        y: saved ? saved[1] : defY,
-        w: 240, h: 132,
-      };
-    });
+    var W = 1600, H = 640;
+    var view = { x: 0, y: 0, w: W, h: H };
+    var INT = { cx: 170, cy: H / 2 };
+    var CORE = { cx: W - 210, cy: H / 2 };
 
     function el(tag, attrs, parent) {
       var e = document.createElementNS(NS, tag);
@@ -82,110 +229,149 @@
       (parent || svg).appendChild(e);
       return e;
     }
+    function apply() { svg.setAttribute('viewBox', view.x + ' ' + view.y + ' ' + view.w + ' ' + view.h); }
+    function clientToWorld(cx, cy) {
+      var pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    function worldPerPx() {
+      var r = svg.getBoundingClientRect();
+      return { x: view.w / r.width, y: view.h / r.height };
+    }
+    function zoomAt(factor, cx, cy) {
+      var p = clientToWorld(cx, cy);
+      var nw = Math.min(W * 2, Math.max(320, view.w / factor));
+      var k = nw / view.w;
+      view.x = p.x - (p.x - view.x) * k;
+      view.y = p.y - (p.y - view.y) * k;
+      view.w = nw; view.h = view.h * k;
+      apply();
+    }
+    svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      zoomAt(ev.deltaY < 0 ? 1.15 : 1 / 1.15, ev.clientX, ev.clientY);
+    }, { passive: false });
+    document.getElementById('z-in').addEventListener('click', function () {
+      var r = svg.getBoundingClientRect(); zoomAt(1.25, r.left + r.width / 2, r.top + r.height / 2);
+    });
+    document.getElementById('z-out').addEventListener('click', function () {
+      var r = svg.getBoundingClientRect(); zoomAt(1 / 1.25, r.left + r.width / 2, r.top + r.height / 2);
+    });
+    document.getElementById('z-fit').addEventListener('click', function () {
+      view = { x: 0, y: 0, w: W, h: H }; apply();
+    });
 
-    // edges layer first (under nodes)
-    var edgeLayer = el('g', {});
+    // ── world objects ──────────────────────────────────────────────
+    var sysNodes = DATA.systems.map(function (sys, i) {
+      var saved = DATA.layout[sys.id];
+      var col = Math.floor(i / Math.max(1, Math.ceil(DATA.systems.length / 2)));
+      var row = i % Math.max(1, Math.ceil(DATA.systems.length / 2));
+      return {
+        sys: sys,
+        x: saved ? saved[0] : 470 + col * 300,
+        y: saved ? saved[1] : 80 + row * 200,
+        w: 244, h: 138,
+      };
+    });
+
+    var edgeLayer = el('g', { style: 'pointer-events:none' });
+    function orthPath(x1, y1, x2, y2) {
+      if (Math.abs(y2 - y1) < 3) return 'M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2;
+      var r = Math.min(14, Math.abs(y2 - y1) / 2);
+      var mx = (x1 + x2) / 2;
+      var s = y2 > y1 ? 1 : -1;
+      return 'M' + x1 + ' ' + y1 +
+        'L' + (mx - r) + ' ' + y1 + 'Q' + mx + ' ' + y1 + ' ' + mx + ' ' + (y1 + s * r) +
+        'L' + mx + ' ' + (y2 - s * r) + 'Q' + mx + ' ' + y2 + ' ' + (mx + r) + ' ' + y2 +
+        'L' + x2 + ' ' + y2;
+    }
     function drawEdges() {
       edgeLayer.innerHTML = '';
       sysNodes.forEach(function (n) {
-        var cx = n.x + n.w, cy = n.y + n.h / 2;
-        var e1 = el('path', { class: 'edge', d:
-          'M' + (INT.x + 190) + ' ' + (INT.y + 55) +
-          ' C ' + (INT.x + 300) + ' ' + (INT.y + 55) + ', ' + (cx - 90) + ' ' + cy + ', ' + cx + ' ' + cy }, edgeLayer);
-        var cx2 = CORE.x, cy2 = CORE.y + 55;
-        el('path', { class: 'edge', d:
-          'M' + (n.x + n.w) + ' ' + cy +
-          ' C ' + (n.x + n.w + 90) + ' ' + cy + ', ' + (cx2 - 110) + ' ' + cy2 + ', ' + cx2 + ' ' + cy2 }, edgeLayer);
+        var cyL = n.y + n.h / 2;
+        el('path', { class: 'edge', d: orthPath(INT.cx + 52, INT.cy, n.x, cyL) }, edgeLayer);
+        el('path', { class: 'edge', d: orthPath(n.x + n.w, cyL, CORE.cx - 46, CORE.cy) }, edgeLayer);
       });
     }
 
-    function drawIconInternet(x, y) {
+    function drawInternet() {
       var g = el('g', {});
-      el('circle', { cx: x + 95, cy: y + 55, r: 46, class: 'icon-cloud', style: 'fill:rgba(63,185,80,.08)' }, g);
-      el('path', { d: 'M' + (x+59) + ' ' + (y+55) + 'h72 M' + (x+95) + ' ' + (y+19) +
+      el('circle', { cx: INT.cx, cy: INT.cy, r: 46, style: 'fill:rgba(52,211,153,.08);stroke:#34d399;stroke-width:1.8;fill-opacity:1' }, g);
+      el('path', { d: 'M' + (INT.cx - 36) + ' ' + INT.cy + 'h72 M' + INT.cx + ' ' + (INT.cy - 36) +
         'a52 52 0 0 1 14 36 52 52 0 0 1 -14 36 52 52 0 0 1 -14 -36 52 52 0 0 1 14 -36z',
-        class: 'icon-cloud' }, g);
-      var t = el('text', { x: x + 95, y: y + 130, 'text-anchor': 'middle', class: 'name' }, g);
+        style: 'fill:none;stroke:#34d399;stroke-width:1.8' }, g);
+      var t = el('text', { x: INT.cx, y: INT.cy + 76, 'text-anchor': 'middle', class: 'name' }, g);
       t.textContent = {{ _('互联网 / 攻击者') | tojson }};
-      var t2 = el('text', { x: x + 95, y: y + 148, 'text-anchor': 'middle', class: 'meta' }, g);
+      var t2 = el('text', { x: INT.cx, y: INT.cy + 94, 'text-anchor': 'middle', class: 'meta' }, g);
       t2.textContent = {{ _('扫描 · 探测 · 撞库 · Agent 探测') | tojson }};
       return g;
     }
-
-    function drawIconCore(x, y) {
+    function drawCore() {
       var g = el('g', {});
-      var r = el('rect', { x: x + 55, y: y + 15, width: 80, height: 80, rx: 14,
-        style: 'fill:rgba(68,147,248,.08);stroke:#79b8ff;stroke-width:1.8' }, g);
-      el('rect', { x: x + 70, y: y + 30, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#79b8ff;stroke-width:1.6' }, g);
-      el('rect', { x: x + 70, y: y + 60, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#79b8ff;stroke-width:1.6' }, g);
-      el('circle', { cx: x + 78, cy: y + 40, r: 2.5, style: 'fill:#79b8ff' }, g);
-      el('circle', { cx: x + 78, cy: y + 70, r: 2.5, style: 'fill:#79b8ff' }, g);
-      var t = el('text', { x: x + 95, y: y + 125, 'text-anchor': 'middle', class: 'name' }, g);
+      el('rect', { x: CORE.cx - 40, y: CORE.cy - 40, width: 80, height: 80, rx: 14,
+        style: 'fill:rgba(68,147,248,.08);stroke:#4493f8;stroke-width:1.8' }, g);
+      el('rect', { x: CORE.cx - 25, y: CORE.cy - 25, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#4493f8;stroke-width:1.6' }, g);
+      el('rect', { x: CORE.cx - 25, y: CORE.cy + 5, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#4493f8;stroke-width:1.6' }, g);
+      el('circle', { cx: CORE.cx - 17, cy: CORE.cy - 15, r: 2.5, style: 'fill:#4493f8' }, g);
+      el('circle', { cx: CORE.cx - 17, cy: CORE.cy + 15, r: 2.5, style: 'fill:#4493f8' }, g);
+      var t = el('text', { x: CORE.cx, y: CORE.cy + 62, 'text-anchor': 'middle', class: 'name' }, g);
       t.textContent = {{ _('AgentCapture 平台') | tojson }};
-      var t2 = el('text', { x: x + 95, y: y + 143, 'text-anchor': 'middle', class: 'meta' }, g);
+      var t2 = el('text', { x: CORE.cx, y: CORE.cy + 80, 'text-anchor': 'middle', class: 'meta' }, g);
       t2.textContent = {{ _('风险引擎 · 蜜饵链 · 凭证捕获 · C2 名册') | tojson }};
       return g;
     }
 
-    drawIconInternet(INT.x, INT.y);
-    drawIconCore(CORE.x, CORE.y);
+    drawInternet();
+    drawCore();
     drawEdges();
 
     sysNodes.forEach(function (n) {
-      var g = el('g', { class: 'node' });
+      var g = el('g', { class: 'node', id: 'node-' + n.sys.id });
       g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
       el('rect', { x: 0, y: 0, width: n.w, height: n.h, class: 'body', rx: 12 }, g);
-      // server icon
-      el('rect', { x: 14, y: 14, width: 26, height: 26, rx: 5,
-        style: 'fill:none;stroke:#79b8ff;stroke-width:1.6' }, g);
-      el('path', { d: 'M20 22h14 M20 27h14 M22 24.5h.01 M22 29.5h.01',
-        style: 'stroke:#79b8ff;stroke-width:1.4;fill:none' }, g);
-      var name = el('text', { x: 50, y: 26, class: 'name' }, g);
-      name.textContent = n.sys.name.length > 13 ? n.sys.name.slice(0, 12) + '…' : n.sys.name;
-      var domain = el('text', { x: 50, y: 42, class: 'meta' }, g);
+      // icon chip (netviz style)
+      el('rect', { x: 12, y: 12, width: 38, height: 38, rx: 10, class: 'chip',
+        style: 'fill:rgba(68,147,248,.12);stroke:rgba(68,147,248,.35);stroke-width:1.4' }, g);
+      el('rect', { x: 20, y: 20, width: 22, height: 9, rx: 2, style: 'fill:none;stroke:#4493f8;stroke-width:1.5' }, g);
+      el('rect', { x: 20, y: 33, width: 22, height: 9, rx: 2, style: 'fill:none;stroke:#4493f8;stroke-width:1.5' }, g);
+      el('circle', { cx: 24, cy: 24.5, r: 1.3, style: 'fill:#4493f8' }, g);
+      el('circle', { cx: 24, cy: 37.5, r: 1.3, style: 'fill:#4493f8' }, g);
+      var name = el('text', { x: 60, y: 26, class: 'name' }, g);
+      name.textContent = n.sys.name.length > 12 ? n.sys.name.slice(0, 11) + '…' : n.sys.name;
+      var domain = el('text', { x: 60, y: 43, class: 'meta' }, g);
       domain.textContent = n.sys.domain;
-      // status badge
-      var st = el('text', { x: 14, y: 62, class: 'badge',
-        style: 'fill:' + (n.sys.enabled ? '#3fb950' : '#d29922') }, g);
-      st.textContent = n.sys.enabled ? '● {{ _('运行中') }}' : '○ {{ _('已暂停') }}';
-      var stx = el('text', { x: 50, y: 62, class: 'badge', style: 'fill:var(--muted)' }, g);
-      stx.textContent = n.sys.status;
-      // config chips (up to 3 + '+N')
-      var cfgY = 82;
-      n.sys.configs.slice(0, 3).forEach(function (cfg) {
-        var color = cfg.type === 'credential' ? '#fda4af' : cfg.type === 'file' ? '#fcd34d' : '#6ee7b7';
-        var dot = el('circle', { cx: 18, cy: cfgY - 4, r: 3.5, style: 'fill:' + color }, g);
-        var t = el('text', { x: 28, y: cfgY, class: 'cfg', style: 'fill:var(--muted)' }, g);
-        var label = cfg.path.length > 30 ? cfg.path.slice(0, 29) + '…' : cfg.path;
-        t.textContent = label;
-        cfgY += 16;
-      });
-      if (n.sys.configs.length > 3) {
-        var more = el('text', { x: 18, y: cfgY, class: 'cfg', style: 'fill:var(--muted)' }, g);
-        more.textContent = '+ ' + (n.sys.configs.length - 3) + ' …';
-        cfgY += 16;
+      // status row (y=68) and config rows (from y=90) never overlap
+      el('circle', { cx: 17, cy: 64, r: 4, style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
+      var st = el('text', { x: 27, y: 68, class: 'badge',
+        style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
+      st.textContent = n.sys.enabled ? {{ _('运行中') | tojson }} : {{ _('已暂停') | tojson }};
+      var rowsY = [90, 107, 124];
+      var list = n.sys.configs;
+      var shown = list.length > 3 ? 2 : list.length;
+      for (var i = 0; i < shown; i++) {
+        var color = list[i].type === 'credential' ? '#fb7185' : list[i].type === 'file' ? '#f59e0b' : '#34d399';
+        el('circle', { cx: 17, cy: rowsY[i] - 4, r: 3.2, style: 'fill:' + color }, g);
+        var t = el('text', { x: 27, y: rowsY[i], class: 'cfg' }, g);
+        t.textContent = list[i].path.length > 30 ? list[i].path.slice(0, 29) + '…' : list[i].path;
       }
-      if (!n.sys.configs.length) {
-        var empty = el('text', { x: 18, y: cfgY, class: 'cfg', style: 'fill:var(--muted)' }, g);
-        empty.textContent = '{{ _('暂无绑定配置') }}';
+      if (list.length > 3) {
+        var more = el('text', { x: 17, y: rowsY[2], class: 'cfg' }, g);
+        more.textContent = '+ ' + (list.length - 2) + ' …';
       }
-      // click hint
-      var hint = el('text', { x: 14, y: n.h - 12, class: 'cfg', style: 'fill:#79b8ff' }, g);
-      hint.textContent = '{{ _('单击节点 → 添加 / 删除配置') }}';
 
-      // drag: move/up live on window so the gesture survives leaving the node bounds
+      // ── drag (move/up on window: gestures survive leaving bounds) ──
       var drag = null;
       g.addEventListener('pointerdown', function (ev) {
-        drag = { dx: ev.clientX, dy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+        drag = { cx: ev.clientX, cy: ev.clientY, ox: n.x, oy: n.y, moved: false };
         ev.preventDefault();
       });
       window.addEventListener('pointermove', function (ev) {
         if (!drag) return;
-        var ddx = ev.clientX - drag.dx, ddy = ev.clientY - drag.dy;
-        if (Math.abs(ddx) + Math.abs(ddy) > 4) drag.moved = true;
-        var scale = svg.getScreenCTM().a || 1;
-        n.x = Math.max(10, Math.min(W - n.w - 10, drag.ox + ddx / scale));
-        n.y = Math.max(10, Math.min(H - n.h - 10, drag.oy + ddy / scale));
+        var k = worldPerPx();
+        var dxw = (ev.clientX - drag.cx) * k.x, dyw = (ev.clientY - drag.cy) * k.y;
+        if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
+        n.x = Math.max(10, Math.min(W - n.w - 10, drag.ox + dxw));
+        n.y = Math.max(10, Math.min(H - n.h - 10, drag.oy + dyw));
         g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
         drawEdges();
       });
@@ -202,52 +388,103 @@
             body: JSON.stringify({ layout: layout }),
           }).catch(function () {});
         } else {
-          var modal = document.getElementById('cfg-modal-' + n.sys.id);
-          if (modal) { modal.hidden = false; document.body.style.overflow = 'hidden'; }
+          select(n.sys.id);
         }
       });
+
+      // ── palette drop target ──────────────────────────────────────
+      g.addEventListener('dragover', function (ev) { ev.preventDefault(); g.classList.add('droptgt'); });
+      g.addEventListener('dragleave', function () { g.classList.remove('droptgt'); });
+      g.addEventListener('drop', function (ev) {
+        ev.preventDefault();
+        g.classList.remove('droptgt');
+        var type = ev.dataTransfer.getData('text/decoy-type');
+        select(n.sys.id);
+        if (type) {
+          var sel = document.getElementById('dtype-' + n.sys.id);
+          if (sel) sel.value = type;
+        }
+        var nameInput = document.querySelector('#insp-' + n.sys.id + ' input[name="name"]');
+        if (nameInput) nameInput.focus();
+      });
     });
+
+    // ── canvas pan + click-empty deselect ───────────────────────────
+    var pan = null;
+    svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target !== svg) return;
+      pan = { cx: ev.clientX, cy: ev.clientY, vx: view.x, vy: view.y, moved: false };
+      svg.classList.add('panning');
+    });
+    window.addEventListener('pointermove', function (ev) {
+      if (!pan) return;
+      var k = worldPerPx();
+      if (Math.abs(ev.clientX - pan.cx) + Math.abs(ev.clientY - pan.cy) > 4) pan.moved = true;
+      view.x = Math.max(-W, Math.min(W, pan.vx - (ev.clientX - pan.cx) * k.x));
+      view.y = Math.max(-H, Math.min(H, pan.vy - (ev.clientY - pan.cy) * k.y));
+      apply();
+    });
+    window.addEventListener('pointerup', function () {
+      if (!pan) return;
+      var wasPan = pan;
+      pan = null;
+      svg.classList.remove('panning');
+      if (!wasPan.moved) deselect();
+    });
+
+    // ── inspector ───────────────────────────────────────────────────
+    var inspector = document.getElementById('topo-inspector');
+    var current = null;
+    function select(sysId) {
+      if (current !== null) {
+        var prev = document.getElementById('node-' + current);
+        if (prev) prev.classList.remove('sel');
+      }
+      current = sysId;
+      var g = document.getElementById('node-' + sysId);
+      if (g) g.classList.add('sel');
+      inspector.hidden = false;
+      var bodies = inspector.querySelectorAll('.insp-body');
+      for (var i = 0; i < bodies.length; i++) bodies[i].hidden = bodies[i].id !== 'insp-' + sysId;
+    }
+    function deselect() {
+      if (current !== null) {
+        var g = document.getElementById('node-' + current);
+        if (g) g.classList.remove('sel');
+      }
+      current = null;
+      inspector.hidden = true;
+    }
+    document.getElementById('insp-close').addEventListener('click', deselect);
+
+    // ── palette: HTML5 drag to nodes, click applies to selection ────
+    var palBlocks = document.querySelectorAll('.pal-block');
+    palBlocks.forEach(function (b) {
+      b.addEventListener('dragstart', function (ev) {
+        ev.dataTransfer.setData('text/decoy-type', b.getAttribute('data-decoy-type'));
+        ev.dataTransfer.effectAllowed = 'copy';
+      });
+      b.addEventListener('click', function () {
+        applyPalette(b);
+      });
+      b.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); applyPalette(b); }
+      });
+    });
+    function applyPalette(b) {
+      if (current === null) return;
+      var sel = document.getElementById('dtype-' + current);
+      if (sel) sel.value = b.getAttribute('data-decoy-type');
+      var nameInput = document.querySelector('#insp-' + current + ' input[name="name"]');
+      if (nameInput) nameInput.focus();
+    }
+
+    if (!sysNodes.length) {
+      var t = el('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', class: 'meta',
+        style: 'font-size:13px' });
+      t.textContent = {{ _('暂无资产节点——先在「互联网系统」中接入域名') | tojson }};
+    }
+    apply();
   })();
   </script>
-  {% if unassigned %}
-  <div style="margin-top:16px">
-    {{ section_header(_('未关联配置'), _('以下蜜饵部署未绑定到任何资产节点，可在对应系统卡片中重新创建绑定。')) }}
-    <div class="table-wrap"><table>
-      <thead><tr><th>{{ _('类型') }}</th><th>{{ _('名称') }}</th><th>{{ _('路径') }}</th><th>{{ _('原部署位置') }}</th></tr></thead>
-      <tbody>
-        {% for cfg in unassigned %}
-        <tr>
-          <td>{{ cfg.type }}</td>
-          <td>{{ cfg.name }}</td>
-          <td><code style="font-size:11px">{{ cfg.path }}</code></td>
-          <td class="muted">{{ cfg.host or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table></div>
-  </div>
-  {% endif %}
-</div>
-
-{% for sys in systems %}
-{% call modal_dialog('cfg-modal-' ~ sys.id, _('添加配置 · ') ~ sys.domain, _('选择配置类型：API 路由蜜饵（伪装接口）、文件蜜饵（诱饵文档）或凭证蜜饵（假账号密码）。保存后绑定到该节点，路径即刻生效。')) %}
-<form method="post" action="/admin/internet-topology/configs/create" class="stack">
-  <input type="hidden" name="system_id" value="{{ sys.id }}">
-  <label class="field-label"><span>{{ _('配置类型') }}</span>
-    <select name="decoy_type" onchange="this.form['name'].placeholder = this.value === 'api_route' ? '{{ _('如 internal-api') }}' : (this.value === 'credential' ? '{{ _('如 备份账号') }}' : '{{ _('如 运维手册') }}')">
-      <option value="api_route">{{ _('API 路由蜜饵') }}</option>
-      <option value="file">{{ _('文件蜜饵') }}</option>
-      <option value="credential">{{ _('凭证蜜饵') }}</option>
-    </select>
-  </label>
-  <label class="field-label"><span>{{ _('配置名称 *') }}</span><input name="name" required placeholder="{{ _('如 内部重建 API') }}"></label>
-  <label class="field-label"><span>{{ _('API 路由（仅 API 路由蜜饵需要）') }}</span><input name="route_path" placeholder="{{ _('如 /api/internal/reindex') }}"></label>
-  <label class="field-label"><span>{{ _('说明') }}</span><input name="description" placeholder="{{ _('用途说明（可选）') }}"></label>
-  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
-    <button type="button" class="secondary" data-modal-close>{{ _('取消') }}</button>
-    <button type="submit" class="primary">{{ _('创建并绑定到该节点') }}</button>
-  </div>
-</form>
-{% endcall %}
-{% endfor %}
 {% endblock %}
