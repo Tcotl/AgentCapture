@@ -411,7 +411,8 @@
         } else {
           emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), true, false);
         }
-        emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy - 14), false, true);
+        // attacker C2 traffic: the whole link reads red
+        emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy - 14), false, true, true);
       });
       hpNodes.forEach(function (n) {
         // services operated by the platform: short links from the right column
