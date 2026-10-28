@@ -416,7 +416,7 @@
       });
       hpNodes.forEach(function (n) {
         // services operated by the platform: short links from the right column
-        emit(orthPath(n.x + n.w / 2 - 24, n.y + 18, CORE.cx + CORE.ox + 52, CORE.cy + CORE.oy - 8), false, true);
+        emit(orthPath(n.x + n.w / 2 - 21, n.y + 22, CORE.cx + CORE.ox + 52, CORE.cy + CORE.oy - 8), false, true);
       });
       for (; i < edgePool.length; i++) {
         edgePool[i].base.style.display = 'none';
@@ -719,24 +719,87 @@
 
 
     // ── running honeypots (bottom row) ──────────────────────────────
+    // per-service official-style logo chip (品牌配色 + 官方标志形态)
+    function drawHpLogo(g, cx, cy, n) {
+      var key = n.hp.key, kind = n.hp.kind;
+      function chip(fill, stroke) {
+        el('rect', { x: cx - 21, y: cy - 21, width: 42, height: 42, rx: 10,
+          style: 'fill:' + fill + ';stroke:' + stroke + ';stroke-width:1.1' }, g);
+      }
+      function wordmark(parts, dy, size, mono) {
+        var t = el('text', { x: cx, y: cy + dy, 'text-anchor': 'middle',
+          style: 'font-weight:700;font-size:' + size + 'px;font-family:' +
+            (mono ? '"Fira Code",ui-monospace,monospace' : '"Fira Sans",system-ui,sans-serif') }, g);
+        parts.forEach(function (p) {
+          var sp = document.createElementNS(NS, 'tspan');
+          sp.setAttribute('fill', p[0]);
+          sp.textContent = p[1];
+          t.appendChild(sp);
+        });
+      }
+      if (kind === 'docker') {
+        // Docker: whale-blue chip, white container stack + hull
+        chip('#1D63ED', 'rgba(0,0,0,.12)');
+        for (var r2 = 0; r2 < 2; r2++) {
+          for (var c2 = 0; c2 < 4; c2++) {
+            el('rect', { x: cx - 15 + c2 * 8, y: cy - 9 + r2 * 8, width: 6, height: 6, rx: 1,
+              style: 'fill:#ffffff;opacity:.95' }, g);
+          }
+        }
+        el('rect', { x: cx - 20, y: cy + 7, width: 40, height: 7, rx: 3.5,
+          style: 'fill:#ffffff;opacity:.95' }, g);
+      } else if (key === 'redis') {
+        // Redis: the iconic stacked red cubes
+        chip('#ffffff', 'rgba(216, 44, 32, .45)');
+        var layers = [[cy + 2, '#b71c1c'], [cy - 6, '#d32f2f'], [cy - 14, '#e53935']];
+        layers.forEach(function (L) {
+          el('polygon', { points: (cx - 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] + 11) + ' ' + (cx + 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] - 3),
+            style: 'fill:' + L[1] }, g);
+          el('polygon', { points: cx + ',' + (L[0] - 3) + ' ' + (cx + 15) + ',' + (L[0] + 4) + ' ' + (cx + 15) + ',' + (L[0] + 10) + ' ' + cx + ',' + (L[0] + 3),
+            style: 'fill:' + L[1] }, g);
+          el('polygon', { points: (cx - 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] + 11) + ' ' + cx + ',' + (L[0] + 17) + ' ' + (cx - 15) + ',' + (L[0] + 10),
+            style: 'fill:#8e1610' }, g);
+          el('polygon', { points: (cx + 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] + 11) + ' ' + cx + ',' + (L[0] + 17) + ' ' + (cx + 15) + ',' + (L[0] + 10),
+            style: 'fill:#a51c15' }, g);
+        });
+      } else if (key === 'elasticsearch') {
+        // ElasticSearch: three staggered rounded bars in brand colors
+        chip('#ffffff', 'rgba(15, 23, 42, .15)');
+        el('rect', { x: cx - 15, y: cy - 13, width: 21, height: 7, rx: 3.5, style: 'fill:#FEC514' }, g);
+        el('rect', { x: cx - 8, y: cy - 3.5, width: 23, height: 7, rx: 3.5, style: 'fill:#00BFB3' }, g);
+        el('rect', { x: cx - 15, y: cy + 6, width: 17, height: 7, rx: 3.5, style: 'fill:#006BB4' }, g);
+      } else if (key === 'mysql') {
+        // MySQL: two-tone official wordmark (My teal / SQL orange)
+        chip('#ffffff', 'rgba(0, 117, 143, .45)');
+        wordmark([['#00758F', 'My'], ['#F29111', 'SQL']], 5, 12);
+      } else if (key === 'ssh') {
+        // OpenSSH: dark slate terminal with the green prompt
+        chip('#1D2B35', 'rgba(255, 255, 255, .12)');
+        wordmark([['#4ade80', '>_']], 5, 12, true);
+      } else if (key === 'ftp') {
+        chip('#334155', 'rgba(255, 255, 255, .12)');
+        wordmark([['#ffffff', 'FTP']], 4, 10);
+      } else if (key === 'thinkphp') {
+        chip('#3D7DC8', 'rgba(255, 255, 255, .2)');
+        wordmark([['#ffffff', 'TP']], 5, 13);
+      } else {
+        chip('#475569', 'rgba(255, 255, 255, .12)');
+        wordmark([['#ffffff', (n.hp.name || 'HP').slice(0, 3).toUpperCase()]], 4, 10);
+      }
+    }
+
     hpNodes.forEach(function (n) {
       var g = el('g', { class: 'node' });
       n.g = g;
       g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
       var title = el('title', {}, g);
       title.textContent = {{ _('蜜罐服务') | tojson }} + ' · ' + n.hp.name + ' · ' + {{ _('单击编辑') | tojson }};
-      var px = n.w / 2, py = 18; // mini pedestal centered above the label
-      el('polygon', { points: (px - 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + px + ',' + (py + 17) + ' ' + (px - 24) + ',' + (py + 4),
-        fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .9 }, g);
-      el('polygon', { points: (px + 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + px + ',' + (py + 17) + ' ' + (px + 24) + ',' + (py + 4),
-        fill: 'url(#core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .9 }, g);
-      el('polygon', { points: px + ',' + (py - 18) + ' ' + (px + 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + (px - 24) + ',' + (py - 5),
-        fill: 'url(#core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1 }, g);
-      var name = el('text', { x: px, y: 50, 'text-anchor': 'middle', class: 'name', style: 'font-size:11.5px' }, g);
+      drawHpLogo(g, n.w / 2, 22, n);
+      var name = el('text', { x: n.w / 2, y: 50, 'text-anchor': 'middle', class: 'name', style: 'font-size:11.5px' }, g);
       n.labelEl = name;
       var shown = n.alias || n.hp.name;
       name.textContent = shown.length > 12 ? shown.slice(0, 11) + '…' : shown;
-      var st = el('text', { x: px, y: 61, 'text-anchor': 'middle', class: 'badge', style: 'fill:#34d399;font-size:9.5px' }, g);
+      var st = el('text', { x: n.w / 2, y: 61, 'text-anchor': 'middle', class: 'badge', style: 'fill:#34d399;font-size:9.5px' }, g);
       st.textContent = '● ' + {{ _('运行中') | tojson }};
       attachMiniDrag(g, n, function () {
         openHpInspector(n);
