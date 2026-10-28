@@ -317,7 +317,7 @@
     });
     var hpNodes = (DATA.honeypots || []).map(function (h, i) {
       var saved = DATA.layout['hp:' + h.key];
-      return { hp: h, x: saved ? saved[0] : 470 + i * 152, y: 544, w: 140, h: 64 };
+      return { hp: h, x: saved ? saved[0] : 1446, y: saved ? saved[1] : 92 + i * 82, w: 140, h: 64 };
     });
 
     var edgeLayer = el('g', { style: 'pointer-events:none' });
@@ -360,9 +360,8 @@
         emit(orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy - 14), false, true);
       });
       hpNodes.forEach(function (n) {
-        var cyL = n.y + 24;
-        emit(orthPath(INT.cx + 52, INT.cy, n.x, cyL), true, false);
-        emit(orthPath(n.x + 40, cyL, CORE.cx - 38, CORE.cy + 10), false, true);
+        // services operated by the platform: short links from the right column
+        emit(orthPath(n.x, n.y + 26, CORE.cx + 52, CORE.cy - 8), false, true);
       });
       for (; i < edgePool.length; i++) {
         edgePool[i].base.style.display = 'none';
@@ -654,10 +653,10 @@
         window.location.assign('/admin/honeypots');
       });
     });
-    if (!hpNodes.length) {
-      var cap3 = el('text', { x: 486, y: 622, class: 'zone-cap' });
-      cap3.textContent = {{ _('蜜罐服务 · 暂无运行中') | tojson }};
-    }
+    var cap3 = el('text', { x: 1446, y: 74, class: 'zone-cap' });
+    cap3.textContent = hpNodes.length
+      ? {{ _('蜜罐服务') | tojson }}
+      : {{ _('蜜罐服务 · 暂无运行中') | tojson }};
 
     // ── canvas pan + click-empty deselect ───────────────────────────
     var pan = null;
