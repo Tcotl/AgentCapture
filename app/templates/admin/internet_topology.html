@@ -471,8 +471,6 @@
         style: 'fill:#ffffff;opacity:.38' }, g);
       var t = el('text', { x: INT.cx, y: INT.cy + 76, 'text-anchor': 'middle', class: 'name' }, g);
       t.textContent = {{ _('互联网 / 攻击者') | tojson }};
-      var t2 = el('text', { x: INT.cx, y: INT.cy + 94, 'text-anchor': 'middle', class: 'meta' }, g);
-      t2.textContent = {{ _('扫描 · 探测 · 撞库 · Agent 探测') | tojson }};
       return g;
     }
     function drawCore() {
@@ -524,8 +522,6 @@
       });
       var t = el('text', { x: CORE.cx, y: CORE.cy + 62, 'text-anchor': 'middle', class: 'name' }, g);
       t.textContent = {{ _('AgentCapture 平台') | tojson }};
-      var t2 = el('text', { x: CORE.cx, y: CORE.cy + 80, 'text-anchor': 'middle', class: 'meta' }, g);
-      t2.textContent = {{ _('风险引擎 · 蜜饵链 · 凭证捕获 · C2 名册') | tojson }};
       return g;
     }
 
@@ -725,13 +721,6 @@
     attachAnchorDrag(INT);
     attachAnchorDrag(CORE);
 
-    if (!agentNodes.length) {
-      var cap0 = el('text', { x: 486, y: 44, class: 'zone-cap' });
-      cap0.textContent = {{ _('上线 Agent 主机 · 暂无在线') | tojson }};
-    } else {
-      var cap1 = el('text', { x: 366, y: 44, class: 'zone-cap' });
-      cap1.textContent = {{ _('上线 Agent 主机') | tojson }};
-    }
 
     // ── running honeypots (bottom row) ──────────────────────────────
     hpNodes.forEach(function (n) {
@@ -757,10 +746,6 @@
         openHpInspector(n);
       });
     });
-    var cap3 = el('text', { x: 1516, y: 70, 'text-anchor': 'middle', class: 'zone-cap' });
-    cap3.textContent = hpNodes.length
-      ? {{ _('蜜罐服务') | tojson }}
-      : {{ _('蜜罐服务 · 暂无运行中') | tojson }};
 
     // ── canvas pan + click-empty deselect ───────────────────────────
     var pan = null;
