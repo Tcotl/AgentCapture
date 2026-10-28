@@ -36,6 +36,8 @@
   #topo-svg.panning { cursor: grabbing; }
   #topo-svg .edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .38; stroke-width: 1.5; stroke-dasharray: 7 6; }
   #topo-svg .edge.dim { stroke-opacity: .20; stroke-width: 1.3; }
+  #topo-svg .edge.edge-agent { stroke: #f43f5e; stroke-opacity: .45; }
+  #topo-svg .edge-flow.edge-flow-agent { stroke: #f43f5e; stroke-opacity: .8; }
   #topo-svg .zone-cap { fill: var(--muted-foreground); font-size: 10.5px; letter-spacing: .16em;
     font-family: "Fira Code", monospace; }
   #topo-svg .node .abody { fill: url(#node-body-grad); stroke: var(--border-strong); stroke-width: 1.3; rx: 10;
@@ -377,11 +379,12 @@
       // capture/report links (-> platform) carry the marching pulse.
       var edgePool = edgeLayer.__pool || (edgeLayer.__pool = []);
       var i = 0;
-      function emit(d, dim, withFlow) {
+      function emit(d, dim, withFlow, red) {
         var p = edgeSlot(i++);
         p.base.setAttribute('d', d);
-        p.base.setAttribute('class', 'edge' + (dim ? ' dim' : ''));
+        p.base.setAttribute('class', 'edge' + (dim ? ' dim' : '') + (red ? ' edge-agent' : ''));
         p.base.style.display = '';
+        p.flow.setAttribute('class', 'edge-flow' + (red ? ' edge-flow-agent' : ''));
         if (withFlow) {
           p.flow.setAttribute('d', d);
           p.flow.style.display = '';
@@ -396,7 +399,18 @@
       });
       agentNodes.forEach(function (n) {
         var cyL = n.y + n.h / 2;
-        emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), true, false);
+        var sys = null;
+        if (n.a.system_id != null) {
+          for (var s = 0; s < sysNodes.length; s++) {
+            if (sysNodes[s].sys.id === n.a.system_id) { sys = sysNodes[s]; break; }
+          }
+        }
+        if (sys) {
+          // recruited through this asset: red 上线 link from the system card
+          emit(orthPath(sys.x + sys.w / 2, sys.y, n.x + n.w / 2, n.y + n.h), false, true, true);
+        } else {
+          emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), true, false);
+        }
         emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy - 14), false, true);
       });
       hpNodes.forEach(function (n) {
@@ -683,6 +697,9 @@
       g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
       var title = el('title', {}, g);
       title.textContent = (n.a.kind === 'c2' ? 'C2 Agent' : 'Managed Beacon') + ' · ' + n.a.id;
+      if (n.a.system_domain) {
+        title.textContent += ' · ' + {{ _('上线于') | tojson }} + ' ' + n.a.system_domain;
+      }
       el('rect', { x: 3, y: 4, width: n.w - 3, height: n.h, rx: 10, class: 'side3d' }, g);
       el('rect', { x: 0, y: 0, width: n.w, height: n.h, rx: 10, class: 'abody' }, g);
       // hacker chip: black slab + red skull logo (红黑黑客标识)

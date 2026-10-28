@@ -6003,12 +6003,52 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
     except ValueError:
         layout = {}
     online_agents = []
+    # attribution: which internet system did this agent come through?  An
+    # agent's source IP hitting a deployed decoy path ties it to the system
+    # that owns the deployment (deployed_host -> domain).
+    from app.models.decoy import DecoyDeployment as _DD
+
+    dep_paths = [
+        (row[0] or "", (row[1] or "").lower())
+        for row in db.execute(
+            select(_DD.fetch_path, _DD.deployed_host).where(
+                _DD.deployed_host.isnot(None)
+            )
+        ).all()
+    ]
+    sys_id_by_domain = {s.domain.lower(): s.id for s in systems}
+
+    def _attributed_system_id(ip: str):
+        import ipaddress as _ipaddress
+
+        try:
+            if _ipaddress.ip_address(ip).is_loopback:
+                return None  # loopback traffic is our own health checks
+        except ValueError:
+            return None
+        events = db.scalars(
+            select(Event).where(Event.source_ip == ip).order_by(Event.created_at.desc()).limit(80)
+        ).all()
+        for ev in events:
+            path = ev.path or ""
+            for fetch_path, host in dep_paths:
+                if fetch_path and (path == fetch_path or path.startswith(fetch_path)):
+                    sid = sys_id_by_domain.get(host)
+                    if sid is not None:
+                        return sid
+        return None
+
     for a in db.scalars(select(C2Agent).where(C2Agent.status == "active")).all():
+        sid = _attributed_system_id(a.source_ip)
         online_agents.append({
             "id": a.agent_id,
             "label": a.hostname or a.username or a.agent_id[:12],
             "ip": a.source_ip,
             "kind": "c2",
+            "system_id": sid,
+            "system_domain": next(
+                (s.domain for s in systems if s.id == sid), None
+            ),
         })
     # ManagedHost.status is advanced lazily on read paths; treat a fresh
     # heartbeat (<= 5 min) as online so the topology reflects reality.
@@ -6026,6 +6066,7 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
                 "label": h.hostname or h.display_name or h.host_uid[:16],
                 "ip": (h.external_ips or ["-"])[0],
                 "kind": "managed",
+                "system_id": None,
             })
     online_agents = online_agents[:8]
     honeypots = [
