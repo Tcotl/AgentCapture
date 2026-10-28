@@ -54,11 +54,8 @@
   @keyframes topo-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { #topo-svg .edge-flow { display: none; } }
   [data-theme="light"] #topo-svg .edge-flow { stroke: rgba(37, 99, 235, .78); }
-  #topo-svg .globe-glow { animation: globe-glow 3.4s ease-in-out infinite; }
-  @keyframes globe-glow { 0%, 100% { opacity: .08; } 50% { opacity: .22; } }
-  @media (prefers-reduced-motion: reduce) { #topo-svg .globe-glow { animation: none; } }
-  #topo-svg .globe-wire { stroke: #7cf0bb; stroke-opacity: .32; fill: none; stroke-width: 1; }
-  [data-theme="light"] #topo-svg .globe-wire { stroke: #0c5e44; stroke-opacity: .34; }
+  .globe-canvas { position: absolute; transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 1; }
   #topo-svg .core-glow { animation: core-glow 3s ease-in-out infinite; }
   @keyframes core-glow { 0%, 100% { opacity: .10; } 50% { opacity: .26; } }
   @media (prefers-reduced-motion: reduce) { #topo-svg .core-glow { animation: none; } }
@@ -280,6 +277,7 @@
 {% endif %}
 
 <script id="topo-data" type="application/json">{{ topo_data_json | safe }}</script>
+<script src="/static/world-land.js?v=1"></script>
 <script>
   (function () {
     var DATA = JSON.parse(document.getElementById('topo-data').textContent);
@@ -300,7 +298,10 @@
       (parent || svg).appendChild(e);
       return e;
     }
-    function apply() { svg.setAttribute('viewBox', view.x + ' ' + view.y + ' ' + view.w + ' ' + view.h); }
+    function apply() {
+      svg.setAttribute('viewBox', view.x + ' ' + view.y + ' ' + view.w + ' ' + view.h);
+      if (typeof syncGlobeCanvas === 'function') syncGlobeCanvas();
+    }
     function clientToWorld(cx, cy) {
       var pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
       return pt.matrixTransform(svg.getScreenCTM().inverse());
@@ -438,40 +439,144 @@
     }
 
     function drawInternet() {
-      // shaded 3D globe: radial-gradient sphere + clipped lat/long wireframe
-      // + specular highlight + breathing halo (see .globe-glow keyframes)
-      var defs = el('defs', {});
-      var grad = el('radialGradient', { id: 'globe-grad', cx: '34%', cy: '30%', r: '78%' }, defs);
-      el('stop', { offset: '0%', 'stop-color': '#8df5c4', 'stop-opacity': '0.55' }, grad);
-      el('stop', { offset: '40%', 'stop-color': '#34d399', 'stop-opacity': '0.30' }, grad);
-      el('stop', { offset: '78%', 'stop-color': '#0b7a55', 'stop-opacity': '0.38' }, grad);
-      el('stop', { offset: '100%', 'stop-color': '#04241a', 'stop-opacity': '0.72' }, grad);
-      var blur = el('filter', { id: 'globe-blur', x: '-45%', y: '-45%', width: '190%', height: '190%' }, defs);
-      el('feGaussianBlur', { stdDeviation: 6 }, blur);
-      var clip = el('clipPath', { id: 'globe-clip' }, defs);
-      el('circle', { cx: INT.cx, cy: INT.cy, r: 45 }, clip);
-
+      // real 3D rotating earth: a canvas overlay (see startGlobe) with real
+      // continent outlines; this holder keeps drag/anchor gestures + label
       var holder = el('g', { class: 'anchor' });
       INT.holder = holder;
       holder.setAttribute('transform', 'translate(' + INT.ox + ',' + INT.oy + ')');
-      var g = el('g', {}, holder);
-      el('circle', { cx: INT.cx, cy: INT.cy, r: 56, class: 'globe-glow',
-        style: 'fill:none;stroke:#34d399;stroke-width:6;opacity:.1;filter:url(#globe-blur)' }, g);
-      el('circle', { cx: INT.cx, cy: INT.cy, r: 46,
-        style: 'fill:url(#globe-grad);stroke:#34d399;stroke-opacity:.65;stroke-width:1.4' }, g);
-      var wire = el('g', { 'class': 'globe-wire', 'clip-path': 'url(#globe-clip)' }, g);
-      [14, 30, 42].forEach(function (rx) {
-        el('ellipse', { cx: INT.cx, cy: INT.cy, rx: rx, ry: 45.5 }, wire);
-      });
-      [[-32, 30], [-16, 40], [0, 45], [16, 40], [32, 30]].forEach(function (p) {
-        el('ellipse', { cx: INT.cx, cy: INT.cy + p[0], rx: p[1], ry: Math.max(2.5, p[1] * 0.3) }, wire);
-      });
-      el('ellipse', { cx: INT.cx - 15, cy: INT.cy - 17, rx: 15, ry: 9,
-        transform: 'rotate(-24 ' + (INT.cx - 15) + ' ' + (INT.cy - 17) + ')',
-        style: 'fill:#ffffff;opacity:.38' }, g);
-      var t = el('text', { x: INT.cx, y: INT.cy + 76, 'text-anchor': 'middle', class: 'name' }, g);
+      el('circle', { cx: INT.cx, cy: INT.cy, r: 50,
+        style: 'fill:transparent;pointer-events:all' }, holder);
+      var t = el('text', { x: INT.cx, y: INT.cy + 76, 'text-anchor': 'middle', class: 'name' }, holder);
       t.textContent = {{ _('互联网 / 攻击者') | tojson }};
-      return g;
+      return holder;
+    }
+    // ── real 3D globe (canvas, orthographic projection) ────────────
+    var globeCanvas = null, gctx = null, globeRot = 0, globeLastTs = 0;
+    var globeReduced = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function startGlobe() {
+      var wrapEl = document.getElementById('topo-canvas-wrap');
+      globeCanvas = document.createElement('canvas');
+      globeCanvas.className = 'globe-canvas';
+      wrapEl.appendChild(globeCanvas);
+      gctx = globeCanvas.getContext('2d');
+      requestAnimationFrame(globeFrame);
+    }
+    function syncGlobeCanvas() {
+      if (!globeCanvas) return;
+      var k = 1;
+      try {
+        var m = svg.getScreenCTM();
+        if (m) {
+          var pt = svg.createSVGPoint(); pt.x = INT.cx + INT.ox; pt.y = INT.cy + INT.oy;
+          var c = pt.matrixTransform(m);
+          var wrapRect = wrapEl2();
+          k = m.a || 1;
+          globeCanvas.style.left = (c.x - wrapRect.left) + 'px';
+          globeCanvas.style.top = (c.y - wrapRect.top) + 'px';
+        }
+      } catch (e) { /* canvas stays at last position */ }
+      // 232-box maps to 116*k CSS px so the drawn sphere (R=92) renders
+      // at exactly the world-space radius (46*k)
+      var size = Math.max(60, 116 * k);
+      globeCanvas.style.width = size + 'px';
+      globeCanvas.style.height = size + 'px';
+    }
+    function wrapEl2() {
+      return document.getElementById('topo-canvas-wrap').getBoundingClientRect();
+    }
+    function globeFrame(ts) {
+      if (!globeLastTs) globeLastTs = ts;
+      var dt = Math.min(64, ts - globeLastTs);
+      globeLastTs = ts;
+      if (!globeReduced && !document.hidden) globeRot += dt * 0.012; // ~30s / revolution
+      drawGlobeFrame();
+      syncGlobeCanvas();
+      requestAnimationFrame(globeFrame);
+    }
+    function drawGlobeFrame() {
+      if (!gctx || !window.WORLD_LAND) return;
+      var size = parseFloat(globeCanvas.style.width) || 122;
+      var dpr = window.devicePixelRatio || 1;
+      var px = Math.round(size * dpr);
+      if (globeCanvas.width !== px) { globeCanvas.width = px; globeCanvas.height = px; }
+      var s = px / 232;
+      var ctx = gctx;
+      ctx.setTransform(s, 0, 0, s, 0, 0);
+      ctx.clearRect(0, 0, 232, 232);
+      var cx = 116, cy = 116, R = 92;
+      // atmosphere glow
+      var glow = ctx.createRadialGradient(cx, cy, R, cx, cy, R + 16);
+      glow.addColorStop(0, 'rgba(74, 222, 128, .30)');
+      glow.addColorStop(1, 'rgba(74, 222, 128, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, 232, 232);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+      // ocean
+      var og = ctx.createRadialGradient(cx - R * .35, cy - R * .35, R * .1, cx, cy, R * 1.25);
+      og.addColorStop(0, '#3b96e0');
+      og.addColorStop(.55, '#1d5fb0');
+      og.addColorStop(1, '#0d2f63');
+      ctx.fillStyle = og;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+      function project(lon, lat) {
+        var la = lat * Math.PI / 180, lo = (lon + globeRot) * Math.PI / 180;
+        return {
+          x: cx + R * Math.cos(la) * Math.sin(lo),
+          y: cy - R * Math.sin(la),
+          f: Math.cos(la) * Math.cos(lo) >= 0,
+        };
+      }
+      // graticule: parallels + rotating meridians
+      ctx.strokeStyle = 'rgba(255, 255, 255, .13)';
+      ctx.lineWidth = 1;
+      for (var lat = -60; lat <= 60; lat += 30) {
+        var y = cy - R * Math.sin(lat * Math.PI / 180);
+        var half = R * Math.cos(lat * Math.PI / 180);
+        ctx.beginPath(); ctx.moveTo(cx - half, y); ctx.lineTo(cx + half, y); ctx.stroke();
+      }
+      ctx.beginPath();
+      for (var lon0 = 0; lon0 < 180; lon0 += 30) {
+        var pen = false;
+        for (var la2 = -90; la2 <= 90; la2 += 6) {
+          var p = project(lon0, la2);
+          if (p.f) { pen ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), pen = true); }
+          else pen = false;
+        }
+      }
+      ctx.stroke();
+      // real continents (front hemisphere only)
+      ctx.fillStyle = '#3f9e5f';
+      ctx.strokeStyle = '#3f9e5f';
+      ctx.lineWidth = 1.2;
+      ctx.lineJoin = 'round';
+      WORLD_LAND.forEach(function (ring) {
+        ctx.beginPath();
+        var pen = false;
+        for (var i = 0; i < ring.length; i++) {
+          var q = project(ring[i][0], ring[i][1]);
+          if (q.f) { pen ? ctx.lineTo(q.x, q.y) : (ctx.moveTo(q.x, q.y), pen = true); }
+          else pen = false;
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+      // day-side highlight
+      var hi = ctx.createRadialGradient(cx - R * .45, cy - R * .45, 2, cx - R * .45, cy - R * .45, R * 1.2);
+      hi.addColorStop(0, 'rgba(255, 255, 255, .22)');
+      hi.addColorStop(.4, 'rgba(255, 255, 255, .05)');
+      hi.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = hi;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+      ctx.restore();
+      // limb
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(52, 211, 153, .55)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
     function drawCore() {
       // isometric two-tier server platform: gradient top faces, shaded side
@@ -716,6 +821,8 @@
     });
     attachAnchorDrag(INT);
     attachAnchorDrag(CORE);
+    startGlobe();
+    window.addEventListener('resize', syncGlobeCanvas);
 
 
     // ── running honeypots (bottom row) ──────────────────────────────
