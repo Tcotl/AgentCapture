@@ -226,6 +226,27 @@
         </form>
       </div>
       {% endfor %}
+      <div class="insp-body" id="insp-hp" hidden>
+        <div class="insp-kicker">{{ _('蜜罐服务检查器') }}</div>
+        <h4 class="insp-name" id="hp-insp-name"></h4>
+        <div class="insp-meta">
+          <div class="row"><span class="k">{{ _('类别') }}</span><span class="v" id="hp-insp-category"></span></div>
+          <div class="row"><span class="k">{{ _('端口') }}</span><span class="v" id="hp-insp-port"></span></div>
+          <div class="row"><span class="k">{{ _('状态') }}</span><span class="v" style="color:#34d399">● {{ _('运行中') }}</span></div>
+        </div>
+        <div class="insp-sub">{{ _('画布显示名') }}</div>
+        <form id="hp-alias-form" class="stack" onsubmit="return false">
+          <label class="field-label"><span>{{ _('仅更新拓扑显示，服务不停转') }}</span>
+            <input id="hp-alias-input" maxlength="40" placeholder="{{ _('留空则恢复默认名称') }}"></label>
+          <button type="button" class="secondary btn-sm" id="hp-alias-save">{{ _('保存显示名') }}</button>
+        </form>
+        <div class="insp-sub">{{ _('服务控制') }}</div>
+        <form method="post" id="hp-toggle-form" data-confirm="{{ _('确认变更该蜜罐服务的运行状态？') }}">
+          <input type="hidden" name="next" value="/admin/internet-topology">
+          <button type="submit" class="danger btn-sm" id="hp-toggle-btn" style="width:100%">{{ _('停止该蜜罐') }}</button>
+        </form>
+        <div style="margin-top:12px"><a class="chip" href="/admin/honeypots">{{ _('查看蜜罐部署') }}</a></div>
+      </div>
     </aside>
   </div>
 </div>
@@ -317,7 +338,15 @@
     });
     var hpNodes = (DATA.honeypots || []).map(function (h, i) {
       var saved = DATA.layout['hp:' + h.key];
-      return { hp: h, x: saved ? saved[0] : 1446, y: saved ? saved[1] : 92 + i * 82, w: 140, h: 64 };
+      var sx = null, sy = null, alias = '';
+      if (Array.isArray(saved)) { sx = saved[0]; sy = saved[1]; }
+      else if (saved && typeof saved === 'object') {
+        sx = saved.x; sy = saved.y; alias = saved.alias || '';
+      }
+      return {
+        hp: h, alias: alias, g: null, labelEl: null,
+        x: sx != null ? sx : 1446, y: sy != null ? sy : 92 + i * 82, w: 140, h: 64,
+      };
     });
 
     var edgeLayer = el('g', { style: 'pointer-events:none' });
@@ -566,7 +595,11 @@
       var layout = {};
       sysNodes.forEach(function (sn) { layout[sn.sys.id] = [Math.round(sn.x), Math.round(sn.y)]; });
       agentNodes.forEach(function (an) { layout['agent:' + an.a.id] = [Math.round(an.x), Math.round(an.y)]; });
-      hpNodes.forEach(function (hn) { layout['hp:' + hn.hp.key] = [Math.round(hn.x), Math.round(hn.y)]; });
+      hpNodes.forEach(function (hn) {
+        layout['hp:' + hn.hp.key] = {
+          x: Math.round(hn.x), y: Math.round(hn.y), alias: hn.alias || '',
+        };
+      });
       return layout;
     }
     function fetchSaveLayout() {
@@ -635,9 +668,10 @@
     // ── running honeypots (bottom row) ──────────────────────────────
     hpNodes.forEach(function (n) {
       var g = el('g', { class: 'node' });
+      n.g = g;
       g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
       var title = el('title', {}, g);
-      title.textContent = {{ _('蜜罐服务') | tojson }} + ' · ' + n.hp.name;
+      title.textContent = {{ _('蜜罐服务') | tojson }} + ' · ' + n.hp.name + ' · ' + {{ _('单击编辑') | tojson }};
       var px = 34, py = 26; // mini pedestal center
       el('polygon', { points: (px - 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + px + ',' + (py + 17) + ' ' + (px - 24) + ',' + (py + 4),
         fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .9 }, g);
@@ -646,11 +680,13 @@
       el('polygon', { points: px + ',' + (py - 18) + ' ' + (px + 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + (px - 24) + ',' + (py - 5),
         fill: 'url(#core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1 }, g);
       var name = el('text', { x: 64, y: 22, class: 'name', style: 'font-size:11.5px' }, g);
-      name.textContent = n.hp.name.length > 10 ? n.hp.name.slice(0, 9) + '…' : n.hp.name;
+      n.labelEl = name;
+      var shown = n.alias || n.hp.name;
+      name.textContent = shown.length > 10 ? shown.slice(0, 9) + '…' : shown;
       var st = el('text', { x: 64, y: 40, class: 'badge', style: 'fill:#34d399' }, g);
       st.textContent = '● ' + {{ _('运行中') | tojson }};
       attachMiniDrag(g, n, function () {
-        window.location.assign('/admin/honeypots');
+        openHpInspector(n);
       });
     });
     var cap3 = el('text', { x: 1446, y: 74, class: 'zone-cap' });
@@ -684,7 +720,13 @@
     // ── inspector ───────────────────────────────────────────────────
     var inspector = document.getElementById('topo-inspector');
     var current = null;
+    var currentHp = null;
+    function clearHpSelection() {
+      if (currentHp && currentHp.g) currentHp.g.classList.remove('sel');
+      currentHp = null;
+    }
     function select(sysId) {
+      clearHpSelection();
       if (current !== null) {
         var prev = document.getElementById('node-' + current);
         if (prev) prev.classList.remove('sel');
@@ -696,7 +738,34 @@
       var bodies = inspector.querySelectorAll('.insp-body');
       for (var i = 0; i < bodies.length; i++) bodies[i].hidden = bodies[i].id !== 'insp-' + sysId;
     }
+    function openHpInspector(n) {
+      if (current !== null) {
+        var prev = document.getElementById('node-' + current);
+        if (prev) prev.classList.remove('sel');
+        current = null;
+      }
+      clearHpSelection();
+      currentHp = n;
+      if (n.g) n.g.classList.add('sel');
+      inspector.hidden = false;
+      var bodies = inspector.querySelectorAll('.insp-body');
+      for (var i = 0; i < bodies.length; i++) bodies[i].hidden = bodies[i].id !== 'insp-hp';
+      var shown = n.alias || n.hp.name;
+      document.getElementById('hp-insp-name').textContent = shown;
+      document.getElementById('hp-insp-category').textContent =
+        n.hp.kind === 'docker' ? {{ _('Docker 镜像蜜罐') | tojson }} : n.hp.category;
+      document.getElementById('hp-insp-port').textContent = n.hp.port || '—';
+      document.getElementById('hp-alias-input').value = n.alias || '';
+      var form = document.getElementById('hp-toggle-form');
+      if (n.hp.kind === 'service') {
+        form.style.display = '';
+        form.action = '/admin/services/' + n.hp.service_id + '/stop';
+      } else {
+        form.style.display = 'none';
+      }
+    }
     function deselect() {
+      clearHpSelection();
       if (current !== null) {
         var g = document.getElementById('node-' + current);
         if (g) g.classList.remove('sel');
@@ -705,6 +774,22 @@
       inspector.hidden = true;
     }
     document.getElementById('insp-close').addEventListener('click', deselect);
+    // honeypot alias: canvas metadata only — saved with the layout, the
+    // running service is never touched (不停转)
+    document.getElementById('hp-alias-save').addEventListener('click', function () {
+      if (!currentHp) return;
+      currentHp.alias = document.getElementById('hp-alias-input').value.trim();
+      var shown = currentHp.alias || currentHp.hp.name;
+      if (currentHp.labelEl) {
+        currentHp.labelEl.textContent = shown.length > 10 ? shown.slice(0, 9) + '…' : shown;
+      }
+      document.getElementById('hp-insp-name').textContent = shown;
+      fetchSaveLayout();
+      var btn = document.getElementById('hp-alias-save');
+      var old = btn.textContent;
+      btn.textContent = {{ _('已保存（服务未受影响）') | tojson }};
+      setTimeout(function () { btn.textContent = old; }, 1600);
+    });
 
     // ── palette: HTML5 drag to nodes, click applies to selection ────
     var palBlocks = document.querySelectorAll('.pal-block');

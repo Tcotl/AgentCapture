@@ -4445,7 +4445,8 @@ def start_honeypot_service(
     item = db.get(ServiceCatalog, service_id)
     if not item:
         return _redirect("/admin/services")
-    back = next if next.startswith("/admin") else "/admin/services"
+    idx = next.find("/admin")  # tolerate the security-path prefix
+    back = next[idx:] if idx >= 0 else "/admin/services"
     from app.services.honeypot_services import start_service
 
     try:
@@ -4498,7 +4499,8 @@ def stop_honeypot_service(
     item = db.get(ServiceCatalog, service_id)
     if not item:
         return _redirect("/admin/services")
-    back = next if next.startswith("/admin") else "/admin/services"
+    idx = next.find("/admin")  # tolerate the security-path prefix
+    back = next[idx:] if idx >= 0 else "/admin/services"
     from app.services.honeypot_services import stop_service
 
     stop_service(item.service_key)
@@ -6027,7 +6029,14 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
             })
     online_agents = online_agents[:8]
     honeypots = [
-        {"key": s.service_key, "name": s.name}
+        {
+            "key": s.service_key,
+            "name": s.name,
+            "service_id": s.id,
+            "category": s.category,
+            "port": s.default_port,
+            "kind": "service",
+        }
         for s in db.scalars(
             select(ServiceCatalog).where(
                 ServiceCatalog.status == "running", ServiceCatalog.is_active.is_(True)
@@ -6035,7 +6044,14 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
         ).all()
     ]
     honeypots += [
-        {"key": f"docker:{d.id}", "name": d.name}
+        {
+            "key": f"docker:{d.id}",
+            "name": d.name,
+            "service_id": d.id,
+            "category": "docker",
+            "port": d.proxy_port,
+            "kind": "docker",
+        }
         for d in db.scalars(
             select(DockerHoneypot).where(DockerHoneypot.status == "running")
         ).all()
@@ -6094,7 +6110,20 @@ async def internet_topology_save_layout(request: Request):
                 prefix, _, rest = key.partition(":")
                 if prefix not in ("agent", "hp") or not (1 <= len(rest) <= 90):
                     continue
-                clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+                if prefix == "hp" and isinstance(xy, dict):
+                    # honeypot nodes carry an optional display alias; the
+                    # alias is canvas metadata only and never touches the
+                    # running service.
+                    entry = {
+                        "x": round(float(xy.get("x")), 1),
+                        "y": round(float(xy.get("y")), 1),
+                    }
+                    alias = str(xy.get("alias") or "").strip()[:40]
+                    if alias:
+                        entry["alias"] = alias
+                    clean[key] = entry
+                else:
+                    clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
             else:
                 clean[str(int(key))] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
         except (TypeError, ValueError, IndexError, KeyError):
