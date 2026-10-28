@@ -5989,6 +5989,10 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
         })
     import json as _json
 
+    from app.models.c2_agent import C2Agent
+    from app.models.docker_honeypot import DockerHoneypot
+    from app.models.managed import ManagedHost
+    from app.models.service import ServiceCatalog
     from app.models.system_setting import SystemSetting
 
     layout_row = db.get(SystemSetting, "internet_topology_layout")
@@ -5996,6 +6000,46 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
         layout = _json.loads(layout_row.value) if layout_row else {}
     except ValueError:
         layout = {}
+    online_agents = []
+    for a in db.scalars(select(C2Agent).where(C2Agent.status == "active")).all():
+        online_agents.append({
+            "id": a.agent_id,
+            "label": a.hostname or a.username or a.agent_id[:12],
+            "ip": a.source_ip,
+            "kind": "c2",
+        })
+    # ManagedHost.status is advanced lazily on read paths; treat a fresh
+    # heartbeat (<= 5 min) as online so the topology reflects reality.
+    from datetime import datetime as _dt, timezone as _tz
+
+    from app.services.timefmt import as_utc
+
+    now_utc = _dt.now(_tz.utc)
+    for h in db.scalars(select(ManagedHost)).all():
+        seen = as_utc(h.last_seen_at) if h.last_seen_at else None
+        fresh = seen is not None and 0 <= (now_utc - seen).total_seconds() <= 300
+        if h.status == "online" or fresh:
+            online_agents.append({
+                "id": h.host_uid,
+                "label": h.hostname or h.display_name or h.host_uid[:16],
+                "ip": (h.external_ips or ["-"])[0],
+                "kind": "managed",
+            })
+    online_agents = online_agents[:8]
+    honeypots = [
+        {"key": s.service_key, "name": s.name}
+        for s in db.scalars(
+            select(ServiceCatalog).where(
+                ServiceCatalog.status == "running", ServiceCatalog.is_active.is_(True)
+            )
+        ).all()
+    ]
+    honeypots += [
+        {"key": f"docker:{d.id}", "name": d.name}
+        for d in db.scalars(
+            select(DockerHoneypot).where(DockerHoneypot.status == "running")
+        ).all()
+    ]
     canvas_data = {
         "systems": [
             {
@@ -6011,6 +6055,8 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
             }
             for row in system_rows
         ],
+        "agents": online_agents,
+        "honeypots": honeypots[:12],
         "layout": layout,
     }
     return _render(
@@ -6022,6 +6068,8 @@ def admin_internet_topology(request: Request, db: Session = Depends(get_db)):
             "systems": system_rows,
             "unassigned": unassigned,
             "total_configs": len(deployments),
+            "online_agents": online_agents,
+            "running_honeypots": honeypots,
             # JSON-in-script: neutralize "<" so autoescape/HTML parsing can
             # never break the payload; values remain intact after JSON.parse.
             "topo_data_json": _json.dumps(canvas_data, ensure_ascii=False).replace("<", "\\u003c"),
@@ -6041,7 +6089,14 @@ async def internet_topology_save_layout(request: Request):
     clean = {}
     for key, xy in layout.items():
         try:
-            clean[str(int(key))] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+            if isinstance(key, str) and ":" in key:
+                # namespaced node keys: agent:<id> / hp:<service_key>
+                prefix, _, rest = key.partition(":")
+                if prefix not in ("agent", "hp") or not (1 <= len(rest) <= 90):
+                    continue
+                clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+            else:
+                clean[str(int(key))] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
         except (TypeError, ValueError, IndexError, KeyError):
             continue
     with SessionLocal() as db:

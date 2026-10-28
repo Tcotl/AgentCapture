@@ -35,6 +35,13 @@
   #topo-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
   #topo-svg.panning { cursor: grabbing; }
   #topo-svg .edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .38; stroke-width: 1.5; stroke-dasharray: 7 6; }
+  #topo-svg .edge.dim { stroke-opacity: .20; stroke-width: 1.3; }
+  #topo-svg .zone-cap { fill: var(--muted-foreground); font-size: 10.5px; letter-spacing: .16em;
+    font-family: "Fira Code", monospace; }
+  #topo-svg .node .abody { fill: url(#node-body-grad); stroke: var(--border-strong); stroke-width: 1.3; rx: 10;
+    transition: stroke .15s ease, filter .15s ease; filter: drop-shadow(0 3px 4px rgba(2, 6, 23, .28)); }
+  [data-theme="light"] #topo-svg .node .abody { filter: drop-shadow(0 3px 4px rgba(15, 23, 42, .13)); }
+  #topo-svg .node:hover .abody, #topo-svg .node.sel .abody { stroke: var(--ring); }
   #topo-svg .edge-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
     stroke-linecap: round; stroke-dasharray: 9 91; animation: topo-flow 2.4s linear infinite; }
   @keyframes topo-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
@@ -137,6 +144,8 @@
   <div class="card metric-card"><div class="muted metric-card-label">{{ _('已绑定配置') }}</div><div class="stat-card-value">{{ total_configs - unassigned|length }}</div></div>
   <div class="card metric-card"><div class="muted metric-card-label">{{ _('未关联配置') }}</div><div class="stat-card-value">{{ unassigned|length }}</div></div>
   <div class="card metric-card"><div class="muted metric-card-label">{{ _('API 路由配置') }}</div><div class="stat-card-value">{{ ns.api_configs }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('上线 Agent') }}</div><div class="stat-card-value">{{ online_agents|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('运行中蜜罐') }}</div><div class="stat-card-value">{{ running_honeypots|length }}</div></div>
 </div>
 
 <div class="panel" style="padding:0; overflow:hidden">
@@ -162,6 +171,8 @@
       <div class="pal-legend"><span class="lg" style="background:#fb7185"></span>{{ _('凭证蜜饵') }}</div>
       <div class="pal-legend"><span class="lg" style="background:#f59e0b"></span>{{ _('文件蜜饵') }}</div>
       <div class="pal-legend"><span class="lg" style="border:1.5px dashed var(--muted-foreground)"></span>{{ _('捕获链路') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#4493f8;border-radius:50%"></span>{{ _('上线 Agent · 单击进入控制') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:linear-gradient(135deg,#8fbcf5,#2e6fc4)"></span>{{ _('蜜罐服务 · 单击查看部署') }}</div>
     </aside>
 
     <div id="topo-canvas-wrap">
@@ -299,6 +310,15 @@
         w: 244, h: 138,
       };
     });
+    // online C2 / managed agent hosts (top row) and running honeypots (bottom row)
+    var agentNodes = (DATA.agents || []).map(function (a, i) {
+      var saved = DATA.layout['agent:' + a.id];
+      return { a: a, x: saved ? saved[0] : 480 + i * 196, y: 12, w: 184, h: 58 };
+    });
+    var hpNodes = (DATA.honeypots || []).map(function (h, i) {
+      var saved = DATA.layout['hp:' + h.key];
+      return { hp: h, x: saved ? saved[0] : 470 + i * 152, y: 544, w: 140, h: 64 };
+    });
 
     var edgeLayer = el('g', { style: 'pointer-events:none' });
     function orthPath(x1, y1, x2, y2) {
@@ -312,30 +332,55 @@
         'L' + x2 + ' ' + y2;
     }
     function drawEdges() {
-      // per node: [inbound base, inbound flow, outbound base, outbound flow];
-      // flow paths carry a marching-dash pulse (capture direction, staggered);
-      // update d in place so dragging never restarts the animations
-      var edges = edgeLayer.__pairs || (edgeLayer.__pairs = []);
-      sysNodes.forEach(function (n, i) {
-        var cyL = n.y + n.h / 2;
-        var dIn = orthPath(INT.cx + 52, INT.cy, n.x, cyL);
-        var dOut = orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy);
-        var pair = edges[i];
-        if (!pair) {
-          pair = edges[i] = [
-            el('path', { class: 'edge' }, edgeLayer),
-            el('path', { class: 'edge-flow' }, edgeLayer),
-            el('path', { class: 'edge' }, edgeLayer),
-            el('path', { class: 'edge-flow' }, edgeLayer),
-          ];
-          pair[1].style.animationDelay = (-((i * 0.8) % 2.4)).toFixed(2) + 's';
-          pair[3].style.animationDelay = (-((i * 0.8 + 1.1) % 2.4)).toFixed(2) + 's';
+      // Edge pool: one slot per rendered link, base + optional flow path.
+      // Inbound links (internet -> agent/honeypot) render dim without flow;
+      // capture/report links (-> platform) carry the marching pulse.
+      var edgePool = edgeLayer.__pool || (edgeLayer.__pool = []);
+      var i = 0;
+      function emit(d, dim, withFlow) {
+        var p = edgeSlot(i++);
+        p.base.setAttribute('d', d);
+        p.base.setAttribute('class', 'edge' + (dim ? ' dim' : ''));
+        p.base.style.display = '';
+        if (withFlow) {
+          p.flow.setAttribute('d', d);
+          p.flow.style.display = '';
+        } else {
+          p.flow.style.display = 'none';
         }
-        pair[0].setAttribute('d', dIn);
-        pair[1].setAttribute('d', dIn);
-        pair[2].setAttribute('d', dOut);
-        pair[3].setAttribute('d', dOut);
+      }
+      sysNodes.forEach(function (n) {
+        var cyL = n.y + n.h / 2;
+        emit(orthPath(INT.cx + 52, INT.cy, n.x, cyL), false, true);
+        emit(orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy), false, true);
       });
+      agentNodes.forEach(function (n) {
+        var cyL = n.y + n.h / 2;
+        emit(orthPath(INT.cx + 52, INT.cy, n.x, cyL), true, false);
+        emit(orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy - 14), false, true);
+      });
+      hpNodes.forEach(function (n) {
+        var cyL = n.y + 24;
+        emit(orthPath(INT.cx + 52, INT.cy, n.x, cyL), true, false);
+        emit(orthPath(n.x + 40, cyL, CORE.cx - 38, CORE.cy + 10), false, true);
+      });
+      for (; i < edgePool.length; i++) {
+        edgePool[i].base.style.display = 'none';
+        edgePool[i].flow.style.display = 'none';
+      }
+    }
+    function edgeSlot(i) {
+      var pool = edgeLayer.__pool || (edgeLayer.__pool = []);
+      while (pool.length <= i) {
+        var idx = pool.length;
+        var pair = {
+          base: el('path', { class: 'edge' }, edgeLayer),
+          flow: el('path', { class: 'edge-flow' }, edgeLayer),
+        };
+        pair.flow.style.animationDelay = (-((idx * 0.7) % 2.4)).toFixed(2) + 's';
+        pool.push(pair);
+      }
+      return pool[i];
     }
 
     function drawInternet() {
@@ -494,13 +539,7 @@
         var wasDrag = drag;
         drag = null;
         if (wasDrag.moved) {
-          var layout = {};
-          sysNodes.forEach(function (sn) { layout[sn.sys.id] = [Math.round(sn.x), Math.round(sn.y)]; });
-          fetch('/admin/internet-topology/layout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ layout: layout }),
-          }).catch(function () {});
+          fetchSaveLayout();
         } else {
           select(n.sys.id);
         }
@@ -522,6 +561,103 @@
         if (nameInput) nameInput.focus();
       });
     });
+
+    // ── online agent hosts (top row) ────────────────────────────────
+    function collectLayout() {
+      var layout = {};
+      sysNodes.forEach(function (sn) { layout[sn.sys.id] = [Math.round(sn.x), Math.round(sn.y)]; });
+      agentNodes.forEach(function (an) { layout['agent:' + an.a.id] = [Math.round(an.x), Math.round(an.y)]; });
+      hpNodes.forEach(function (hn) { layout['hp:' + hn.hp.key] = [Math.round(hn.x), Math.round(hn.y)]; });
+      return layout;
+    }
+    function fetchSaveLayout() {
+      fetch('/admin/internet-topology/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layout: collectLayout() }),
+      }).catch(function () {});
+    }
+    // shared mini-node drag (same window-level gesture pattern)
+    function attachMiniDrag(g, n, onClick) {
+      var drag = null;
+      g.addEventListener('pointerdown', function (ev) {
+        drag = { cx: ev.clientX, cy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+        ev.preventDefault();
+      });
+      window.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        var k = worldPerPx();
+        var dxw = (ev.clientX - drag.cx) * k.x, dyw = (ev.clientY - drag.cy) * k.y;
+        if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
+        n.x = Math.max(10, Math.min(W - n.w - 10, drag.ox + dxw));
+        n.y = Math.max(10, Math.min(H - n.h - 10, drag.oy + dyw));
+        g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+        drawEdges();
+      });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        var wasDrag = drag;
+        drag = null;
+        if (wasDrag.moved) fetchSaveLayout();
+        else onClick();
+      });
+    }
+    agentNodes.forEach(function (n) {
+      var g = el('g', { class: 'node' });
+      g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      var title = el('title', {}, g);
+      title.textContent = (n.a.kind === 'c2' ? 'C2 Agent' : 'Managed Beacon') + ' · ' + n.a.id;
+      el('rect', { x: 3, y: 4, width: n.w - 3, height: n.h, rx: 10, class: 'side3d' }, g);
+      el('rect', { x: 0, y: 0, width: n.w, height: n.h, rx: 10, class: 'abody' }, g);
+      el('rect', { x: 10, y: 15, width: 26, height: 26, rx: 7, class: 'chip',
+        style: 'stroke:rgba(68,147,248,.4);stroke-width:1.2' }, g);
+      var glyph = el('text', { x: 23, y: 33, 'text-anchor': 'middle', class: 'cfg',
+        style: 'fill:#4493f8;font-size:12px;font-weight:700' }, g);
+      glyph.textContent = '>';
+      var label = el('text', { x: 44, y: 24, class: 'name', style: 'font-size:12px' }, g);
+      label.textContent = n.a.label.length > 14 ? n.a.label.slice(0, 13) + '…' : n.a.label;
+      var ip = el('text', { x: 44, y: 42, class: 'meta' }, g);
+      ip.textContent = n.a.ip;
+      el('circle', { cx: n.w - 14, cy: n.h / 2, r: 4,
+        style: 'fill:' + (n.a.kind === 'c2' ? '#34d399' : '#4493f8') }, g);
+      attachMiniDrag(g, n, function () {
+        window.location.assign(n.a.kind === 'c2'
+          ? '/admin/c2/agents/' + n.a.id : '/admin/c2/console');
+      });
+    });
+    if (!agentNodes.length) {
+      var cap0 = el('text', { x: 486, y: 44, class: 'zone-cap' });
+      cap0.textContent = {{ _('上线 Agent 主机 · 暂无在线') | tojson }};
+    } else {
+      var cap1 = el('text', { x: 430, y: 44, class: 'zone-cap' });
+      cap1.textContent = {{ _('上线 Agent 主机') | tojson }};
+    }
+
+    // ── running honeypots (bottom row) ──────────────────────────────
+    hpNodes.forEach(function (n) {
+      var g = el('g', { class: 'node' });
+      g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      var title = el('title', {}, g);
+      title.textContent = {{ _('蜜罐服务') | tojson }} + ' · ' + n.hp.name;
+      var px = 34, py = 26; // mini pedestal center
+      el('polygon', { points: (px - 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + px + ',' + (py + 17) + ' ' + (px - 24) + ',' + (py + 4),
+        fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .9 }, g);
+      el('polygon', { points: (px + 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + px + ',' + (py + 17) + ' ' + (px + 24) + ',' + (py + 4),
+        fill: 'url(#core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .9 }, g);
+      el('polygon', { points: px + ',' + (py - 18) + ' ' + (px + 24) + ',' + (py - 5) + ' ' + px + ',' + (py + 8) + ' ' + (px - 24) + ',' + (py - 5),
+        fill: 'url(#core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1 }, g);
+      var name = el('text', { x: 64, y: 22, class: 'name', style: 'font-size:11.5px' }, g);
+      name.textContent = n.hp.name.length > 10 ? n.hp.name.slice(0, 9) + '…' : n.hp.name;
+      var st = el('text', { x: 64, y: 40, class: 'badge', style: 'fill:#34d399' }, g);
+      st.textContent = '● ' + {{ _('运行中') | tojson }};
+      attachMiniDrag(g, n, function () {
+        window.location.assign('/admin/honeypots');
+      });
+    });
+    if (!hpNodes.length) {
+      var cap3 = el('text', { x: 486, y: 622, class: 'zone-cap' });
+      cap3.textContent = {{ _('蜜罐服务 · 暂无运行中') | tojson }};
+    }
 
     // ── canvas pan + click-empty deselect ───────────────────────────
     var pan = null;
