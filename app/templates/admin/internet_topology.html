@@ -341,7 +341,7 @@
         sys: sys,
         x: saved ? saved[0] : 470 + col * 300,
         y: saved ? saved[1] : 80 + row * 200,
-        w: 244, h: 138,
+        w: 244, h: 82,
       };
     });
     // online C2 / managed agent hosts (top row) and running honeypots (bottom row)
@@ -555,23 +555,19 @@
       name.textContent = n.sys.name.length > 12 ? n.sys.name.slice(0, 11) + '…' : n.sys.name;
       var domain = el('text', { x: 60, y: 43, class: 'meta' }, g);
       domain.textContent = n.sys.domain;
-      // status row (y=68) and config rows (from y=90) never overlap
-      el('circle', { cx: 17, cy: 64, r: 4, style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
-      var st = el('text', { x: 27, y: 68, class: 'badge',
+      el('circle', { cx: 17, cy: 62, r: 4, style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
+      var st = el('text', { x: 27, y: 66, class: 'badge',
         style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
       st.textContent = n.sys.enabled ? {{ _('运行中') | tojson }} : {{ _('已暂停') | tojson }};
-      var rowsY = [90, 107, 124];
-      var list = n.sys.configs;
-      var shown = list.length > 3 ? 2 : list.length;
-      for (var i = 0; i < shown; i++) {
-        var color = list[i].type === 'credential' ? '#fb7185' : list[i].type === 'file' ? '#f59e0b' : '#34d399';
-        el('circle', { cx: 17, cy: rowsY[i] - 4, r: 3.2, style: 'fill:' + color }, g);
-        var t = el('text', { x: 27, y: rowsY[i], class: 'cfg' }, g);
-        t.textContent = list[i].path.length > 30 ? list[i].path.slice(0, 29) + '…' : list[i].path;
-      }
-      if (list.length > 3) {
-        var more = el('text', { x: 17, y: rowsY[2], class: 'cfg' }, g);
-        more.textContent = '+ ' + (list.length - 2) + ' …';
+      // config count badge — details live in the node inspector
+      if (n.sys.configs.length) {
+        var count = String(n.sys.configs.length);
+        var bw = 18 + count.length * 7;
+        el('rect', { x: n.w - bw - 12, y: 52, width: bw, height: 18, rx: 9,
+          style: 'fill:rgba(68,147,248,.10);stroke:rgba(68,147,248,.35);stroke-width:1' }, g);
+        var cnt = el('text', { x: n.w - 12 - bw / 2, y: 64, 'text-anchor': 'middle', class: 'cfg',
+          style: 'fill:#4493f8;font-size:10px' }, g);
+        cnt.textContent = count + ' 配置';
       }
 
       // ── drag (move/up on window: gestures survive leaving bounds) ──
