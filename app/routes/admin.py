@@ -6122,8 +6122,13 @@ async def internet_topology_save_layout(request: Request):
                     if alias:
                         entry["alias"] = alias
                     clean[key] = entry
+                elif key in ("int", "core"):
+                    # endpoint anchor drag offsets (absolute keys, no prefix)
+                    clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
                 else:
                     clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+            elif key in ("int", "core"):
+                clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
             else:
                 clean[str(int(key))] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
         except (TypeError, ValueError, IndexError, KeyError):

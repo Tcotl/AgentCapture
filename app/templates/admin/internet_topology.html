@@ -57,6 +57,8 @@
   @media (prefers-reduced-motion: reduce) { #topo-svg .core-glow { animation: none; } }
   #topo-svg .node { cursor: grab; }
   #topo-svg .node:active { cursor: grabbing; }
+  #topo-svg g.anchor { cursor: grab; }
+  #topo-svg g.anchor:active { cursor: grabbing; }
   /* 3D card: gradient face + extruded side slab + drop shadow (lift on select) */
   :root { --topo-card-hi: #17253f; --topo-side: rgba(2, 6, 23, .55); }
   [data-theme="light"] { --topo-card-hi: #ffffff; --topo-side: rgba(15, 23, 42, .22); }
@@ -278,8 +280,12 @@
     var NS = 'http://www.w3.org/2000/svg';
     var W = 1600, H = 640;
     var view = { x: 0, y: 0, w: W, h: H };
-    var INT = { cx: 170, cy: H / 2 };
-    var CORE = { cx: W - 210, cy: H / 2 };
+    var INT = {
+      cx: 170, cy: H / 2, ox: (DATA.layout.int || [0])[0] || 0, oy: (DATA.layout.int || [0, 0])[1] || 0,
+    };
+    var CORE = {
+      cx: W - 210, cy: H / 2, ox: (DATA.layout.core || [0])[0] || 0, oy: (DATA.layout.core || [0, 0])[1] || 0,
+    };
 
     function el(tag, attrs, parent) {
       var e = document.createElementNS(NS, tag);
@@ -380,17 +386,17 @@
       }
       sysNodes.forEach(function (n) {
         var cyL = n.y + n.h / 2;
-        emit(orthPath(INT.cx + 52, INT.cy, n.x, cyL), false, true);
-        emit(orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy), false, true);
+        emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), false, true);
+        emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy), false, true);
       });
       agentNodes.forEach(function (n) {
         var cyL = n.y + n.h / 2;
-        emit(orthPath(INT.cx + 52, INT.cy, n.x, cyL), true, false);
-        emit(orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy - 14), false, true);
+        emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), true, false);
+        emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy - 14), false, true);
       });
       hpNodes.forEach(function (n) {
         // services operated by the platform: short links from the right column
-        emit(orthPath(n.x, n.y + 26, CORE.cx + 52, CORE.cy - 8), false, true);
+        emit(orthPath(n.x, n.y + 26, CORE.cx + CORE.ox + 52, CORE.cy + CORE.oy - 8), false, true);
       });
       for (; i < edgePool.length; i++) {
         edgePool[i].base.style.display = 'none';
@@ -425,7 +431,10 @@
       var clip = el('clipPath', { id: 'globe-clip' }, defs);
       el('circle', { cx: INT.cx, cy: INT.cy, r: 45 }, clip);
 
-      var g = el('g', {});
+      var holder = el('g', { class: 'anchor' });
+      INT.holder = holder;
+      holder.setAttribute('transform', 'translate(' + INT.ox + ',' + INT.oy + ')');
+      var g = el('g', {}, holder);
       el('circle', { cx: INT.cx, cy: INT.cy, r: 56, class: 'globe-glow',
         style: 'fill:none;stroke:#34d399;stroke-width:6;opacity:.1;filter:url(#globe-blur)' }, g);
       el('circle', { cx: INT.cx, cy: INT.cy, r: 46,
@@ -463,7 +472,10 @@
       el('feGaussianBlur', { stdDeviation: 7 }, blur);
 
       var cx = CORE.cx, cy = CORE.cy;
-      var g = el('g', {});
+      var holder = el('g', { class: 'anchor' });
+      CORE.holder = holder;
+      holder.setAttribute('transform', 'translate(' + CORE.ox + ',' + CORE.oy + ')');
+      var g = el('g', {}, holder);
       // breathing under-glow
       el('ellipse', { cx: cx, cy: cy + 30, rx: 48, ry: 12, class: 'core-glow',
         style: 'fill:#4493f8;opacity:.16;filter:url(#core-blur)' }, g);
@@ -601,6 +613,8 @@
           x: Math.round(hn.x), y: Math.round(hn.y), alias: hn.alias || '',
         };
       });
+      layout.int = [Math.round(INT.ox), Math.round(INT.oy)];
+      layout.core = [Math.round(CORE.ox), Math.round(CORE.oy)];
       return layout;
     }
     function fetchSaveLayout() {
@@ -610,6 +624,29 @@
         body: JSON.stringify({ layout: collectLayout() }),
       }).catch(function () {});
     }
+    // endpoint anchors (internet / platform) are draggable too: offsets
+    // shift the drawn group and every edge anchor follows
+    function attachAnchorDrag(state) {
+      var drag = null;
+      state.holder.addEventListener('pointerdown', function (ev) {
+        drag = { cx: ev.clientX, cy: ev.clientY, ox: state.ox, oy: state.oy };
+        ev.preventDefault();
+      });
+      window.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        var k = worldPerPx();
+        state.ox = drag.ox + (ev.clientX - drag.cx) * k.x;
+        state.oy = drag.oy + (ev.clientY - drag.cy) * k.y;
+        state.holder.setAttribute('transform', 'translate(' + state.ox + ',' + state.oy + ')');
+        drawEdges();
+      });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        drag = null;
+        fetchSaveLayout();
+      });
+    }
+
     // shared mini-node drag (same window-level gesture pattern)
     function attachMiniDrag(g, n, onClick) {
       var drag = null;
@@ -659,6 +696,9 @@
           ? '/admin/c2/agents/' + n.a.id : '/admin/c2/console');
       });
     });
+    attachAnchorDrag(INT);
+    attachAnchorDrag(CORE);
+
     if (!agentNodes.length) {
       var cap0 = el('text', { x: 486, y: 44, class: 'zone-cap' });
       cap0.textContent = {{ _('上线 Agent 主机 · 暂无在线') | tojson }};
