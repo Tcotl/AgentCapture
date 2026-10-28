@@ -94,7 +94,7 @@
   agent.status|status_zh,
   _('Portal 招募') if is_recruited else _('植入 Beacon'),
   agent.privileges or 'user'
-]) }}
+], actions='<a class="chip" href="/admin/c2/agents">' ~ _('← 返回对话式 C2 管理') ~ '</a>') }}
 
 <div class="chat-layout">
   <section class="panel chat-panel">

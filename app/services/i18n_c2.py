@@ -174,6 +174,7 @@ EN = {
     "Agent 回连但未泄露信息": "Beaconed without exfiltration",
     "Agent 回连并泄露信息/环境": "Beaconed with data/environment exfiltration",
     "Agent 对话式控制台": "Agent Conversational Console",
+    "← 返回对话式 C2 管理": "← Back to Conversational C2",
     "Agent 或高风险": "Agent or high risk",
     "Agent 指纹": "Agent fingerprint",
     "Agent 检测": "Agent detection",
