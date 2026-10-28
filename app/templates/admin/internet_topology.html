@@ -45,6 +45,9 @@
   @media (prefers-reduced-motion: reduce) { #topo-svg .globe-glow { animation: none; } }
   #topo-svg .globe-wire { stroke: #7cf0bb; stroke-opacity: .32; fill: none; stroke-width: 1; }
   [data-theme="light"] #topo-svg .globe-wire { stroke: #0c5e44; stroke-opacity: .34; }
+  #topo-svg .core-glow { animation: core-glow 3s ease-in-out infinite; }
+  @keyframes core-glow { 0%, 100% { opacity: .10; } 50% { opacity: .26; } }
+  @media (prefers-reduced-motion: reduce) { #topo-svg .core-glow { animation: none; } }
   #topo-svg .node { cursor: grab; }
   #topo-svg .node:active { cursor: grabbing; }
   #topo-svg .node rect.body { fill: var(--card); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
@@ -303,7 +306,7 @@
       sysNodes.forEach(function (n, i) {
         var cyL = n.y + n.h / 2;
         var dIn = orthPath(INT.cx + 52, INT.cy, n.x, cyL);
-        var dOut = orthPath(n.x + n.w, cyL, CORE.cx - 46, CORE.cy);
+        var dOut = orthPath(n.x + n.w, cyL, CORE.cx - 38, CORE.cy);
         var pair = edges[i];
         if (!pair) {
           pair = edges[i] = [
@@ -358,13 +361,49 @@
       return g;
     }
     function drawCore() {
+      // isometric two-tier server platform: gradient top faces, shaded side
+      // faces, glowing vent strips + status LEDs, breathing under-glow
+      var defs = el('defs', {});
+      function linGrad(id, stops) {
+        var g2 = el('linearGradient', { id: id, x1: '0%', y1: '0%', x2: '0%', y2: '100%' }, defs);
+        stops.forEach(function (s) {
+          el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] }, g2);
+        });
+      }
+      linGrad('core-top', [['0%', '#b7d9ff', '0.95'], ['100%', '#4493f8', '0.60']]);
+      linGrad('core-left', [['0%', '#143a6e', '0.95'], ['100%', '#0a1c38', '0.98']]);
+      linGrad('core-right', [['0%', '#2e6fc4', '0.92'], ['100%', '#12325e', '0.96']]);
+      var blur = el('filter', { id: 'core-blur', x: '-50%', y: '-150%', width: '200%', height: '400%' }, defs);
+      el('feGaussianBlur', { stdDeviation: 7 }, blur);
+
+      var cx = CORE.cx, cy = CORE.cy;
       var g = el('g', {});
-      el('rect', { x: CORE.cx - 40, y: CORE.cy - 40, width: 80, height: 80, rx: 14,
-        style: 'fill:rgba(68,147,248,.08);stroke:#4493f8;stroke-width:1.8' }, g);
-      el('rect', { x: CORE.cx - 25, y: CORE.cy - 25, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#4493f8;stroke-width:1.6' }, g);
-      el('rect', { x: CORE.cx - 25, y: CORE.cy + 5, width: 50, height: 20, rx: 4, style: 'fill:none;stroke:#4493f8;stroke-width:1.6' }, g);
-      el('circle', { cx: CORE.cx - 17, cy: CORE.cy - 15, r: 2.5, style: 'fill:#4493f8' }, g);
-      el('circle', { cx: CORE.cx - 17, cy: CORE.cy + 15, r: 2.5, style: 'fill:#4493f8' }, g);
+      // breathing under-glow
+      el('ellipse', { cx: cx, cy: cy + 30, rx: 48, ry: 12, class: 'core-glow',
+        style: 'fill:#4493f8;opacity:.16;filter:url(#core-blur)' }, g);
+      // base slab: top rhombus N(cx,cy-34) E(+52,cy-8) S(cx,cy+18) W(-52,cy-8), depth 14
+      el('polygon', { points: (cx - 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx - 52) + ',' + (cy + 6),
+        fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, g);
+      el('polygon', { points: (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx + 52) + ',' + (cy + 6),
+        fill: 'url(#core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, g);
+      el('polygon', { points: cx + ',' + (cy - 34) + ' ' + (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + (cx - 52) + ',' + (cy - 8),
+        fill: 'url(#core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1.1 }, g);
+      // upper slab: top rhombus N(cx,cy-47) E(+33,cy-30) S(cx,cy-13) W(-33,cy-30), depth 13
+      el('polygon', { points: (cx - 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx - 33) + ',' + (cy - 17),
+        fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, g);
+      el('polygon', { points: (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx + 33) + ',' + (cy - 17),
+        fill: 'url(#core-right)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, g);
+      el('polygon', { points: cx + ',' + (cy - 47) + ' ' + (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + (cx - 33) + ',' + (cy - 30),
+        fill: 'url(#core-top)', stroke: '#9ecbff', 'stroke-opacity': .9, 'stroke-width': 1.1 }, g);
+      // glowing vent strips on the upper front faces
+      [[cx - 29, cy - 22, cx - 4, cy - 9], [cx + 29, cy - 22, cx + 4, cy - 9]].forEach(function (s) {
+        el('line', { x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+          style: 'stroke:#9ecbff;stroke-opacity:.9;stroke-width:2;stroke-linecap:round' }, g);
+      });
+      // status LEDs along the base front-left face
+      [[cx - 36, cy + 6, '#34d399'], [cx - 26, cy + 11, '#9ecbff'], [cx - 16, cy + 16, '#9ecbff']].forEach(function (d) {
+        el('circle', { cx: d[0], cy: d[1], r: 2, style: 'fill:' + d[2] + ';opacity:.9' }, g);
+      });
       var t = el('text', { x: CORE.cx, y: CORE.cy + 62, 'text-anchor': 'middle', class: 'name' }, g);
       t.textContent = {{ _('AgentCapture 平台') | tojson }};
       var t2 = el('text', { x: CORE.cx, y: CORE.cy + 80, 'text-anchor': 'middle', class: 'meta' }, g);
