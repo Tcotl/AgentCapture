@@ -296,6 +296,13 @@ def _task_op(task_id: int, request: Request, body: TaskOpPayload, op: str):
                     result_summary=body.resultSummary,
                     payload=body.payload or None,
                 )
+                # Device-profile collection tasks persist their parsed output.
+                if (task.arguments_json or {}).get("profile_section"):
+                    from app.services.device_profile import (
+                        upsert_profile_from_managed_task,
+                    )
+
+                    upsert_profile_from_managed_task(db, task)
                 _log_managed_event(
                     request,
                     "c2_task_result",

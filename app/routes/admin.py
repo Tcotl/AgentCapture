@@ -9884,6 +9884,62 @@ def api_managed_tasks(request: Request, host_id: int = 0, db: Session = Depends(
     return {"tasks": [serialize_task(t) for t in db.scalars(stmt).all()]}
 
 
+@router.get("/api/admin/managed/hosts/{host_id}/profile")
+def api_managed_host_profile(
+    host_id: int, request: Request, db: Session = Depends(get_db)
+):
+    """Device-profile data + per-section task status for one managed host."""
+    _require_user(request, db)
+    from app.models.managed import ManagedHost
+    from app.services.device_profile import managed_profile_state
+
+    if not db.get(ManagedHost, host_id):
+        raise HTTPException(status_code=404, detail="host not found")
+    profile_map, status = managed_profile_state(db, host_id)
+    return {
+        "profile": {
+            key: {
+                "data": row["data"],
+                "collectedAt": row["collected_at"].isoformat() if row["collected_at"] else "",
+                "taskId": row["task_id"],
+            }
+            for key, row in profile_map.items()
+        },
+        "status": status,
+    }
+
+
+@router.post("/api/admin/managed/hosts/{host_id}/profile/collect")
+async def api_managed_host_profile_collect(
+    host_id: int, request: Request, db: Session = Depends(get_db)
+):
+    """Queue the ten-section device-profile collection tasks for one host."""
+    user = _require_admin(request, db)
+    from app.models.managed import ManagedHost
+    from app.services.device_profile import queue_profile_collection_managed
+
+    host = db.get(ManagedHost, host_id)
+    if not host:
+        raise HTTPException(status_code=404, detail="host not found")
+    created, skipped = queue_profile_collection_managed(
+        db, host, created_by=user.username
+    )
+    if created:
+        log_execution(
+            db,
+            actor_username=user.username,
+            action="create_task",
+            module="managed-console",
+            target_type="device_profile",
+            target_ref=str(host_id),
+            detail_json={
+                "sections": [t.arguments_json.get("profile_section") for t in created],
+                "skipped": skipped,
+            },
+        )
+    return {"ok": True, "queued": len(created), "skipped": len(skipped)}
+
+
 @router.post("/api/admin/managed/tasks/{task_id}/review")
 async def api_managed_task_review(task_id: int, request: Request, db: Session = Depends(get_db)):
     user = _require_admin(request, db)

@@ -289,42 +289,132 @@ def parse_profile_output(section_key: str, output: str) -> dict:
     return {"fields": fields, "raw": (output or "").strip()[:20000]}
 
 
-def upsert_profile_from_task(db: Session, task: C2Task):
-    """Persist parsed profile data when a profile-section task completes."""
-    section = (task.arguments_json or {}).get("profile_section")
-    if not section or section not in SECTION_MAP:
-        return None
-    if task.status != "completed" or not (task.output or "").strip():
-        return None
+def upsert_profile_row(
+    db: Session, agent_key: str, section: str, data: dict, task_id: int
+):
+    """Create or refresh the profile row for one agent_key + section."""
     from app.models.c2_device_profile import AgentDeviceProfile
 
     row = db.scalar(
         select(AgentDeviceProfile).where(
-            AgentDeviceProfile.agent_id == task.agent_id,
+            AgentDeviceProfile.agent_id == agent_key,
             AgentDeviceProfile.section == section,
         )
     )
-    data = parse_profile_output(section, task.output)
     if row is None:
         row = AgentDeviceProfile(
-            agent_id=task.agent_id,
+            agent_id=agent_key,
             section=section,
             data=data,
-            task_id=task.id,
+            task_id=task_id,
             collected_at=datetime.now(timezone.utc),
         )
         db.add(row)
     else:
         row.data = data
-        row.task_id = task.id
+        row.task_id = task_id
         row.collected_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     return row
 
 
+def upsert_profile_from_task(db: Session, task: C2Task):
+    """Persist parsed profile data when a C2 profile-section task completes."""
+    section = (task.arguments_json or {}).get("profile_section")
+    if not section or section not in SECTION_MAP:
+        return None
+    if task.status != "completed" or not (task.output or "").strip():
+        return None
+    data = parse_profile_output(section, task.output)
+    return upsert_profile_row(db, task.agent_id, section, data, task.id)
+
+
+# ---------------------------------------------------------------------------
+# Managed-hosts stack (受管主机控制台, /admin/c2/console)
+# ---------------------------------------------------------------------------
+
+MANAGED_AGENT_PREFIX = "managed:"
+MANAGED_PENDING_STATUSES = ("pending_approval", "queued", "leased", "running")
+
+
+def managed_agent_key(host) -> str:
+    """Namespace managed-host profile rows apart from C2Agent ones."""
+    return f"{MANAGED_AGENT_PREFIX}{host.host_uid}"
+
+
+def queue_profile_collection_managed(
+    db: Session,
+    host,
+    *,
+    created_by: str = "admin",
+    sections: list[str] | None = None,
+) -> tuple[list, list[str]]:
+    """Queue one command_run ManagedTask per section; skip in-flight ones."""
+    from app.models.managed import ManagedTask
+    from app.services.managed_runtime import enqueue_managed_task
+
+    wanted = [s for s in (sections or SECTION_KEYS) if s in SECTION_MAP]
+    pending_stmt = (
+        select(ManagedTask)
+        .where(
+            ManagedTask.host_id == host.id,
+            ManagedTask.status.in_(MANAGED_PENDING_STATUSES),
+        )
+        .order_by(ManagedTask.id.desc())
+    )
+    skipped: set[str] = set()
+    for task in db.scalars(pending_stmt).all():
+        marker = (task.arguments_json or {}).get("profile_section")
+        if marker:
+            skipped.add(marker)
+    skipped = sorted(skipped & set(wanted))
+    created: list = []
+    for key in wanted:
+        if key in skipped:
+            continue
+        section = SECTION_MAP[key]
+        task = enqueue_managed_task(
+            db,
+            host_id=host.id,
+            task_type="command_run",
+            command_text=" ; ".join(section["cmds"]),
+            arguments={"profile_section": key},
+            risk_level="low",
+            created_by=created_by,
+        )
+        task.title = f"设备精确信息 · {section['label']}"
+        db.commit()
+        created.append(task)
+    return created, skipped
+
+
+def upsert_profile_from_managed_task(db: Session, task):
+    """Persist parsed profile data when a managed profile task completes."""
+    section = (task.arguments_json or {}).get("profile_section")
+    if not section or section not in SECTION_MAP:
+        return None
+    if task.status != "completed":
+        return None
+    payload = task.result_json or {}
+    parts: list[str] = []
+    for candidate in (payload.get("stdout"), payload.get("output"), task.result_summary):
+        if candidate and str(candidate).strip():
+            parts.append(str(candidate).strip())
+    output = "\n".join(parts)
+    if not output:
+        return None
+    from app.models.managed import ManagedHost
+
+    host = db.get(ManagedHost, task.host_id) if task.host_id else None
+    if not host:
+        return None
+    data = parse_profile_output(section, output)
+    return upsert_profile_row(db, managed_agent_key(host), section, data, task.id)
+
+
 def get_profile_map(db: Session, agent_id: str) -> dict[str, dict]:
-    """``{section: {data, collected_at, task_id}}`` for the detail page."""
+    """``{section: {data, collected_at, task_id}}`` keyed by agent id."""
     from app.models.c2_device_profile import AgentDeviceProfile
 
     rows = db.scalars(
@@ -350,3 +440,29 @@ def profile_task_status(db: Session, agent_id: str) -> dict[str, dict]:
             continue
         status[section] = {"status": task.status, "task_id": task.id}
     return status
+
+
+def managed_profile_state(db: Session, host_id: int) -> tuple[dict, dict]:
+    """Profile map + per-section task status for one managed host."""
+    from app.models.managed import ManagedHost, ManagedTask
+
+    host = db.get(ManagedHost, host_id)
+    if not host:
+        return {}, {}
+    profile_map = get_profile_map(db, managed_agent_key(host))
+    status: dict[str, dict] = {}
+    stmt = (
+        select(ManagedTask)
+        .where(ManagedTask.host_id == host_id)
+        .order_by(ManagedTask.id.desc())
+    )
+    for task in db.scalars(stmt).all():
+        marker = (task.arguments_json or {}).get("profile_section")
+        if not marker or marker in status:
+            continue
+        status[marker] = {
+            "status": task.status,
+            "task_id": task.id,
+            "command_text": (task.command_text or "")[:2000],
+        }
+    return profile_map, status

