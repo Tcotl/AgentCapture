@@ -42,6 +42,11 @@
     transition: stroke .15s ease, filter .15s ease; filter: drop-shadow(0 3px 4px rgba(2, 6, 23, .28)); }
   [data-theme="light"] #topo-svg .node .abody { filter: drop-shadow(0 3px 4px rgba(15, 23, 42, .13)); }
   #topo-svg .node:hover .abody, #topo-svg .node.sel .abody { stroke: var(--ring); }
+  /* attacker agent cards: hacker red/black theme */
+  #topo-svg .node.agent-node rect.chip { fill: rgba(2, 6, 23, .88); stroke: rgba(244, 63, 94, .65); }
+  #topo-svg .node.agent-node rect.abody { stroke: rgba(244, 63, 94, .38); }
+  #topo-svg .node.agent-node:hover .abody,
+  #topo-svg .node.agent-node.sel .abody { stroke: #f43f5e; }
   #topo-svg .edge-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
     stroke-linecap: round; stroke-dasharray: 9 91; animation: topo-flow 2.4s linear infinite; }
   @keyframes topo-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
@@ -173,7 +178,7 @@
       <div class="pal-legend"><span class="lg" style="background:#fb7185"></span>{{ _('凭证蜜饵') }}</div>
       <div class="pal-legend"><span class="lg" style="background:#f59e0b"></span>{{ _('文件蜜饵') }}</div>
       <div class="pal-legend"><span class="lg" style="border:1.5px dashed var(--muted-foreground)"></span>{{ _('捕获链路') }}</div>
-      <div class="pal-legend"><span class="lg" style="background:#4493f8;border-radius:50%"></span>{{ _('上线 Agent · 单击进入控制') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#f43f5e;border-radius:50%"></span>{{ _('上线 Agent · 黑客主机，单击进入控制') }}</div>
       <div class="pal-legend"><span class="lg" style="background:linear-gradient(135deg,#8fbcf5,#2e6fc4)"></span>{{ _('蜜罐服务 · 单击查看部署') }}</div>
     </aside>
 
@@ -674,23 +679,26 @@
       });
     }
     agentNodes.forEach(function (n) {
-      var g = el('g', { class: 'node' });
+      var g = el('g', { class: 'node agent-node' });
       g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
       var title = el('title', {}, g);
       title.textContent = (n.a.kind === 'c2' ? 'C2 Agent' : 'Managed Beacon') + ' · ' + n.a.id;
       el('rect', { x: 3, y: 4, width: n.w - 3, height: n.h, rx: 10, class: 'side3d' }, g);
       el('rect', { x: 0, y: 0, width: n.w, height: n.h, rx: 10, class: 'abody' }, g);
-      el('rect', { x: 10, y: 15, width: 26, height: 26, rx: 7, class: 'chip',
-        style: 'stroke:rgba(68,147,248,.4);stroke-width:1.2' }, g);
-      var glyph = el('text', { x: 23, y: 33, 'text-anchor': 'middle', class: 'cfg',
-        style: 'fill:#4493f8;font-size:12px;font-weight:700' }, g);
-      glyph.textContent = '>';
+      // hacker chip: black slab + red skull logo (红黑黑客标识)
+      el('rect', { x: 10, y: 15, width: 26, height: 26, rx: 7, class: 'chip agent-chip' }, g);
+      var logo = el('g', { transform: 'translate(12, 16.5) scale(0.92)',
+        style: 'stroke:#fb4d5d;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round' }, g);
+      el('path', { d: 'M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20' }, logo);
+      el('path', { d: 'M8 20v2h8v-2' }, logo);
+      el('path', { d: 'm12.5 17-.5-1-.5 1h1z' }, logo);
+      el('circle', { cx: 9, cy: 12, r: 1, style: 'fill:#fb4d5d;stroke:none' }, logo);
+      el('circle', { cx: 15, cy: 12, r: 1, style: 'fill:#fb4d5d;stroke:none' }, logo);
       var label = el('text', { x: 44, y: 24, class: 'name', style: 'font-size:12px' }, g);
       label.textContent = n.a.label.length > 14 ? n.a.label.slice(0, 13) + '…' : n.a.label;
-      var ip = el('text', { x: 44, y: 42, class: 'meta' }, g);
+      var ip = el('text', { x: 44, y: 42, class: 'meta', style: 'fill:#fb7185' }, g);
       ip.textContent = n.a.ip;
-      el('circle', { cx: n.w - 14, cy: n.h / 2, r: 4,
-        style: 'fill:' + (n.a.kind === 'c2' ? '#34d399' : '#4493f8') }, g);
+      el('circle', { cx: n.w - 14, cy: n.h / 2, r: 4, style: 'fill:#f43f5e' }, g);
       attachMiniDrag(g, n, function () {
         window.location.assign(n.a.kind === 'c2'
           ? '/admin/c2/agents/' + n.a.id : '/admin/c2/console');
