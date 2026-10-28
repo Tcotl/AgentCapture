@@ -482,6 +482,18 @@
       var size = Math.max(60, 116 * k);
       globeCanvas.style.width = size + 'px';
       globeCanvas.style.height = size + 'px';
+      var wantLeft = c.x - wrapRect.left, wantTop = c.y - wrapRect.top;
+      if (!globeCanvas.style.left) {
+        globeCanvas.style.left = wantLeft + 'px';
+        globeCanvas.style.top = wantTop + 'px';
+        return;
+      }
+      // feedback correction: nudge the stored position until the measured
+      // canvas center lands exactly on the anchor point — absorbs any
+      // CSS-scale shell / translate / rounding residual every frame
+      var cvr = globeCanvas.getBoundingClientRect();
+      globeCanvas.style.left = (parseFloat(globeCanvas.style.left) + c.x - cvr.x - cvr.width / 2) + 'px';
+      globeCanvas.style.top = (parseFloat(globeCanvas.style.top) + c.y - cvr.y - cvr.height / 2) + 'px';
     }
     function wrapEl2() {
       return document.getElementById('topo-canvas-wrap').getBoundingClientRect();
