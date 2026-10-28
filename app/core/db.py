@@ -55,6 +55,7 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     from app.models.api_token import ApiToken  # noqa: F401
     from app.models.c2_agent import C2Agent  # noqa: F401
+    from app.models.c2_device_profile import AgentDeviceProfile  # noqa: F401
     from app.models.c2_listener import C2Listener  # noqa: F401
     from app.models.c2_task import C2Task  # noqa: F401
     from app.models.credential import CredentialObservation  # noqa: F401

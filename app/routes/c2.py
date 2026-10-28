@@ -216,6 +216,11 @@ def c2_task_result(task_id: int, payload: TaskResultPayload, request: Request):
         )
 
         if task:
+            # Device-profile collection tasks persist their parsed output.
+            if (task.arguments_json or {}).get("profile_section"):
+                from app.services.device_profile import upsert_profile_from_task
+
+                upsert_profile_from_task(db, task)
             create_event(
                 db,
                 site_id=settings.site_id,

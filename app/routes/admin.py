@@ -8997,6 +8997,15 @@ def admin_c2_agent_detail(agent_id: str, request: Request, db: Session = Depends
     type_stats = task_type_stats(db, agent_id)
     metadata = agent.metadata_json or {}
     is_recruited = bool(metadata.get("recruit_src") or metadata.get("recruited_via"))
+    from app.services.device_profile import (
+        PROFILE_SECTIONS,
+        get_profile_map,
+        profile_task_status,
+    )
+
+    profile_map = get_profile_map(db, agent_id)
+    profile_status = profile_task_status(db, agent_id)
+    profile_done = sum(1 for s in PROFILE_SECTIONS if s["key"] in profile_map)
     initial_tasks_json = json.dumps(
         [serialize_task_full(t) for t in reversed(tasks)], ensure_ascii=False
     )
@@ -9013,6 +9022,12 @@ def admin_c2_agent_detail(agent_id: str, request: Request, db: Session = Depends
             "is_recruited": is_recruited,
             "recruit_src": metadata.get("recruit_src", ""),
             "initial_tasks_json": initial_tasks_json,
+            "profile_sections": PROFILE_SECTIONS,
+            "profile_map": profile_map,
+            "profile_status": profile_status,
+            "profile_done": profile_done,
+            "profile_queued": int(request.query_params.get("profile_queued", "0") or 0),
+            "profile_skipped": int(request.query_params.get("profile_skipped", "0") or 0),
             "user": user,
             "title": f"Agent {agent_id[:12]}",
             "nav_base": "/admin/c2/agents",
@@ -9049,6 +9064,36 @@ def admin_c2_send_command(
         return_to=f"/admin/c2/agents/{agent_id}",
         title=f"向 Agent 投递命令：{agent_id[:12]}",
         description="该操作会向目标 Agent 投递命令执行任务，请输入管理员密码确认。",
+    )
+
+
+@router.post("/admin/c2/agents/{agent_id}/profile/collect")
+def admin_c2_profile_collect(
+    agent_id: str, request: Request, db: Session = Depends(get_db)
+):
+    """Queue the ten-section attacker device-profile collection tasks."""
+    _require_admin(request, db)
+    agent = get_agent(db, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="agent not found")
+    from app.services.device_profile import queue_profile_collection
+
+    created, skipped = queue_profile_collection(db, agent, created_by="admin")
+    if created:
+        log_execution(
+            db,
+            actor_username="admin",
+            action="create",
+            module="c2",
+            target_type="device_profile",
+            target_ref=agent_id,
+            detail_json={
+                "sections": [t.arguments_json.get("profile_section") for t in created],
+                "skipped": skipped,
+            },
+        )
+    return _redirect(
+        f"/admin/c2/agents/{agent_id}?profile_queued={len(created)}&profile_skipped={len(skipped)}"
     )
 
 
