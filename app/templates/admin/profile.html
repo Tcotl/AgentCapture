@@ -37,6 +37,14 @@
 </div>
 
 <section class="panel" style="margin-top:16px">
+  {{ section_header(_('部署向导'), _('交互式部署指引：蜜罐 → 蜜饵 → 域名 → 观测 → 反制，逐步聚光带路。可随时重新打开。')) }}
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span class="muted" style="font-size:13px">{{ _('重新查看部署流程解说，适合新成员学习或回顾配置要点。') }}</span>
+    <button type="button" class="primary btn-sm" style="margin-left:auto" onclick="window.acShowTourPicker && acShowTourPicker()">{{ _('启动部署向导') }}</button>
+  </div>
+</section>
+
+<section class="panel" style="margin-top:16px">
   {{ section_header(_('控制台安全路径'), _('后台控制台的访问前缀——修改后立即生效（≤5s），旧路径即刻失效并返回 404。请妥善保管新路径，它是控制台的第一道访问屏障。')) }}
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
     <span class="muted" style="font-size:13px">{{ _('当前访问地址：') }}</span>

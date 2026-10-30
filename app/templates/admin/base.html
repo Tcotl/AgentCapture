@@ -1461,6 +1461,15 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     err: function () { return window.__tourErr || null; },
   };
 
+  window.acStartDeployTour = function () {
+    try {
+      localStorage.removeItem('ach:deployTourDone');
+      sessionStorage.removeItem(KEY);
+    } catch (e) {}
+    showPicker();
+  };
+  window.acShowTourPicker = showPicker;
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
