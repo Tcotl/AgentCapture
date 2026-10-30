@@ -894,12 +894,21 @@
 <div class="cmdk-overlay" id="cmdk" hidden>
   <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="{{ _('全局搜索') }}">
     <div class="cmdk-head">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
-      <input id="cmdk-input" type="text" placeholder="{{ _('搜索页面、IP、域名、会话…') }}" autocomplete="off" spellcheck="false">
-      <button type="button" class="secondary cmdk-close" id="cmdk-close" title="{{ _('关闭') }}">Esc</button>
+      <div class="cmdk-inputbox">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input id="cmdk-input" type="text" placeholder="{{ _('搜索页面、IP、域名、会话…') }}" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="cmdk-tabs" id="cmdk-tabs">
+        <button type="button" class="secondary cmdk-tab active" data-tab="all">{{ _('全部') }}</button>
+        <button type="button" class="secondary cmdk-tab" data-tab="page">{{ _('页面') }}</button>
+        <button type="button" class="secondary cmdk-tab" data-tab="entity">{{ _('实体') }}</button>
+      </div>
     </div>
     <div class="cmdk-results" id="cmdk-results"></div>
-    <div class="cmdk-foot">{{ _('↑↓ 选择 · Enter 打开 · Esc 关闭') }}</div>
+    <div class="cmdk-foot">
+      <span>{{ _('↑↓ 选择 · Enter 打开') }}</span>
+      <span class="cmdk-foot-keys"><kbd>Esc</kbd> {{ _('关闭') }}</span>
+    </div>
   </div>
 </div>
 <script id="cmdk-pages" type="application/json">{{ cmdk_pages | tojson }}</script>
@@ -908,9 +917,8 @@
   var overlay = document.getElementById('cmdk');
   var input = document.getElementById('cmdk-input');
   var resultsEl = document.getElementById('cmdk-results');
-  var pagesEl = document.getElementById('cmdk-pages');
   var PAGES = [];
-  try { PAGES = JSON.parse(pagesEl.textContent); } catch (e) {}
+  try { PAGES = JSON.parse(document.getElementById('cmdk-pages').textContent); } catch (e) {}
   var GROUP_LABEL = {
     page: {{ _('页面') | tojson }},
     system: {{ _('资产节点') | tojson }},
@@ -921,7 +929,17 @@
     decoy: {{ _('蜜饵部署') | tojson }},
     attack: {{ _('攻击流量') | tojson }}
   };
-  var items = [], active = -1, timer = null;
+  var ICONS = {
+    page: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    system: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>',
+    agent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>',
+    managed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 8h.01M7 17h.01"/></svg>',
+    session: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    credential: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M18 5l2 2M15 8l2 2"/></svg>',
+    decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c2 0 3 1 4 1s2-1 4-1a6 6 0 0 1 3.6 1.2A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-2 0-3-1-4-1s-2 1-4 1a6 6 0 0 1-3.6-1.2"/></svg>',
+    attack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-8 4 16 3-8h6"/></svg>'
+  };
+  var items = [], all = [], active = -1, timer = null, tab = 'all';
 
   function esc(s) {
     var d = document.createElement('div');
@@ -931,19 +949,26 @@
   function open() {
     overlay.hidden = false;
     input.value = '';
+    setTab('all');
     runQuery('');
     setTimeout(function () { input.focus(); }, 0);
   }
   function close() { overlay.hidden = true; }
   function isOpen() { return !overlay.hidden; }
 
-  function render(list) {
-    items = list;
-    active = list.length ? 0 : -1;
+  function render() {
+    var list = items.filter(function (o) {
+      if (tab === 'all') return true;
+      if (tab === 'page') return o.group === 'page';
+      return o.group !== 'page';
+    });
     if (!list.length) {
       resultsEl.innerHTML = '<div class="cmdk-empty">' + {{ _('无结果') | tojson }} + '</div>';
+      active = -1;
       return;
     }
+    if (active >= list.length) active = list.length - 1;
+    if (active < 0) active = 0;
     var html = '', lastGroup = null;
     list.forEach(function (o, idx) {
       if (o.group !== lastGroup) {
@@ -951,24 +976,19 @@
         lastGroup = o.group;
       }
       html += '<div class="cmdk-item' + (idx === active ? ' active' : '') + '" data-idx="' + idx + '">'
+        + '<span class="cmdk-ic">' + (ICONS[o.group] || ICONS.page) + '</span>'
         + '<span class="cmdk-item-main"><b>' + esc(o.title) + '</b>'
         + (o.sub ? '<small>' + esc(o.sub) + '</small>' : '') + '</span>'
-        + '<span class="cmdk-item-group">' + esc(GROUP_LABEL[o.group] || o.group) + '</span></div>';
+        + (idx === active ? '<kbd>↵</kbd>' : '') + '</div>';
     });
     resultsEl.innerHTML = html;
-    scrollToActive();
-  }
-  function scrollToActive() {
     var el = resultsEl.querySelector('.cmdk-item.active');
     if (el) el.scrollIntoView({ block: 'nearest' });
   }
   function move(dir) {
     if (!items.length) return;
     active = (active + dir + items.length) % items.length;
-    resultsEl.querySelectorAll('.cmdk-item').forEach(function (el, i) {
-      el.classList.toggle('active', i === active);
-    });
-    scrollToActive();
+    render();
   }
   function go(idx) {
     var o = items[idx];
@@ -976,26 +996,42 @@
     close();
     window.location.assign(o.url);
   }
-  function pageMatches(q) {
-    var ql = q.toLowerCase();
-    return PAGES.filter(function (p) {
-      return !q || (p.title + ' ' + p.sub + ' ' + p.group + ' ' + p.url).toLowerCase().indexOf(ql) >= 0;
-    }).slice(0, 8);
+  function applyTab(list) {
+    return list.filter(function (o) {
+      if (tab === 'all') return true;
+      if (tab === 'page') return o.group === 'page';
+      return o.group !== 'page';
+    });
+  }
+  function refresh() {
+    items = applyTab(all);
+    render();
+  }
+  function setTab(t) {
+    tab = t;
+    document.querySelectorAll('.cmdk-tab').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-tab') === t);
+    });
+    refresh();
   }
   function runQuery(q) {
     var ql = q.trim().toLowerCase();
-    var list = pageMatches(ql);
-    if (!ql) { render(list); return; }
-    // 出站中间件会自动把这里的 /api/... 重写为带安全路径前缀
+    var list = PAGES.filter(function (p) {
+      return !ql || (p.title + ' ' + p.sub + ' ' + p.groupLabel + ' ' + p.url).toLowerCase().indexOf(ql) >= 0;
+    }).slice(0, 8).map(function (p) {
+      return { group: 'page', title: p.title, sub: p.sub, url: p.url };
+    });
+    if (!ql) { all = list; refresh(); return; }
     fetch('/api/admin/search?q=' + encodeURIComponent(ql), { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var seen = {};
         list.forEach(function (o) { seen[o.url] = 1; });
         (d.items || []).forEach(function (o) { if (!seen[o.url]) list.push(o); });
-        render(list);
+        all = list;
+        refresh();
       })
-      .catch(function () { render(list); });
+      .catch(function () { all = list; refresh(); });
   }
 
   input.addEventListener('input', function () {
@@ -1012,8 +1048,10 @@
     var el = ev.target.closest('.cmdk-item');
     if (el) go(Number(el.getAttribute('data-idx')));
   });
+  document.querySelectorAll('.cmdk-tab').forEach(function (b) {
+    b.addEventListener('click', function () { setTab(b.getAttribute('data-tab')); });
+  });
   document.getElementById('cmdk-open').addEventListener('click', open);
-  document.getElementById('cmdk-close').addEventListener('click', close);
   overlay.addEventListener('click', function (ev) { if (ev.target === overlay) close(); });
   document.addEventListener('keydown', function (ev) {
     if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
