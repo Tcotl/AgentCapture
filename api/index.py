@@ -29,6 +29,21 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from app.main import app  # noqa: E402
 
+# TEMP body-parse diagnostics
+import traceback  # noqa: E402
+
+@app.middleware("http")
+async def _log_body_parse_err(request, call_next):  # noqa: E402
+    try:
+        return await call_next(request)
+    except Exception as exc:  # noqa: E402
+        detail = str(getattr(exc, "detail", "") or "")
+        if "parsing the body" in detail:
+            cause = exc.__cause__ or exc
+            print("BODY-PARSE-ERR:", "".join(
+                traceback.format_exception(type(cause), cause, cause.__traceback__)), flush=True)
+        raise
+
 # TEMP diagnostics (remove after verifying): report importable form backend
 from app.core.config import get_settings as _gs  # noqa: E402
 
