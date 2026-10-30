@@ -29,4 +29,24 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from app.main import app  # noqa: E402
 
+# TEMP diagnostics (remove after verifying): report importable form backend
+from app.core.config import get_settings as _gs  # noqa: E402
+
+@app.get("/api/__diag")
+def _diag():  # noqa: E402
+    import importlib.util
+    import sys
+    def has(mod):
+        try:
+            return importlib.util.find_spec(mod) is not None
+        except Exception as exc:
+            return f"err:{exc}"
+    return {
+        "python": sys.version.split()[0],
+        "multipart": has("multipart"),
+        "uvicorn": has("uvicorn"),
+        "paramiko": has("paramiko"),
+        "app_loaded": True,
+    }
+
 # Vercel's Python runtime picks up an ASGI callable named `app`.
