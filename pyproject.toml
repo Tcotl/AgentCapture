@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-capture-honeypot"
-version = "0.5.0"
+version = "0.0.6"
 license = "AGPL-3.0-or-later"
 description = "Embedded honeypot and agent-detection platform for AI-driven web probing"
 readme = "README.md"
