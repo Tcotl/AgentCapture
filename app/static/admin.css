@@ -1542,6 +1542,15 @@ button.is-loading {
 }
 .utility-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* 中/EN language toggle (utility strip) — chip-styled submit button */
+.lang-toggle-form { display: inline-flex; }
+.chip-lang { cursor: pointer; gap: 5px; padding: 4px 10px; }
+.lang-opt { opacity: 0.45; transition: opacity 150ms ease; }
+.lang-opt.on { opacity: 1; }
+.lang-sep { opacity: 0.4; font-weight: 400; }
+.chip-lang:hover .lang-opt { opacity: 0.85; }
+.chip-lang:hover .lang-opt.on { opacity: 1; }
+
 .content { padding: 26px 32px 48px; }
 
 .sidebar-footer { padding: 10px 12px; }

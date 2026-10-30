@@ -8287,6 +8287,37 @@ def update_profile(
     return response
 
 
+@router.post("/admin/profile/language")
+def set_ui_language(
+    request: Request,
+    lang: str = Form(""),
+    next: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Utility-strip 中/EN toggle: flip the console language in one click."""
+    user = _require_user(request, db)
+    target = "en" if lang == "en" else "zh"
+    if user.preferred_language != target:
+        user.preferred_language = target
+        db.add(user)
+        db.commit()
+        log_execution(
+            db,
+            actor_username=user.username,
+            action="set-language",
+            module="profile",
+            target_type="user",
+            target_ref=user.username,
+            detail_json={"lang": target},
+        )
+    idx = next.find("/admin")  # tolerate the security-path prefix
+    response = _redirect(next[idx:] if idx >= 0 else "/admin")
+    response.set_cookie(
+        "ach:lang", target, max_age=3600 * 24 * 365, samesite="lax"
+    )
+    return response
+
+
 @router.post("/admin/profile/change-password")
 def change_profile_password(
     request: Request,

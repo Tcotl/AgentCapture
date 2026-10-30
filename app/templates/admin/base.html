@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.0.6" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.0.7" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -108,7 +108,15 @@
               <span class="utility-path">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}<span>/admin{% if active_path and active_path != '/admin' %} · {{ active_path }}{% endif %}</span></span>
               <div class="utility-right">
                 {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
-                {% if site_id %}<span class="chip">{{ site_id }}</span>{% endif %}
+                <form method="post" action="/admin/profile/language" class="lang-toggle-form">
+                  <input type="hidden" name="lang" value="{{ 'en' if lang == 'zh' else 'zh' }}">
+                  <input type="hidden" name="next" value="">
+                  <button type="submit" class="chip chip-lang" id="lang-toggle" aria-label="{{ '切换为中文' if lang == 'en' else 'Switch to English' }}" title="{{ '切换为中文' if lang == 'en' else 'Switch to English' }}">
+                    <span class="lang-opt{{ ' on' if lang == 'zh' else '' }}">中</span>
+                    <span class="lang-sep">/</span>
+                    <span class="lang-opt{{ ' on' if lang == 'en' else '' }}">EN</span>
+                  </button>
+                </form>
                 <span class="chip chip-live">Live</span>
                 <button type="button" class="utility-icon-btn" id="cmdk-open" aria-label="{{ _('全局搜索') }}" title="{{ _('全局搜索 (⌘K)') }}">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
@@ -681,6 +689,14 @@
         });
       }
 
+      function initLangToggle() {
+        // Language toggle posts back to the current page so context is kept.
+        const form = document.querySelector(".lang-toggle-form");
+        if (!form) return;
+        const nextInput = form.querySelector('input[name="next"]');
+        if (nextInput) nextInput.value = window.location.pathname + window.location.search;
+      }
+
       function initSidebarCollapse() {
         const btn = document.getElementById("sidebar-collapse");
         if (!btn) return;
@@ -769,6 +785,7 @@
 
       window.addEventListener("DOMContentLoaded", () => {
         initThemeToggle();
+        initLangToggle();
         initSidebarCollapse();
         initNavGroups();
         initFormSubmitGuard();
