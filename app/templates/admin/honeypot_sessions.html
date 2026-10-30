@@ -29,7 +29,7 @@
           <td>{{ row.command_count }}</td>
           <td>{{ (item.duration_s // 60).__str__() + 'm' + (item.duration_s % 60).__str__() + 's' }}</td>
           <td>{% if row.status == 'active' %}{{ badge('进行中', 'success') }}{% else %}{{ badge('已结束', 'muted') }}{% endif %}</td>
-          <td><a class="chip" href="/admin/honeypot-sessions/{{ row.id }}">{{ _( '回放 →' ) }}</a></td>
+          <td><div class="actions-inline"><a class="chip" data-qv="{{ row.id }}">{{ _( '快览' ) }}</a><a class="chip" href="/admin/honeypot-sessions/{{ row.id }}">{{ _( '回放 →' ) }}</a></div></td>
         </tr>
         {% else %}
         {{ empty_state(_('暂无蜜罐会话'), _('启动 SSH 端口服务蜜罐（需已安装 paramiko）后，攻击者的交互会话会出现在这里。'), 10, 'HS') }}
@@ -39,4 +39,52 @@
   </div>
   {{ pagination(pager.page, pager.per_page, pager.total, pager.base_url) }}
 </section>
+
+<script>
+(function () {
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function kv(k, v) {
+    return '<div class="ac-kv"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>';
+  }
+  document.querySelectorAll('[data-qv]').forEach(function (a) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var replay = a.parentNode.querySelector('a[href*="honeypot-sessions/"]');
+      var url = replay.getAttribute('href') + '/data.json';
+      fetch(url, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var tr = (d.transcript || []).map(function (e) {
+            if (e.kind === 'auth') {
+              return '<div class="ac-tl-row"><span class="badge ' + (e.accepted ? 'badge-success' : 'badge-danger') + '">AUTH · '
+                + esc(e.method || 'password') + ' · ' + esc(e.user || '?')
+                + (e.accepted ? ' · ok' : ' · denied') + '</span></div>';
+            }
+            if (e.kind === 'cmd') {
+              return '<div class="hp-qv-cmd">' + esc(e.user || 'root') + '@honeypot:~$ ' + esc(e.cmd || '')
+                + (e.out ? '<span class="hp-qv-out"><br>' + esc(String(e.out).slice(0, 260)) + '</span>' : '') + '</div>';
+            }
+            if (e.kind === 'session_open') return '<div class="insp-empty">— session opened —</div>';
+            return '';
+          }).join('');
+          window.acDrawer({{ _('会话快览') | tojson }} + ' · ' + d.source_ip,
+            '<div class="ac-kv-grid">'
+            + kv({{ _('服务') | tojson }}, d.service)
+            + kv({{ _('端口') | tojson }}, d.port)
+            + kv({{ _('状态') | tojson }}, d.status)
+            + kv({{ _('开始') | tojson }}, d.started)
+            + '</div>'
+            + '<div class="ac-sub">{{ _('交互记录') | tojson }}</div>'
+            + (tr || '<div class="insp-empty">{{ _('暂无交互记录') }}</div>'),
+            replay.getAttribute('href'));
+        })
+        .catch(function () { window.location.assign(replay.getAttribute('href')); });
+    });
+  });
+})();
+</script>
 {% endblock %}

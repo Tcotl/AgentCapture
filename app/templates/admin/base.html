@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.10.12" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.10.13" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -1064,5 +1064,152 @@
 })();
 </script>
 
-</body>
+
+<script>
+/* ── UX infra: glossary tooltips / global time range / drawer ── */
+(function () {
+  var lang = {{ (lang or 'zh') | tojson }};
+  var TERMS = lang === 'en' ? [
+    ['decoy', 'A trap disguised as sensitive data or an API — touching it exposes the attacker and leaves a traceable watermark.'],
+    ['honeypot', 'A trap environment mimicking real services, built to attract and record attacker behavior.'],
+    ['recruit', 'Turn the attacker\'s automated agent into our own sensor and harvest its device and behavior data.'],
+    ['counter-offense', 'Active measures against attackers: injected directives, counter playbooks.'],
+    ['profile', 'Per-IP attacker dossier aggregated from behavior: UA, fingerprints, activity.'],
+    ['fingerprint', 'Client identification derived from request traits (UA, headers, behavior).'],
+    ['prompt injection', 'Directives aimed at AI attack agents to expose them or make them work for us.'],
+    ['JSONP', 'Counter-technique that harvests attacker-side info through JSONP callbacks.']
+  ] : [
+    ['蜜饵', '伪装成敏感数据或接口的陷阱，攻击者一旦触碰即暴露身份并留下溯源水印。'],
+    ['蜜罐', '伪装成真实服务的陷阱环境，用来吸引并记录攻击行为。'],
+    ['收编', '把攻击者的自动化 Agent 转化为我方探针，反向获取其设备与行为信息。'],
+    ['反制', '对攻击者主动实施的对抗动作：注入指令、投放反制剧本等。'],
+    ['画像', '按来源 IP 聚合出的攻击者特征档案：UA、指纹、行为与兴趣。'],
+    ['指纹', '从请求特征（UA、头部、行为序列）识别出的客户端类型标识。'],
+    ['提示词注入', '面向 AI 攻击 Agent 的诱导指令，使其暴露自身或执行我方任务。'],
+    ['JSONP', '利用 JSONP 回调接口获取攻击端信息的反制手段。']
+  ];
+  var SEL = '.page-header-title, .page-description, .panel-title, .panel-subtitle';
+  document.querySelectorAll(SEL).forEach(function (el) {
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    var nodes = [];
+    while (walker.nextNode()) {
+      if (walker.currentNode.textContent.trim()) nodes.push(walker.currentNode);
+    }
+    nodes.forEach(function (node) {
+      var text = node.textContent;
+      var lower = text.toLowerCase();
+      var hit = null;
+      for (var i = 0; i < TERMS.length; i++) {
+        if (lower.indexOf(TERMS[i][0].toLowerCase()) >= 0) { hit = TERMS[i]; break; }
+      }
+      if (!hit) return;
+      var idx = lower.indexOf(hit[0].toLowerCase());
+      var span = document.createElement('span');
+      span.className = 'glossary-term';
+      span.setAttribute('data-tip', hit[1]);
+      span.setAttribute('tabindex', '0');
+      span.textContent = text.substr(idx, hit[0].length);
+      node.textContent = text.slice(idx + hit[0].length);
+      node.parentNode.insertBefore(span, node);
+      node.parentNode.insertBefore(document.createTextNode(text.slice(0, idx)), span);
+    });
+  });
+})();
+
+(function () {
+  var SUPPORTED = ['/admin/attacks', '/admin/attack-sources', '/admin/attacker-profiles',
+    '/admin/credentials', '/admin/payload-tracking', '/admin/agent-interactions', '/admin/recon-data'];
+  var path = location.pathname;
+  var hit = SUPPORTED.find(function (p) { return path.indexOf(p) >= 0; });
+  if (!hit) return;
+  var params = new URLSearchParams(location.search);
+  var df = params.get('date_from') || '';
+  var opts = [
+    ['all', {{ _('全部时间') | tojson }}],
+    ['24h', {{ _('最近 24 小时') | tojson }}],
+    ['7d', {{ _('最近 7 天') | tojson }}],
+    ['30d', {{ _('最近 30 天') | tojson }}],
+    ['90d', {{ _('最近 90 天') | tojson }}]
+  ];
+  var select = document.createElement('select');
+  select.id = 'global-time';
+  select.className = 'chip';
+  select.style.cursor = 'pointer';
+  opts.forEach(function (o) {
+    var op = document.createElement('option');
+    op.value = o[0]; op.textContent = o[1];
+    select.appendChild(op);
+  });
+  var cur = 'all';
+  if (df) {
+    var from = new Date(df), to = params.get('date_to') ? new Date(params.get('date_to')) : new Date();
+    var days = Math.round((to - from) / 86400000) + 1;
+    cur = { 1: '24h', 2: '24h', 7: '7d', 8: '7d', 30: '30d', 31: '30d', 90: '90d', 91: '90d' }[days] || 'custom';
+  }
+  if (cur === 'custom') {
+    var oc = document.createElement('option');
+    oc.value = 'custom'; oc.textContent = {{ _('自定义区间') | tojson }};
+    select.appendChild(oc);
+  }
+  select.value = cur;
+  var right = document.querySelector('.utility-right');
+  if (right) right.insertBefore(select, document.getElementById('cmdk-open'));
+  function iso(daysAgo) {
+    return new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+  }
+  function apply(v) {
+    var p = new URLSearchParams(location.search);
+    if (v === 'all' || v === 'custom') { p.delete('date_from'); p.delete('date_to'); }
+    else {
+      var days = v === '24h' ? 1 : v === '7d' ? 7 : v === '30d' ? 30 : 90;
+      p.set('date_from', iso(days - 1));
+      p.set('date_to', iso(0));
+    }
+    p.delete('page');
+    try { localStorage.setItem('ach:timeRange', v); } catch (e) {}
+    var qs = p.toString();
+    window.location.assign(location.pathname + (qs ? '?' + qs : ''));
+  }
+  select.addEventListener('change', function () { apply(select.value); });
+  if (!df) {
+    var saved = null;
+    try { saved = localStorage.getItem('ach:timeRange'); } catch (e) {}
+    if (saved && saved !== 'all' && saved !== 'custom') apply(saved);
+  }
+})();
+
+window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
+  var ov = document.getElementById('ac-drawer-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ac-drawer-overlay';
+    ov.className = 'ac-drawer-overlay';
+    ov.innerHTML = '<aside class="ac-drawer"><div class="ac-drawer-head">'
+      + '<div class="ac-drawer-title"></div><div class="ac-drawer-actions"></div>'
+      + '<button type="button" class="ac-drawer-close" aria-label="{{ _('关闭') }}">✕</button></div>'
+      + '<div class="ac-drawer-body"></div></aside>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) ov.hidden = true; });
+    ov.querySelector('.ac-drawer-close').addEventListener('click', function () { ov.hidden = true; });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && !ov.hidden && !document.getElementById('cmdk').hidden) { /* cmdk 优先 */ }
+      else if (ev.key === 'Escape' && !ov.hidden) ov.hidden = true;
+    });
+  }
+  ov.hidden = false;
+  ov.querySelector('.ac-drawer-title').textContent = title;
+  var acts = ov.querySelector('.ac-drawer-actions');
+  acts.innerHTML = '';
+  if (fullUrl) {
+    var a = document.createElement('a');
+    a.className = 'chip';
+    a.href = fullUrl;
+    a.textContent = {{ _('在完整页打开') | tojson }};
+    acts.appendChild(a);
+  }
+  ov.querySelector('.ac-drawer-body').innerHTML = bodyHtml;
+  return ov;
+};
+</script>
+</body></body>
 </html>

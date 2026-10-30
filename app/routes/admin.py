@@ -3757,6 +3757,40 @@ def admin_attack_detail(session_id: str, request: Request, db: Session = Depends
     )
 
 
+@router.get("/admin/attacks/{session_id}/detail.json")
+def admin_attack_detail_json(session_id: str, request: Request, db: Session = Depends(get_db)):
+    """Slim JSON for the attack-detail drawer on the attacks list page."""
+    _require_user(request, db)
+    detail = session_detail(db, session_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="session not found")
+    from app.services.timefmt import as_utc
+
+    timeline_full = detail.get("timeline") or []
+    timeline = []
+    for item in timeline_full[:60]:
+        ev = item.get("event")
+        timeline.append({
+            "ts": as_utc(ev.created_at).strftime("%m-%d %H:%M:%S"),
+            "method": ev.method,
+            "path": ev.path,
+            "status": ev.status_code,
+            "risk": ev.risk_score,
+            "decision": ev.decision,
+            "signals": (ev.signals_json or [])[:4],
+        })
+    return {
+        "session_id": detail.get("session_id"),
+        "source_ip": detail.get("source_ip"),
+        "user_agent": detail.get("user_agent"),
+        "labels": detail.get("labels") or [],
+        "automation_score": detail.get("automation_score"),
+        "events_total": len(timeline_full),
+        "duration_seconds": detail.get("duration_seconds"),
+        "timeline": timeline,
+    }
+
+
 @router.get("/admin/sessions/{session_id}", response_class=HTMLResponse)
 def admin_session_portrait(session_id: str, request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
@@ -4339,6 +4373,31 @@ def admin_honeypot_session_detail(session_pk: int, request: Request, db: Session
             "duration_s": duration_s,
         },
     )
+
+
+@router.get("/admin/honeypot-sessions/{session_pk}/data.json")
+def honeypot_session_data_json(session_pk: int, request: Request, db: Session = Depends(get_db)):
+    """Quick-view JSON for the session drawer on the sessions list page."""
+    _require_user(request, db)
+    from app.models.honeypot_session import HoneypotSession
+
+    row = db.get(HoneypotSession, session_pk)
+    if not row:
+        raise HTTPException(status_code=404)
+    from app.services.timefmt import as_utc
+
+    end = as_utc(row.ended_at)
+    return {
+        "id": row.id,
+        "service": row.service,
+        "source_ip": row.source_ip,
+        "port": row.port,
+        "username": row.username,
+        "status": row.status,
+        "started": as_utc(row.started_at).strftime("%m-%d %H:%M:%S") if row.started_at else "",
+        "ended": end.strftime("%m-%d %H:%M:%S") if end else "",
+        "transcript": row.transcript_json or [],
+    }
 
 
 @router.get("/admin/honeypot-sessions/{session_pk}/export.pcap")
@@ -8112,11 +8171,25 @@ def change_profile_password(
 
 
 @router.get("/admin/recon-data", response_class=HTMLResponse)
-def admin_recon_data(request: Request, db: Session = Depends(get_db)):
+def admin_recon_data(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    db: Session = Depends(get_db),
+):
     user = _require_user(request, db)
+    from app.services.events import _parse_datetime_filter
+
+    start = _parse_datetime_filter(date_from)
+    end = _parse_datetime_filter(date_to, end_of_day=True)
+    conds = [Event.event_type == "recon_fingerprint"]
+    if start:
+        conds.append(Event.created_at >= start)
+    if end:
+        conds.append(Event.created_at < end)
     items = db.scalars(
         select(Event)
-        .where(Event.event_type == "recon_fingerprint")
+        .where(*conds)
         .order_by(desc(Event.created_at))
         .limit(200)
     ).all()
@@ -8126,11 +8199,25 @@ def admin_recon_data(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/admin/payload-tracking", response_class=HTMLResponse)
-def admin_payload_tracking(request: Request, db: Session = Depends(get_db)):
+def admin_payload_tracking(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    db: Session = Depends(get_db),
+):
     user = _require_user(request, db)
+    from app.services.events import _parse_datetime_filter
+
+    start = _parse_datetime_filter(date_from)
+    end = _parse_datetime_filter(date_to, end_of_day=True)
+    conds = [Event.event_type.in_(["payload_download", "payload_callback"])]
+    if start:
+        conds.append(Event.created_at >= start)
+    if end:
+        conds.append(Event.created_at < end)
     items = db.scalars(
         select(Event)
-        .where(Event.event_type.in_(["payload_download", "payload_callback"]))
+        .where(*conds)
         .order_by(desc(Event.created_at))
         .limit(200)
     ).all()
@@ -8142,16 +8229,30 @@ def admin_payload_tracking(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/admin/agent-interactions", response_class=HTMLResponse)
-def admin_agent_interactions(request: Request, db: Session = Depends(get_db)):
+def admin_agent_interactions(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    db: Session = Depends(get_db),
+):
     user = _require_user(request, db)
+    from app.services.events import _parse_datetime_filter
+
+    start = _parse_datetime_filter(date_from)
+    end = _parse_datetime_filter(date_to, end_of_day=True)
+    conds = [
+        Event.event_type.in_(["agent_interaction", "agent_verification"])
+        | Event.signals_json.contains("ai_agent_")
+        | Event.signals_json.contains("agent_product:")
+        | Event.signals_json.contains("agent_injected:")
+    ]
+    if start:
+        conds.append(Event.created_at >= start)
+    if end:
+        conds.append(Event.created_at < end)
     items = db.scalars(
         select(Event)
-        .where(
-            Event.event_type.in_(["agent_interaction", "agent_verification"])
-            | Event.signals_json.contains("ai_agent_")
-            | Event.signals_json.contains("agent_product:")
-            | Event.signals_json.contains("agent_injected:")
-        )
+        .where(*conds)
         .order_by(desc(Event.created_at))
         .limit(200)
     ).all()
@@ -8749,11 +8850,24 @@ def admin_playbook_apply(
 
 
 @router.get("/admin/attacker-profiles", response_class=HTMLResponse)
-def admin_attacker_profiles(request: Request, db: Session = Depends(get_db)):
+def admin_attacker_profiles(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    db: Session = Depends(get_db),
+):
     user = _require_user(request, db)
     from app.models.credential import CredentialObservation
     from app.services.counter_intel import attacker_tags
+    from app.services.events import _parse_datetime_filter
 
+    start = _parse_datetime_filter(date_from)
+    end = _parse_datetime_filter(date_to, end_of_day=True)
+    conds = []
+    if start:
+        conds.append(Event.created_at >= start)
+    if end:
+        conds.append(Event.created_at < end)
     rows = db.execute(
         select(
             Event.source_ip,
@@ -8762,6 +8876,7 @@ def admin_attacker_profiles(request: Request, db: Session = Depends(get_db)):
             func.min(Event.created_at).label("first_seen"),
             func.max(Event.created_at).label("last_seen"),
         )
+        .where(*conds)
         .group_by(Event.source_ip)
         .order_by(desc("events"))
         .limit(100)

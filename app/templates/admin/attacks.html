@@ -260,4 +260,52 @@
     </section>
   </div>
 </div>
+
+<script>
+(function () {
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function kv(k, v) {
+    return '<div class="ac-kv"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>';
+  }
+  document.querySelectorAll('a[href$="/admin/attacks/"], a[href*="/admin/attacks/"]').forEach(function () {});
+  document.querySelectorAll('.actions-inline a.chip.primary').forEach(function (a) {
+    var href = a.getAttribute('href') || '';
+    var m = href.match('/admin/attacks/([^/?]+)$'.replace('/', '\/'));
+    if (!m) {
+      var m2 = href.match(/([^/]+)\/?$/);
+      if (!m2 || href.indexOf('attacks') < 0) return;
+    }
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      fetch(href + '/detail.json', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var body = '<div class="ac-kv-grid">'
+            + kv({{ _('来源 IP') | tojson }}, d.source_ip)
+            + kv({{ _('自动化评分') | tojson }}, d.automation_score == null ? '-' : d.automation_score)
+            + kv({{ _('事件数') | tojson }}, d.events_total)
+            + kv('User-Agent', d.user_agent || '-')
+            + '</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+            + (d.labels || []).map(function (l) { return '<span class="badge badge-info">' + esc(l) + '</span>'; }).join('')
+            + '</div>'
+            + '<div class="ac-sub">{{ _('时间线') | tojson }}</div><div class="ac-tl">'
+            + (d.timeline || []).map(function (t) {
+                return '<div class="ac-tl-row"><span class="ts">' + esc(t.ts) + '</span>'
+                  + '<span>' + esc(t.method) + ' ' + esc(t.path) + '</span>'
+                  + '<span>' + esc(t.status) + '</span>'
+                  + '<span class="' + (t.risk >= 70 ? 'risk-high' : '') + '">risk ' + esc(t.risk) + '</span></div>';
+              }).join('')
+            + '</div>';
+          window.acDrawer({{ _('攻击详情') | tojson }} + ' · ' + d.source_ip, body, href);
+        })
+        .catch(function () { window.location.assign(href); });
+    });
+  });
+})();
+</script>
 {% endblock %}
