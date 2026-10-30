@@ -3118,4 +3118,22 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   box-shadow: 0 10px 26px rgba(37, 99, 235, .32) !important; }
 .tour-launcher .tour-launch-btns { display: flex; gap: 10px; margin-top: 8px; }
 [data-theme="light"] .tour-spot { box-shadow: 0 0 0 9999px rgba(15, 23, 42, .45); }
+.tour-card.tour-picker { position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); }
+.tour-scenario { display: flex; align-items: center; gap: 12px; padding: 12px;
+  border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease; }
+.tour-scenario:hover { border-color: var(--ring);
+  background: color-mix(in srgb, rgb(var(--pm-accent-rgb)) 8%, transparent); }
+.tour-sc-ic { width: 36px; height: 36px; border-radius: 10px; flex: 0 0 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, rgb(var(--pm-accent-rgb)) 12%, transparent);
+  color: var(--ring); }
+.tour-sc-ic svg { width: 18px; height: 18px; }
+.tour-sc-main { flex: 1; min-width: 0; }
+.tour-sc-main b { display: block; font-size: 13px; font-weight: 700; }
+.tour-sc-main small { display: block; font-size: 11px; color: var(--muted-foreground);
+  margin-top: 2px; }
+.tour-sc-n { flex: 0 0 auto; font-size: 10px; color: var(--muted-foreground);
+  font-family: "Fira Code", ui-monospace, monospace; }
 @media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }
