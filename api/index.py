@@ -29,6 +29,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from app.main import app  # noqa: E402
 
+# TEMP form diagnostics (remove)
+import traceback  # noqa: E402
+
+@app.post("/api/__formdiag")
+async def _formdiag(request):  # noqa: E402
+    try:
+        form = await request.form()
+        return {"ok": True, "fields": dict(form)}
+    except Exception as exc:
+        return {"ok": False, "err": repr(exc),
+                "tb": traceback.format_exc()[-1800:]}
+
 # TEMP body-parse diagnostics
 import traceback  # noqa: E402
 
