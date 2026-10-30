@@ -526,6 +526,18 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
             }
             for group in nav_groups
         ],
+        "cmdk_pages": [
+            {
+                "group": "page",
+                "groupLabel": _(group["title"]),
+                "title": _(item["label"]),
+                "sub": _(item["description"]),
+                "url": item["href"],
+            }
+            for group in nav_groups
+            for item in group["links"]
+            if not item["header"] and item["href"]
+        ],
         "active_path": active_path,
         "site_id": get_settings().site_id,
         "admin_access_path": admin_access_path,
@@ -10068,6 +10080,136 @@ async def api_managed_host_profile_collect(
             },
         )
     return {"ok": True, "queued": len(created), "skipped": len(skipped)}
+
+
+@router.get("/api/admin/search")
+def api_admin_search(request: Request, q: str = "", db: Session = Depends(get_db)):
+    """⌘K command-palette entity search: IP / domain / session / host."""
+    _require_user(request, db)
+    q = (q or "").strip()
+    if not q:
+        return {"items": []}
+    from sqlalchemy import or_ as _or
+
+    like = f"%{q}%"
+    items: list[dict] = []
+    from app.models.c2_agent import C2Agent
+    from app.models.credential import CredentialObservation
+    from app.models.honeypot_session import HoneypotSession
+    from app.models.internet_system import InternetSystem
+    from app.models.managed import ManagedHost
+
+    for s in db.scalars(
+        select(InternetSystem)
+        .where(_or(InternetSystem.domain.like(like), InternetSystem.name.like(like)))
+        .limit(4)
+    ):
+        items.append({
+            "group": "system", "title": s.name, "sub": s.domain,
+            "url": "/admin/internet-systems",
+        })
+    for a in db.scalars(
+        select(C2Agent)
+        .where(
+            _or(
+                C2Agent.agent_id.like(like),
+                C2Agent.hostname.like(like),
+                C2Agent.username.like(like),
+                C2Agent.source_ip.like(like),
+            )
+        )
+        .limit(4)
+    ):
+        items.append({
+            "group": "agent",
+            "title": a.hostname or a.username or a.agent_id[:12],
+            "sub": a.source_ip,
+            "url": f"/admin/c2/agents/{a.agent_id}",
+        })
+    for h in db.scalars(
+        select(ManagedHost)
+        .where(
+            _or(
+                ManagedHost.host_uid.like(like),
+                ManagedHost.hostname.like(like),
+                ManagedHost.username.like(like),
+                ManagedHost.external_ips.like(like),
+            )
+        )
+        .limit(3)
+    ):
+        items.append({
+            "group": "managed",
+            "title": h.hostname or h.display_name or h.host_uid[:16],
+            "sub": (h.external_ips or ["-"])[0],
+            "url": "/admin/c2/console",
+        })
+    for s in db.scalars(
+        select(HoneypotSession)
+        .where(
+            _or(
+                HoneypotSession.source_ip.like(like),
+                HoneypotSession.session_id.like(like),
+                HoneypotSession.service.like(like),
+                HoneypotSession.username.like(like),
+            )
+        )
+        .order_by(HoneypotSession.id.desc())
+        .limit(4)
+    ):
+        items.append({
+            "group": "session",
+            "title": f"#{s.id} {s.service} · {s.source_ip}",
+            "sub": (s.username or "-") + " · port " + str(s.port),
+            "url": f"/admin/honeypot-sessions/{s.id}",
+        })
+    for c in db.scalars(
+        select(CredentialObservation)
+        .where(
+            _or(
+                CredentialObservation.source_ip.like(like),
+                CredentialObservation.username.like(like),
+            )
+        )
+        .order_by(CredentialObservation.id.desc())
+        .limit(3)
+    ):
+        items.append({
+            "group": "credential",
+            "title": f"{c.username} @ {c.source_ip}",
+            "sub": c.service_name,
+            "url": "/admin/credentials",
+        })
+    for d in db.scalars(
+        select(DecoyDeployment)
+        .where(
+            _or(
+                DecoyDeployment.fetch_path.like(like),
+                DecoyDeployment.unique_token.like(like),
+            )
+        )
+        .limit(3)
+    ):
+        items.append({
+            "group": "decoy", "title": d.fetch_path, "sub": d.deployed_host or "",
+            "url": "/admin/decoy-management",
+        })
+    if re.fullmatch(r"[0-9a-fA-F:]{2,45}", q) and ":" in q or re.fullmatch(
+        r"\d{1,3}(?:\.\d{1,3}){0,3}", q
+    ):
+        items.append({
+            "group": "attack", "title": q,
+            "sub": "source_ip filter",
+            "url": f"/admin/attacks?source_ip={q}",
+        })
+    # item URLs are root-relative to the admin surface; honor the configured
+    # security path so the palette works on non-default deployments
+    from app.services.system_settings import get_admin_access_path
+
+    prefix = "/" + get_admin_access_path()
+    for item in items:
+        item["url"] = prefix + item["url"]
+    return {"items": items}
 
 
 @router.post("/api/admin/managed/tasks/{task_id}/review")

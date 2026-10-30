@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.10.11" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.10.12" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -110,6 +110,9 @@
                 {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
                 {% if site_id %}<span class="chip">{{ site_id }}</span>{% endif %}
                 <span class="chip chip-live">Live</span>
+                <button type="button" class="utility-icon-btn" id="cmdk-open" aria-label="{{ _('全局搜索') }}" title="{{ _('全局搜索 (⌘K)') }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+                </button>
                 <button type="button" class="theme-toggle" id="theme-toggle" aria-label="{{ _('切换明暗主题') }}" title="{{ _('切换明暗主题') }}">
                   <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                   <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -887,5 +890,141 @@
         } else { enhanceAll(); }
       })();
     </script>
-  </body>
+  
+<div class="cmdk-overlay" id="cmdk" hidden>
+  <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="{{ _('全局搜索') }}">
+    <div class="cmdk-head">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <input id="cmdk-input" type="text" placeholder="{{ _('搜索页面、IP、域名、会话…') }}" autocomplete="off" spellcheck="false">
+      <button type="button" class="secondary cmdk-close" id="cmdk-close" title="{{ _('关闭') }}">Esc</button>
+    </div>
+    <div class="cmdk-results" id="cmdk-results"></div>
+    <div class="cmdk-foot">{{ _('↑↓ 选择 · Enter 打开 · Esc 关闭') }}</div>
+  </div>
+</div>
+<script id="cmdk-pages" type="application/json">{{ cmdk_pages | tojson }}</script>
+<script>
+(function () {
+  var overlay = document.getElementById('cmdk');
+  var input = document.getElementById('cmdk-input');
+  var resultsEl = document.getElementById('cmdk-results');
+  var pagesEl = document.getElementById('cmdk-pages');
+  var PAGES = [];
+  try { PAGES = JSON.parse(pagesEl.textContent); } catch (e) {}
+  var GROUP_LABEL = {
+    page: {{ _('页面') | tojson }},
+    system: {{ _('资产节点') | tojson }},
+    agent: {{ _('上线 Agent') | tojson }},
+    managed: {{ _('受管主机') | tojson }},
+    session: {{ _('蜜罐会话') | tojson }},
+    credential: {{ _('凭证记录') | tojson }},
+    decoy: {{ _('蜜饵部署') | tojson }},
+    attack: {{ _('攻击流量') | tojson }}
+  };
+  var items = [], active = -1, timer = null;
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function open() {
+    overlay.hidden = false;
+    input.value = '';
+    runQuery('');
+    setTimeout(function () { input.focus(); }, 0);
+  }
+  function close() { overlay.hidden = true; }
+  function isOpen() { return !overlay.hidden; }
+
+  function render(list) {
+    items = list;
+    active = list.length ? 0 : -1;
+    if (!list.length) {
+      resultsEl.innerHTML = '<div class="cmdk-empty">' + {{ _('无结果') | tojson }} + '</div>';
+      return;
+    }
+    var html = '', lastGroup = null;
+    list.forEach(function (o, idx) {
+      if (o.group !== lastGroup) {
+        html += '<div class="cmdk-group">' + esc(GROUP_LABEL[o.group] || o.group) + '</div>';
+        lastGroup = o.group;
+      }
+      html += '<div class="cmdk-item' + (idx === active ? ' active' : '') + '" data-idx="' + idx + '">'
+        + '<span class="cmdk-item-main"><b>' + esc(o.title) + '</b>'
+        + (o.sub ? '<small>' + esc(o.sub) + '</small>' : '') + '</span>'
+        + '<span class="cmdk-item-group">' + esc(GROUP_LABEL[o.group] || o.group) + '</span></div>';
+    });
+    resultsEl.innerHTML = html;
+    scrollToActive();
+  }
+  function scrollToActive() {
+    var el = resultsEl.querySelector('.cmdk-item.active');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+  function move(dir) {
+    if (!items.length) return;
+    active = (active + dir + items.length) % items.length;
+    resultsEl.querySelectorAll('.cmdk-item').forEach(function (el, i) {
+      el.classList.toggle('active', i === active);
+    });
+    scrollToActive();
+  }
+  function go(idx) {
+    var o = items[idx];
+    if (!o) return;
+    close();
+    window.location.assign(o.url);
+  }
+  function pageMatches(q) {
+    var ql = q.toLowerCase();
+    return PAGES.filter(function (p) {
+      return !q || (p.title + ' ' + p.sub + ' ' + p.group + ' ' + p.url).toLowerCase().indexOf(ql) >= 0;
+    }).slice(0, 8);
+  }
+  function runQuery(q) {
+    var ql = q.trim().toLowerCase();
+    var list = pageMatches(ql);
+    if (!ql) { render(list); return; }
+    // 出站中间件会自动把这里的 /api/... 重写为带安全路径前缀
+    fetch('/api/admin/search?q=' + encodeURIComponent(ql), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var seen = {};
+        list.forEach(function (o) { seen[o.url] = 1; });
+        (d.items || []).forEach(function (o) { if (!seen[o.url]) list.push(o); });
+        render(list);
+      })
+      .catch(function () { render(list); });
+  }
+
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    var q = input.value;
+    timer = setTimeout(function () { runQuery(q); }, 160);
+  });
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); move(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); move(-1); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); go(active); }
+  });
+  resultsEl.addEventListener('click', function (ev) {
+    var el = ev.target.closest('.cmdk-item');
+    if (el) go(Number(el.getAttribute('data-idx')));
+  });
+  document.getElementById('cmdk-open').addEventListener('click', open);
+  document.getElementById('cmdk-close').addEventListener('click', close);
+  overlay.addEventListener('click', function (ev) { if (ev.target === overlay) close(); });
+  document.addEventListener('keydown', function (ev) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault();
+      if (isOpen()) close(); else open();
+    } else if (ev.key === 'Escape' && isOpen()) {
+      close();
+    }
+  });
+})();
+</script>
+
+</body>
 </html>
