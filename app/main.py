@@ -37,6 +37,15 @@ def _patch_starlette_form_parser_default_charset() -> None:
 
     from starlette import formparsers
 
+    # Starlette ≥1.0 reworked FormParser internals: no legacy on_end callback
+    # attribute, no self.messages protocol. The UTF-8 default-charset patch no
+    # longer applies there — patching would break every form POST (400).
+    # On the new parser the field bytes are still decoded latin-1 then
+    # percent-decoded, which handles the common ASCII login case; non-ASCII
+    # form fields on Starlette 1.x are a known upstream limitation.
+    if not hasattr(formparsers.FormParser, "on_end"):
+        return
+
     async def _patched_parse(self):  # type: ignore[no-untyped-def]
         from multipart.multipart import QuerystringParser
 
