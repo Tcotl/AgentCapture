@@ -385,6 +385,58 @@ NAV_GROUPS = [
     },
 ]
 
+# Interactive deployment tour (部署向导): cross-page guided walkthrough for
+# first-time operators. Steps carry the target page path plus an optional CSS
+# selector to spotlight; the engine in base.html drives navigation/state.
+DEPLOY_TOUR = [
+    {
+        "path": "/admin",
+        "title": "欢迎来到 AgentCapture",
+        "body": "五步完成首次部署：启动蜜罐 → 创建蜜饵 → 接入域名 → 观测攻击 → 反制收编。点击「下一步」开始。",
+    },
+    {
+        "path": "/admin/honeypots",
+        "title": "第 1 步 · 启动蜜罐",
+        "body": "三类蜜罐：Web 应用蜜罐默认开启；端口服务蜜罐（SSH / MySQL / Redis 等）逐项「启动蜜罐」，真实协议仿真等待连接。",
+        "sel": ".content .panel",
+    },
+    {
+        "path": "/admin/decoy-management",
+        "title": "第 2 步 · 创建蜜饵",
+        "body": "三类蜜饵：API 路由蜜饵捕获探测、凭证蜜饵带溯源水印、文件蜜饵触发下载告警。点击「＋ 新增蜜饵」创建第一个蜜饵。",
+        "sel": 'button[data-modal-open="decoy-create-modal"]',
+    },
+    {
+        "path": "/admin/internet-systems",
+        "title": "第 3 步 · 接入域名",
+        "body": "把业务域名接入嵌入式蜜罐：默认放行真实流量、灰度注入蜜饵与信号采集。点击「＋ 新增互联网系统」完成接入。",
+        "sel": 'button[data-modal-open="internet-create-modal"]',
+    },
+    {
+        "path": "/admin/attacks",
+        "title": "第 4 步 · 观测攻击",
+        "body": "攻击发生时按来源 IP 聚合在这里；顶栏时间范围可切换统计窗口；点「详情」在抽屉里查看会话时间线。",
+        "sel": ".table-wrap",
+    },
+    {
+        "path": "/admin/honeypot-sessions",
+        "title": "第 5 步 · 会话回放",
+        "body": "SSH 等交互会话逐命令回放；「快览」不用跳页即可在列表内预览交互记录。",
+        "sel": "[data-qv]",
+    },
+    {
+        "path": "/admin/c2/agents",
+        "title": "第 6 步 · 反制收编",
+        "body": "被反制收编的 Agent 上线后出现在这里：下发自然语言任务即可完成反制闭环。",
+        "sel": ".table-wrap",
+    },
+    {
+        "path": "/admin/c2/agents",
+        "title": "引导完成 🎉",
+        "body": "基础部署已完成。攻击与 Agent 上线后会实时出现在对应页面；随时可从控制台首页的「部署向导」重新打开本引导。",
+    },
+]
+
 NAV_ICONS = {
     "/admin": "dashboard",
     "/admin/big-screen": "monitor",
@@ -537,6 +589,10 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
             for group in nav_groups
             for item in group["links"]
             if not item["header"] and item["href"]
+        ],
+        "deploy_tour": [
+            {**step, "title": _(step["title"]), "body": _(step["body"])}
+            for step in DEPLOY_TOUR
         ],
         "active_path": active_path,
         "site_id": get_settings().site_id,

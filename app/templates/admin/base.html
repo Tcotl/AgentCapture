@@ -1211,5 +1211,186 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
   return ov;
 };
 </script>
+</body>
+<script id="tour-data" type="application/json">{{ deploy_tour | tojson }}</script>
+<script>
+(function () {
+  var TOUR = [];
+  try { TOUR = JSON.parse(document.getElementById('tour-data').textContent); } catch (e) {}
+  var KEY = 'ach:deployTour';
+  // TOUR paths arrive already rewritten with the security-path prefix by the
+  // outbound middleware — navigate with them as-is
+  var overlay = null, card = null, spot = null, cur = -1;
+
+  function store() { try { sessionStorage.setItem(KEY, JSON.stringify({ i: cur })); } catch (e) {} }
+  function done() { cur = -1; try { sessionStorage.removeItem(KEY); } catch (e) {} teardown(); }
+  function pathMatches(step) {
+    return location.pathname.indexOf(step.path) >= 0 || location.pathname.endsWith(step.path);
+  }
+  function targetEl(step) {
+    if (!step.sel) return null;
+    try { return document.querySelector(step.sel); } catch (e) { return null; }
+  }
+
+  function teardown() {
+    if (overlay) overlay.remove();
+    overlay = card = spot = null;
+  }
+
+  function show(idx) {
+    cur = idx;
+    store();
+    var step = TOUR[idx];
+    if (!step) { done(); return; }
+    // if this step lives on another page, wait silently — the 下一步 click already navigated
+    if (!pathMatches(step)) return;
+    var target = targetEl(step);
+    buildOverlay();
+    position(target);
+    renderCard(idx, step, target);
+  }
+
+  function buildOverlay() {
+    if (overlay) return;
+    overlay = document.createElement('div');
+    overlay.className = 'tour-overlay';
+    document.body.appendChild(overlay);
+    spot = document.createElement('div');
+    spot.className = 'tour-spot';
+    overlay.appendChild(spot);
+    card = document.createElement('div');
+    card.className = 'tour-card';
+    overlay.appendChild(card);
+    window.addEventListener('resize', function () { if (cur >= 0) show(cur); });
+    window.addEventListener('scroll', function () { if (cur >= 0) show(cur); }, true);
+  }
+
+  function position(target) {
+    var pad = 6;
+    if (target && target.getBoundingClientRect) {
+      var r = target.getBoundingClientRect();
+      spot.style.display = 'block';
+      spot.style.background = 'transparent';
+      spot.style.boxShadow = '0 0 0 9999px rgba(2, 6, 23, .62)';
+      spot.style.borderRadius = '12px';
+      spot.style.left = (r.left - pad) + 'px';
+      spot.style.top = (r.top - pad) + 'px';
+      spot.style.width = (r.width + pad * 2) + 'px';
+      spot.style.height = (r.height + pad * 2) + 'px';
+    } else {
+      // no target: dim the whole page for a centered modal step
+      spot.style.display = 'block';
+      spot.style.left = '0'; spot.style.top = '0';
+      spot.style.width = '100vw'; spot.style.height = '100vh';
+      spot.style.borderRadius = '0';
+      spot.style.boxShadow = 'none';
+      spot.style.background = 'rgba(2, 6, 23, .45)';
+    }
+  }
+
+  function renderCard(idx, step, target) {
+    var prevLabel = {{ _('上一步') | tojson }};
+    var nextLabel = idx === TOUR.length - 1 ? {{ _('完成引导') | tojson }} : {{ _('下一步') | tojson }};
+    var skipLabel = {{ _('跳过引导') | tojson }};
+    var progress = '{{ _('第') }} ' + (idx + 1) + ' / ' + TOUR.length + ' {{ _('步') }}';
+    card.innerHTML = '<div class="tour-progress">' + progress + '</div>'
+      + '<div class="tour-title">' + esc(step.title) + '</div>'
+      + '<div class="tour-body">' + esc(step.body) + '</div>'
+      + '<div class="tour-btns">'
+      + '<button type="button" class="tour-skip">' + esc(skipLabel) + '</button>'
+      + '<span style="flex:1"></span>'
+      + (idx > 0 ? '<button type="button" class="tour-prev">' + esc(prevLabel) + '</button>' : '')
+      + '<button type="button" class="tour-next tour-primary">' + esc(nextLabel) + '</button>'
+      + '</div>';
+    card.querySelector('.tour-skip').addEventListener('click', done);
+    var prevBtn = card.querySelector('.tour-prev');
+    if (prevBtn) prevBtn.addEventListener('click', function () { show(Math.max(0, idx - 1)); });
+    card.querySelector('.tour-next').addEventListener('click', function () {
+      if (idx === TOUR.length - 1) { done(); return; }
+      // next step may live on another page: persist and navigate there
+      var next = TOUR[idx + 1];
+      cur = idx + 1;
+      store();
+      if (!pathMatches(next)) teardown();
+      location.assign(next.path);
+    });
+    // place the card near the target (below preferred, above if cramped)
+    card.style.display = 'block';
+    if (target && target.getBoundingClientRect) {
+      var r = target.getBoundingClientRect();
+      var below = r.bottom + 14;
+      var vh = window.innerHeight;
+      if (below + 190 > vh) {
+        card.style.top = Math.max(12, r.top - 200) + 'px';
+      } else {
+        card.style.top = below + 'px';
+      }
+      card.style.left = Math.max(12, Math.min(window.innerWidth - 372, r.left)) + 'px';
+    } else {
+      card.style.top = '50%';
+      card.style.left = '50%';
+      card.style.transform = 'translate(-50%, -50%)';
+    }
+  }
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function start(from) {
+    try { sessionStorage.removeItem(KEY); } catch (e) {}
+    show(from || 0);
+  }
+  window.acDeployTour = start;
+
+  function injectLauncher() {
+    if (!pathMatches({ path: '/admin' })) return;
+    var doneFlag = false;
+    try { doneFlag = !!localStorage.getItem('ach:deployTourDone'); } catch (e) {}
+    var hasState = false;
+    try { hasState = !!sessionStorage.getItem(KEY); } catch (e) {}
+    if (doneFlag || hasState) return;
+    var content = document.querySelector('.content');
+    if (!content) return;
+    var banner = document.createElement('div');
+    banner.className = 'panel page-banner tour-launcher';
+    banner.innerHTML = '<div class="page-banner-body">'
+      + '<div class="panel-title page-banner-title">{{ _('部署向导') }}</div>'
+      + '<p class="page-banner-text">{{ _('第一次使用？启动交互式部署向导：启动蜜罐 → 创建蜜饵 → 接入域名 → 观测攻击 → 反制收编，五步带路式解说。') }}</p>'
+      + '<div class="tour-launch-btns">'
+      + '<button type="button" class="primary btn-sm" id="tour-launch">{{ _('启动向导') }}</button>'
+      + '<button type="button" class="chip" id="tour-dismiss">{{ _('不再显示') }}</button>'
+      + '</div></div>';
+    content.insertBefore(banner, content.firstChild);
+    banner.querySelector('#tour-launch').addEventListener('click', function () {
+      banner.remove();
+      start(0);
+    });
+    banner.querySelector('#tour-dismiss').addEventListener('click', function () {
+      try { localStorage.setItem('ach:deployTourDone', '1'); } catch (e) {}
+      banner.remove();
+    });
+  }
+
+  function boot() {
+    if (!TOUR.length) return;
+    var state = null;
+    try { state = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (state && typeof state.i === 'number' && state.i >= 0 && state.i < TOUR.length) {
+      show(state.i);           // resume mid-tour on the current page
+    } else {
+      injectLauncher();        // first-visit banner on the dashboard
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
 </body></body>
 </html>
