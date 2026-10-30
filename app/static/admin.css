@@ -2876,6 +2876,24 @@ th:hover .th-resizer::after { background: rgba(96, 165, 250, 0.55); }
 .utility-icon-btn[aria-pressed="true"] { color: var(--theme-accent-foreground); background: var(--theme-accent); border-color: var(--theme-accent); }
 .utility-icon-btn svg { width: 15px; height: 15px; }
 
+/* ⌘K / Ctrl+K shortcut badge on the global-search button.
+   The button picks up the global primary-button rule (blue/white text in
+   light theme, white/near-black in dark), so the badge inherits the
+   button's own currentColor to stay readable in both themes. */
+.cmdk-open-btn { width: auto; gap: 5px; padding: 0 7px; }
+.cmdk-kbd {
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  padding: 3px 4px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, currentColor 38%, transparent);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  color: inherit;
+}
+
 /* ---- disabled chip & danger ghost button ---- */
 .chip.is-disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 .btn-danger-ghost {

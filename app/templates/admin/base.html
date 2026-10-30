@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.0.7" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.0.9" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -118,8 +118,9 @@
                   </button>
                 </form>
                 <span class="chip chip-live">Live</span>
-                <button type="button" class="utility-icon-btn" id="cmdk-open" aria-label="{{ _('全局搜索') }}" title="{{ _('全局搜索 (⌘K)') }}">
+                <button type="button" class="utility-icon-btn cmdk-open-btn" id="cmdk-open" aria-label="{{ _('全局搜索') }}" title="{{ _('全局搜索 (⌘K)') }}">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+                  <kbd class="cmdk-kbd" id="cmdk-kbd" aria-hidden="true">⌘K</kbd>
                 </button>
                 <button type="button" class="theme-toggle" id="theme-toggle" aria-label="{{ _('切换明暗主题') }}" title="{{ _('切换明暗主题') }}">
                   <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -697,6 +698,19 @@
         if (nextInput) nextInput.value = window.location.pathname + window.location.search;
       }
 
+      function initCmdkHint() {
+        // Template ships the macOS ⌘K badge; Windows/Linux show Ctrl+K
+        // (the keydown handler already accepts both modifiers).
+        const kbd = document.getElementById("cmdk-kbd");
+        if (!kbd) return;
+        const ua = navigator.userAgent || "";
+        const isApple = /Mac|iPhone|iPad|iPod/i.test(ua) || navigator.platform === "MacIntel";
+        if (isApple) return;
+        kbd.textContent = "Ctrl+K";
+        const btn = document.getElementById("cmdk-open");
+        if (btn) btn.title = btn.title.replace("⌘K", "Ctrl+K");
+      }
+
       function initSidebarCollapse() {
         const btn = document.getElementById("sidebar-collapse");
         if (!btn) return;
@@ -786,6 +800,7 @@
       window.addEventListener("DOMContentLoaded", () => {
         initThemeToggle();
         initLangToggle();
+        initCmdkHint();
         initSidebarCollapse();
         initNavGroups();
         initFormSubmitGuard();
