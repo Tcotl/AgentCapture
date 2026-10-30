@@ -51,25 +51,24 @@ from app.core.config import get_settings as _gs  # noqa: E402
 def _diag():  # noqa: E402
     import importlib.util
     import sys
-    def has(mod):
+    def real_form_parse():
         try:
-            return importlib.util.find_spec(mod) is not None
+            from multipart.multipart import parse_options_header
+            result = parse_options_header(b"application/x-www-form-urlencoded")
+            return "ok:" + repr(result)[:80]
         except Exception as exc:
-            return f"err:{exc}"
-    def ver(mod):
+            return "IMPORT/PARSE-ERR: " + repr(exc)
+    def real_starlette_form():
         try:
-            m = __import__(mod)
-            return getattr(m, "__version__", "installed")
+            from starlette.formparsers import FormParser
+            return "FormParser-ok:" + repr(FormParser)
         except Exception as exc:
-            return f"missing/{exc}"
+            return "IMPORT-ERR: " + repr(exc)
     return {
         "python": sys.version.split()[0],
-        "multipart_import": has("multipart"),
-        "python_multipart_import": has("python_multipart"),
-        "multipart_ver": ver("multipart"),
-        "python_multipart_ver": ver("python_multipart"),
-        "starlette_ver": ver("starlette"),
-        "fastapi_ver": ver("fastapi"),
+        "real_form_parse": real_form_parse(),
+        "real_starlette_form": real_starlette_form(),
+        "app_loaded": True,
     }
 
 # Vercel's Python runtime picks up an ASGI callable named `app`.
