@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.0.9" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.0.10" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -117,7 +117,31 @@
                     <span class="lang-opt{{ ' on' if lang == 'en' else '' }}">EN</span>
                   </button>
                 </form>
-                <span class="chip chip-live">Live</span>
+                <div class="health-wrap">
+                  <button type="button" class="chip chip-live" id="sys-health-chip" aria-haspopup="true" aria-expanded="false" title="{{ _('系统运行状态') }}">
+                    <span id="sys-health-text">{{ _('运行中') }}</span>
+                  </button>
+                  <div class="health-pop" id="health-pop" hidden role="dialog" aria-label="{{ _('系统运行状态') }}">
+                    <div class="health-pop-title">{{ _('系统运行状态') }}</div>
+                    <div class="health-metric">
+                      <div class="health-row"><span class="health-k">CPU</span><b class="health-v" id="health-cpu-val">—</b></div>
+                      <div class="health-bar"><i id="health-cpu-bar"></i></div>
+                    </div>
+                    <div class="health-metric">
+                      <div class="health-row"><span class="health-k">{{ _('内存') }}</span><b class="health-v" id="health-mem-val">—</b></div>
+                      <div class="health-bar"><i id="health-mem-bar"></i></div>
+                    </div>
+                    <div class="health-metric">
+                      <div class="health-row"><span class="health-k">{{ _('磁盘') }}</span><b class="health-v" id="health-disk-val">—</b></div>
+                      <div class="health-bar"><i id="health-disk-bar"></i></div>
+                    </div>
+                    <div class="health-sub" id="health-sub">&nbsp;</div>
+                    <div class="health-row health-count">
+                      <span class="health-k">{{ _('运行中蜜罐') }}</span>
+                      <b class="health-v" id="health-hp-val">—</b>
+                    </div>
+                  </div>
+                </div>
                 <button type="button" class="utility-icon-btn cmdk-open-btn" id="cmdk-open" aria-label="{{ _('全局搜索') }}" title="{{ _('全局搜索 (⌘K)') }}">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
                   <kbd class="cmdk-kbd" id="cmdk-kbd" aria-hidden="true">⌘K</kbd>
@@ -711,6 +735,82 @@
         if (btn) btn.title = btn.title.replace("⌘K", "Ctrl+K");
       }
 
+      function initHealthChip() {
+        // Utility-strip status chip: hover or click reveals CPU / memory /
+        // disk / running-honeypot popover; data refreshes while visible.
+        const chip = document.getElementById("sys-health-chip");
+        const pop = document.getElementById("health-pop");
+        if (!chip || !pop) return;
+        let showTimer = null, hideTimer = null, pollTimer = null, pinned = false;
+        function setBar(id, pct) {
+          const bar = document.getElementById("health-" + id + "-bar");
+          const val = document.getElementById("health-" + id + "-val");
+          if (!bar || !val) return;
+          const v = typeof pct === "number" ? Math.max(0, Math.min(100, pct)) : null;
+          bar.style.width = (v === null ? 0 : v) + "%";
+          bar.classList.toggle("hot", v !== null && v >= 85);
+          bar.classList.toggle("warm", v !== null && v >= 60 && v < 85);
+          val.textContent = v === null ? "—" : v.toFixed(1) + "%";
+        }
+        async function refresh() {
+          try {
+            const res = await fetch("/admin/system-health", { headers: { Accept: "application/json" } });
+            if (!res.ok) throw new Error(String(res.status));
+            const d = await res.json();
+            const ok = !!d.ok;
+            setBar("cpu", ok ? d.cpu_percent : null);
+            setBar("mem", ok ? d.mem_percent : null);
+            setBar("disk", ok ? d.disk_percent : null);
+            const sub = document.getElementById("health-sub");
+            sub.textContent = ok
+              ? d.mem_used_gb + " / " + d.mem_total_gb + " GB · " + d.disk_used_gb + " / " + d.disk_total_gb + " GB"
+              : document.documentElement.lang === "en" ? "unavailable" : "暂无数据";
+            document.getElementById("health-hp-val").textContent = ok || d.honeypots_running != null ? d.honeypots_running : "—";
+            chip.classList.toggle("down", !ok);
+            const label = document.getElementById("sys-health-text");
+            if (label && !ok) label.textContent = document.documentElement.lang === "en" ? "Unknown" : "状态未知";
+          } catch (err) {
+            chip.classList.add("down");
+          }
+        }
+        function open() {
+          clearTimeout(hideTimer);
+          pop.hidden = false;
+          chip.setAttribute("aria-expanded", "true");
+          refresh();
+          if (!pollTimer) pollTimer = setInterval(refresh, 10000);
+        }
+        function close() {
+          pop.hidden = true;
+          chip.setAttribute("aria-expanded", "false");
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+        chip.addEventListener("mouseenter", () => {
+          clearTimeout(hideTimer);
+          if (!pop.hidden || pinned) return;
+          showTimer = setTimeout(open, 150);
+        });
+        chip.addEventListener("mouseleave", () => {
+          clearTimeout(showTimer);
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => { if (!pinned) close(); }, 250);
+        });
+        pop.addEventListener("mouseenter", () => clearTimeout(hideTimer));
+        pop.addEventListener("mouseleave", () => { if (!pinned) close(); });
+        chip.addEventListener("click", () => {
+          if (pop.hidden) { pinned = true; open(); }
+          else if (pinned) { pinned = false; close(); }
+          else { pinned = true; } // hover-opened: click pins it in place
+        });
+        document.addEventListener("click", (ev) => {
+          if (pop.hidden) return;
+          if (!pop.contains(ev.target) && !chip.contains(ev.target)) { pinned = false; close(); }
+        });
+        document.addEventListener("keydown", (ev) => {
+          if (ev.key === "Escape" && !pop.hidden) { pinned = false; close(); }
+        });
+      }
+
       function initSidebarCollapse() {
         const btn = document.getElementById("sidebar-collapse");
         if (!btn) return;
@@ -801,6 +901,7 @@
         initThemeToggle();
         initLangToggle();
         initCmdkHint();
+        initHealthChip();
         initSidebarCollapse();
         initNavGroups();
         initFormSubmitGuard();

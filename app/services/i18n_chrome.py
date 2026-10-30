@@ -146,6 +146,8 @@ EN = {
     "停用": "Disabled",
     "运行中": "Running",
     "已停止": "Stopped",
+    "系统运行状态": "System Health",
+    "状态未知": "Unknown",
 
     "高风险事件": "High-Risk Events",
     "攻击来源 IP": "Attack Source IPs",

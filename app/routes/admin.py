@@ -4761,6 +4761,51 @@ def _default_honeypot_row(db: Session) -> ServiceCatalog | None:
     return db.scalar(select(ServiceCatalog).where(ServiceCatalog.service_key == "thinkphp"))
 
 
+@router.get("/admin/system-health")
+def api_system_health(request: Request, db: Session = Depends(get_db)):
+    """Utility-strip status chip: CPU / memory / disk / running honeypots."""
+    _require_user(request, db)
+    from app.models.docker_honeypot import DockerHoneypot
+    from app.services.honeypot_services import port_listening, running_services
+    from app.services.system_settings import get_embedded_honeypot_enabled
+
+    health: dict = {"ok": True}
+    try:
+        import psutil
+
+        mem = psutil.virtual_memory()
+        data_dir = Path("./data")
+        disk = psutil.disk_usage(str(data_dir.resolve()) if data_dir.exists() else "/")
+        health.update(
+            cpu_percent=round(psutil.cpu_percent(interval=0.05), 1),
+            mem_percent=mem.percent,
+            mem_used_gb=round(mem.used / 2**30, 1),
+            mem_total_gb=round(mem.total / 2**30, 1),
+            disk_percent=disk.percent,
+            disk_used_gb=round(disk.used / 2**30, 1),
+            disk_total_gb=round(disk.total / 2**30, 1),
+        )
+    except Exception:  # noqa: BLE001 — the chip must survive a psutil failure
+        health["ok"] = False
+
+    running = running_services()
+    count = len(running)
+    tp_row = _default_honeypot_row(db)
+    web_port = tp_row.default_port if tp_row else 48777
+    if "thinkphp" not in running and port_listening(web_port):
+        count += 1  # web honeypot face up without its catalog row
+    count += (
+        db.scalar(
+            select(func.count()).select_from(DockerHoneypot).where(DockerHoneypot.status == "running")
+        )
+        or 0
+    )
+    if get_embedded_honeypot_enabled():
+        count += 1
+    health["honeypots_running"] = count
+    return JSONResponse(health)
+
+
 @router.get("/admin/honeypots", response_class=HTMLResponse)
 def admin_honeypots(request: Request, db: Session = Depends(get_db)):
     """蜜罐部署 — per-type deployment management. Each honeypot type gets its
