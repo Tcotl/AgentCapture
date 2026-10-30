@@ -27,19 +27,64 @@ import sys  # noqa: E402
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from starlette.requests import Request  # noqa: E402
+
 from app.main import app  # noqa: E402
 
-# TEMP form diagnostics (remove)
+# ── TEMP diagnostics for the demo form-parse 400 (remove after fix) ──
 import traceback  # noqa: E402
 
+@app.get("/api/__diag")
+def _diag():
+    import importlib.util
+    import sys
+    def has(mod):
+        try:
+            return importlib.util.find_spec(mod) is not None
+        except Exception as exc:
+            return f"err:{exc}"
+    def ver(mod):
+        try:
+            m = __import__(mod)
+            return getattr(m, "__version__", "installed")
+        except Exception as exc:
+            return f"missing/{exc}"
+    def real_form_parse():
+        try:
+            from multipart.multipart import parse_options_header
+            result = parse_options_header(b"application/x-www-form-urlencoded")
+            return "ok:" + repr(result)[:80]
+        except Exception as exc:
+            return "IMPORT/PARSE-ERR: " + repr(exc)
+    return {
+        "python": sys.version.split()[0],
+        "real_form_parse": real_form_parse(),
+        "starlette_ver": ver("starlette"),
+        "fastapi_ver": ver("fastapi"),
+        "multipart": has("multipart"),
+        "python_multipart": has("python_multipart"),
+    }
+
 @app.post("/api/__formdiag")
-async def _formdiag(request):  # noqa: E402
+async def _formdiag(request: Request):
     try:
         form = await request.form()
         return {"ok": True, "fields": dict(form)}
     except Exception as exc:
         return {"ok": False, "err": repr(exc),
                 "tb": traceback.format_exc()[-1800:]}
+
+@app.middleware("http")
+async def _log_body_parse_err(request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        detail = str(getattr(exc, "detail", "") or "")
+        if "parsing the body" in detail:
+            cause = exc.__cause__ or exc
+            print("BODY-PARSE-ERR:", "".join(
+                traceback.format_exception(type(cause), cause, cause.__traceback__)), flush=True)
+        raise
 
 # TEMP body-parse diagnostics
 import traceback  # noqa: E402
