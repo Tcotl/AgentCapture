@@ -41,12 +41,20 @@ def _diag():  # noqa: E402
             return importlib.util.find_spec(mod) is not None
         except Exception as exc:
             return f"err:{exc}"
+    def ver(mod):
+        try:
+            m = __import__(mod)
+            return getattr(m, "__version__", "installed")
+        except Exception as exc:
+            return f"missing/{exc}"
     return {
         "python": sys.version.split()[0],
-        "multipart": has("multipart"),
-        "uvicorn": has("uvicorn"),
-        "paramiko": has("paramiko"),
-        "app_loaded": True,
+        "multipart_import": has("multipart"),
+        "python_multipart_import": has("python_multipart"),
+        "multipart_ver": ver("multipart"),
+        "python_multipart_ver": ver("python_multipart"),
+        "starlette_ver": ver("starlette"),
+        "fastapi_ver": ver("fastapi"),
     }
 
 # Vercel's Python runtime picks up an ASGI callable named `app`.
