@@ -499,4 +499,7 @@ EN = {
     "部署向导 · 选择部署场景": "Deployment wizard · Pick a scenario",
     "选择一个最接近你需求的部署场景": "Pick the scenario closest to your need",
     "第一次使用？选择一个部署场景，跟着交互式指引逐步完成配置：蜜罐 → 蜜饵 → 域名 → 观测 → 反制。": "First time here? Pick a deployment scenario and follow the interactive guide to configure everything: honeypots → decoys → domain → observation → counter-offense.",
+    "启动部署向导": "Start deployment wizard",
+    "交互式部署指引：蜜罐 → 蜜饵 → 域名 → 观测 → 反制，逐步聚光带路。可随时重新打开。": "Interactive deployment guide: honeypots → decoys → domain → observation → counter-offense, with spotlight walkthrough. Reopen anytime.",
+    "重新查看部署流程解说，适合新成员学习或回顾配置要点。": "Replay the deployment walkthrough — great for onboarding new team members or reviewing config details.",
 }
