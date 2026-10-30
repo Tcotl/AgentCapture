@@ -367,4 +367,6 @@ EN = {
     "凭证记录": "Credential Records",
     "蜜饵部署": "Decoy Deployments",
     "全局搜索 (⌘K)": "Global search (⌘K)",
+    "↑↓ 选择 · Enter 打开": "↑↓ select · Enter open",
+    "实体": "Entities",
 }
