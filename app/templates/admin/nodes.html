@@ -3,6 +3,298 @@
 {% block content %}
 {{ page_header('ND', _('节点管理'), _('统一维护内置与远程节点、挂载模板、观察最近心跳，并为节点排入任务分发雏形。'), [_('心跳'), _('任务分发')],
       actions='<button type="button" class="chip primary" data-modal-open="nodes-create-modal">' ~ _('＋ 新增节点') ~ '</button>') }}
+
+<section class="panel node-topo-panel">
+  {{ section_header(_('节点拓扑'), _('中心为主控制台，节点环绕排布。拖拽调整位置（自动保存）；连线流光 = 心跳活跃，琥珀实线 = 心跳超时，红虚线 = 离线。点击节点查看详情。')) }}
+  <div class="node-topo-wrap" id="node-topo-wrap">
+    <svg id="node-topo-svg" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="nt-card-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="var(--nt-card-hi, var(--card))"/>
+          <stop offset="1" stop-color="var(--nt-card, var(--card))"/>
+        </linearGradient>
+        <linearGradient id="nt-core-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="var(--nt-core-hi, var(--card))"/>
+          <stop offset="1" stop-color="var(--nt-core, var(--card))"/>
+        </linearGradient>
+      </defs>
+      <g id="nt-edges"></g>
+      <g id="nt-nodes"></g>
+      <g id="nt-core"></g>
+    </svg>
+    <aside class="node-topo-insp" id="nt-insp" hidden>
+      <div class="nt-insp-head">
+        <strong id="nt-insp-title"></strong>
+        <button type="button" class="secondary btn-sm" id="nt-insp-close">×</button>
+      </div>
+      <div class="kv"><div class="key">{{ _( '状态' ) }}</div><div id="nt-insp-status"></div></div>
+      <div class="kv"><div class="key">{{ _( '类型' ) }}</div><div><code id="nt-insp-type"></code></div></div>
+      <div class="kv"><div class="key">{{ _( '监听地址' ) }}</div><div><code id="nt-insp-listen"></code></div></div>
+      <div class="kv"><div class="key">{{ _( '最后在线' ) }}</div><div id="nt-insp-seen"></div></div>
+      <div class="kv"><div class="key">{{ _( '挂载服务' ) }}</div><div id="nt-insp-services"></div></div>
+      <div class="kv"><div class="key">{{ _( '待执行任务' ) }}</div><div id="nt-insp-pending"></div></div>
+      <a class="chip" id="nt-insp-link" href="#">{{ _( '打开节点详情' ) }} →</a>
+    </aside>
+  </div>
+</section>
+
+<script id="node-topo-data" type="application/json">{{ node_topology | tojson }}</script>
+<script id="node-topo-layout" type="application/json">{{ node_topology_layout | tojson }}</script>
+<style>
+  .node-topo-wrap { position: relative; }
+  #node-topo-svg { width: 100%; height: auto; display: block; touch-action: none;
+    --nt-card: var(--card); --nt-core: var(--card);
+    --nt-card-hi: color-mix(in srgb, var(--foreground) 5%, var(--card));
+    --nt-core-hi: color-mix(in srgb, var(--primary, #2563eb) 20%, var(--card)); }
+  #node-topo-svg .nt-edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .34; stroke-width: 1.5; stroke-dasharray: 7 6; }
+  #node-topo-svg .nt-edge.stale { stroke: #f59e0b; stroke-opacity: .6; }
+  #node-topo-svg .nt-edge.off { stroke: #f43f5e; stroke-opacity: .6; }
+  #node-topo-svg .nt-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
+    stroke-dasharray: 9 91; animation: nt-flow 1.6s linear infinite; }
+  @keyframes nt-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { #node-topo-svg .nt-flow { display: none; } }
+  [data-theme="light"] #node-topo-svg .nt-flow { stroke: rgba(37, 99, 235, .78); }
+  #node-topo-svg .nt-card-rect { fill: url(#nt-card-grad); stroke: var(--border-strong); stroke-width: 1.2; }
+  #node-topo-svg g.nt-node { cursor: pointer; }
+  #node-topo-svg g.nt-node:hover .nt-card-rect { stroke: var(--ring); }
+  #node-topo-svg g.nt-node.selected .nt-card-rect { stroke: var(--ring); stroke-width: 1.8; }
+  #node-topo-svg .nt-name { font-size: 13px; font-weight: 600; fill: var(--foreground); }
+  #node-topo-svg .nt-meta { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
+  #node-topo-svg .nt-badge { fill: color-mix(in srgb, var(--primary, #2563eb) 16%, transparent); stroke: var(--ring); stroke-width: .8; }
+  #node-topo-svg .nt-badge-text { font-size: 10px; font-weight: 700; fill: var(--foreground); font-family: "Fira Code", ui-monospace, monospace; }
+  #node-topo-svg .nt-core-body { fill: url(#nt-core-grad); stroke: var(--border-strong); stroke-width: 1.4; }
+  #node-topo-svg .nt-core-label { font-size: 14px; font-weight: 700; fill: var(--foreground); }
+  #node-topo-svg .nt-core-sub { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
+  #node-topo-svg g.nt-core { cursor: pointer; }
+  .node-topo-insp {
+    position: absolute; top: 12px; right: 12px; width: 268px;
+    background: var(--card); border: 1px solid var(--border-strong); border-radius: 12px;
+    padding: 12px 14px; box-shadow: var(--shadow-card); z-index: 5;
+  }
+  .node-topo-insp .nt-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .node-topo-insp .nt-insp-head strong { font-size: 13px; color: var(--foreground); }
+  .node-topo-insp .kv { margin-bottom: 6px; }
+</style>
+<script>
+(function () {
+  var NODES = [];
+  var LAYOUT = {};
+  try { NODES = JSON.parse(document.getElementById('node-topo-data').textContent) || []; } catch (e) {}
+  try { LAYOUT = JSON.parse(document.getElementById('node-topo-layout').textContent) || {}; } catch (e) {}
+  var svg = document.getElementById('node-topo-svg');
+  if (!svg || !NODES.length) return;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var W = 1440, H = 560;
+  var CW = 200, CH = 66;
+  var CORE0 = { x: W / 2 - 90, y: H / 2 - 46 };
+  var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 92 };
+  if (LAYOUT.core && LAYOUT.core.length === 2) { core.x += LAYOUT.core[0]; core.y += LAYOUT.core[1]; }
+  var edgeLayer = document.getElementById('nt-edges');
+  var nodeLayer = document.getElementById('nt-nodes');
+  var coreLayer = document.getElementById('nt-core');
+
+  function el(name, attrs, parent) {
+    var n = document.createElementNS(SVGNS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+
+  function freshClass(n) {
+    if (n.status !== 'online') return 'off';
+    if (n.fresh_seconds == null) return 'stale';
+    return n.fresh_seconds <= 300 ? 'fresh' : 'stale';
+  }
+
+  var ring = 0;
+  NODES.forEach(function (n) {
+    var saved = LAYOUT[String(n.id)];
+    if (saved && saved.length === 2) { n.x = saved[0]; n.y = saved[1]; return; }
+    var angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(NODES.length, 1);
+    ring += 1;
+    n.x = core.x + core.w / 2 + Math.cos(angle) * 430 - CW / 2;
+    n.y = core.y + core.h / 2 + Math.sin(angle) * 165 - CH / 2;
+    n.x = Math.max(12, Math.min(W - CW - 12, n.x));
+    n.y = Math.max(12, Math.min(H - CH - 12, n.y));
+  });
+
+  var edgePool = [];
+  function edgeSlot(i) {
+    if (!edgePool[i]) {
+      var base = el('path', { class: 'nt-edge' }, edgeLayer);
+      var flow = el('path', { class: 'nt-flow' }, edgeLayer);
+      flow.style.display = 'none';
+      edgePool[i] = { base: base, flow: flow };
+    }
+    var slot = edgePool[i];
+    slot.base.style.display = '';
+    slot.flow.style.display = 'none';
+    return slot;
+  }
+
+  function curve(cx, cy, nx, ny) {
+    var mx = (cx + nx) / 2;
+    return 'M ' + cx + ' ' + cy + ' C ' + mx + ' ' + cy + ', ' + mx + ' ' + ny + ', ' + nx + ' ' + ny;
+  }
+
+  function drawEdges() {
+    var i = 0;
+    var ccx = core.x + core.w / 2, ccy = core.y + core.h / 2;
+    NODES.forEach(function (n) {
+      var state = freshClass(n);
+      var slot = edgeSlot(i++);
+      slot.base.setAttribute('d', curve(ccx, ccy, n.x + CW / 2, n.y + CH / 2));
+      slot.base.setAttribute('class', 'nt-edge' + (state === 'stale' ? ' stale' : '') + (state === 'off' ? ' off' : ''));
+      if (state === 'fresh') {
+        slot.flow.setAttribute('d', slot.base.getAttribute('d'));
+        slot.flow.style.display = '';
+      }
+    });
+    for (; i < edgePool.length; i++) {
+      edgePool[i].base.style.display = 'none';
+      edgePool[i].flow.style.display = 'none';
+    }
+  }
+
+  var SEEN_NEVER = {{ _('从未上报') | tojson }};
+  var SEEN_JUST = {{ _('（刚刚）') | tojson }};
+  var SEEN_MIN = {{ _('分钟前') | tojson }};
+  function fmtSeen(n) {
+    if (!n.last_seen) return SEEN_NEVER;
+    if (n.fresh_seconds == null) return n.last_seen;
+    if (n.fresh_seconds < 60) return n.last_seen + ' ' + SEEN_JUST;
+    if (n.fresh_seconds < 3600) return n.last_seen + '（' + Math.floor(n.fresh_seconds / 60) + ' ' + SEEN_MIN + '）';
+    return n.last_seen;
+  }
+
+  var cardRefs = {};
+  var coreGroup = null;
+  function drawCore() {
+    coreLayer.innerHTML = '';
+    coreGroup = el('g', { class: 'nt-core' }, coreLayer);
+    coreGroup.setAttribute('transform', 'translate(' + core.x + ',' + core.y + ')');
+    el('rect', { class: 'nt-core-body', x: 0, y: 26, width: core.w, height: 62, rx: 12 }, coreGroup);
+    el('rect', { x: 14, y: 44, width: core.w - 28, height: 3.5, rx: 2, fill: 'var(--ring)', opacity: .75 }, coreGroup);
+    var led = el('circle', { cx: core.w - 24, cy: 70, r: 4, fill: 'var(--success)' }, coreGroup);
+    el('animate', { attributeName: 'opacity', values: '1;.25;1', dur: '2s', repeatCount: 'indefinite' }, led);
+    var t1 = el('text', { class: 'nt-core-label', x: core.w / 2, y: 20, 'text-anchor': 'middle' }, coreGroup);
+    t1.textContent = {{ _( '主控制台' ) | tojson }};
+    var online = NODES.filter(function (n) { return freshClass(n) === 'fresh'; }).length;
+    var t2 = el('text', { class: 'nt-core-sub', x: core.w / 2, y: 78, 'text-anchor': 'middle' }, coreGroup);
+    t2.textContent = {{ _('节点') | tojson }} + ' ' + online + '/' + NODES.length + ' · ' + {{ site_id | tojson }};
+    coreGroup.addEventListener('pointerdown', function (ev) {
+      coreDrag = { cx: ev.clientX, cy: ev.clientY, ox: core.x, oy: core.y, moved: false };
+      ev.preventDefault();
+    });
+  }
+
+  function drawNode(n) {
+    var g = el('g', { class: 'nt-node' }, nodeLayer);
+    g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    el('rect', { class: 'nt-card-rect', x: 0, y: 0, width: CW, height: CH, rx: 12 }, g);
+    var state = freshClass(n);
+    var dotColor = state === 'fresh' ? 'var(--success)' : state === 'stale' ? '#f59e0b' : '#f43f5e';
+    el('circle', { class: 'nt-dot', cx: 16, cy: 16, r: 4.5, fill: dotColor }, g);
+    var name = el('text', { class: 'nt-name', x: 28, y: 21 }, g);
+    name.textContent = n.name.length > 14 ? n.name.slice(0, 13) + '…' : n.name;
+    var meta = el('text', { class: 'nt-meta', x: 16, y: 40 }, g);
+    meta.textContent = (n.type || 'node') + ' · ' + fmtSeen(n);
+    var meta2 = el('text', { class: 'nt-meta', x: 16, y: 56 }, g);
+    meta2.textContent = {{ _('挂载') | tojson }} + ' ' + n.services + ' · ' + (n.listen || '');
+    if (n.pending > 0) {
+      el('rect', { class: 'nt-badge', x: CW - 52, y: 8, width: 44, height: 17, rx: 9 }, g);
+      var bt = el('text', { class: 'nt-badge-text', x: CW - 30, y: 20, 'text-anchor': 'middle' }, g);
+      bt.textContent = {{ _('待执行') | tojson }} + ' ' + n.pending;
+    }
+    cardRefs[n.id] = { g: g, node: n };
+    attachDrag(g, n);
+  }
+
+  var drag = null;
+  var coreDrag = null;
+  function attachDrag(g, n) {
+    g.addEventListener('pointerdown', function (ev) {
+      drag = { n: n, cx: ev.clientX, cy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+      ev.preventDefault();
+    });
+  }
+  window.addEventListener('pointermove', function (ev) {
+    var rect = svg.getBoundingClientRect();
+    var kx = W / rect.width, ky = H / rect.height;
+    if (drag) {
+      var dx = (ev.clientX - drag.cx) * kx, dy = (ev.clientY - drag.cy) * ky;
+      if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
+      drag.n.x = drag.ox + dx;
+      drag.n.y = drag.oy + dy;
+      cardRefs[drag.n.id].g.setAttribute('transform', 'translate(' + drag.n.x + ',' + drag.n.y + ')');
+      drawEdges();
+    } else if (coreDrag) {
+      var cdx = (ev.clientX - coreDrag.cx) * kx, cdy = (ev.clientY - coreDrag.cy) * ky;
+      if (Math.abs(ev.clientX - coreDrag.cx) + Math.abs(ev.clientY - coreDrag.cy) > 4) coreDrag.moved = true;
+      core.x = coreDrag.ox + cdx;
+      core.y = coreDrag.oy + cdy;
+      coreGroup.setAttribute('transform', 'translate(' + core.x + ',' + core.y + ')');
+      drawEdges();
+    }
+  });
+  window.addEventListener('pointerup', function () {
+    if (drag) {
+      var d = drag;
+      drag = null;
+      if (d.moved) saveLayout();
+      else select(d.n.id);
+    } else if (coreDrag) {
+      var c = coreDrag;
+      coreDrag = null;
+      if (c.moved) saveLayout();
+    }
+  });
+
+  function saveLayout() {
+    var payload = { core: [Math.round(core.x - CORE0.x), Math.round(core.y - CORE0.y)] };
+    NODES.forEach(function (n) { payload[String(n.id)] = [Math.round(n.x), Math.round(n.y)]; });
+    fetch('/admin/nodes/topology/layout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ layout: payload }),
+    }).catch(function () {});
+  }
+
+  var insp = document.getElementById('nt-insp');
+  var STATUS_TEXT = { online: {{ _('在线') | tojson }}, offline: {{ _('离线') | tojson }} };
+  var STALE_NOTE = {{ _('心跳超时') | tojson }};
+  function clearSelection() {
+    insp.hidden = true;
+    Object.keys(cardRefs).forEach(function (k) { cardRefs[k].g.classList.remove('selected'); });
+  }
+  function select(id) {
+    var n = null;
+    NODES.forEach(function (x) { if (String(x.id) === String(id)) n = x; });
+    if (!n) { clearSelection(); return; }
+    Object.keys(cardRefs).forEach(function (k) {
+      cardRefs[k].g.classList.toggle('selected', String(k) === String(id));
+    });
+    var state = freshClass(n);
+    document.getElementById('nt-insp-title').textContent = n.name;
+    document.getElementById('nt-insp-status').innerHTML = '<span class="status-' + (n.status || 'unknown') + '">' + (STATUS_TEXT[n.status] || n.status) + '</span>' + (state === 'stale' ? ' <span class="muted">(' + STALE_NOTE + ')</span>' : '');
+    document.getElementById('nt-insp-type').textContent = n.type || '-';
+    document.getElementById('nt-insp-listen').textContent = n.listen || '-';
+    document.getElementById('nt-insp-seen').textContent = fmtSeen(n);
+    document.getElementById('nt-insp-services').textContent = n.services;
+    document.getElementById('nt-insp-pending').textContent = n.pending;
+    document.getElementById('nt-insp-link').setAttribute('href', '/admin/nodes/' + n.id);
+    insp.hidden = false;
+  }
+  document.getElementById('nt-insp-close').addEventListener('click', clearSelection);
+  svg.addEventListener('pointerdown', function (ev) {
+    if (ev.target === svg) clearSelection();
+  });
+
+  drawCore();
+  NODES.forEach(drawNode);
+  drawEdges();
+})();
+</script>
 <style>
   /* ---------- Server-management-table 风格：行卡片清单 ---------- */
   .nd-list-head {

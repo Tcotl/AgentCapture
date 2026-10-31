@@ -4200,6 +4200,33 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
             select(ServiceCatalog).order_by(ServiceCatalog.category, ServiceCatalog.name)
         ).all()
     }
+    from app.models.system_setting import SystemSetting
+
+    now = datetime.now(timezone.utc)
+    topology_nodes = []
+    for entry in nodes:
+        node = entry["node"]
+        hb = entry["latest_heartbeat"]
+        last_seen = getattr(hb, "created_at", None) or node.last_seen_at
+        fresh_seconds = None
+        if last_seen is not None:
+            seen = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+            fresh_seconds = max(0, round((now - seen).total_seconds()))
+        topology_nodes.append(
+            {
+                "id": node.id,
+                "name": node.name,
+                "type": node.node_type,
+                "status": node.status,
+                "is_builtin": node.is_builtin,
+                "listen": node.listen_address,
+                "pending": entry["pending_count"],
+                "services": len(node.deployed_services_json or []),
+                "last_seen": last_seen.strftime("%m-%d %H:%M") if last_seen else "",
+                "fresh_seconds": fresh_seconds,
+            }
+        )
+    layout_row = db.get(SystemSetting, "node_topology_layout")
     return _render(
         request,
         "admin/nodes.html",
@@ -4209,8 +4236,41 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
             "nodes": nodes,
             "templates_list": templates_list,
             "service_name_map": service_name_map,
+            "site_id": get_settings().site_id,
+            "node_topology": topology_nodes,
+            "node_topology_layout": _parse_json(layout_row.value, {}) if layout_row else {},
         },
     )
+
+
+@router.post("/admin/nodes/topology/layout")
+async def nodes_topology_save_layout(request: Request):
+    """Persist the node-topology layout (per-node x/y + core anchor offset)."""
+    from app.models.system_setting import SystemSetting
+
+    body = await request.json()
+    layout = body.get("layout") if isinstance(body, dict) else None
+    if not isinstance(layout, dict):
+        raise HTTPException(status_code=400, detail="layout required")
+    clean: dict = {}
+    for key, xy in layout.items():
+        try:
+            if key == "core":
+                clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+            else:
+                clean[str(int(key))] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+    with SessionLocal() as db:
+        row = db.get(SystemSetting, "node_topology_layout")
+        if row is None:
+            row = SystemSetting(
+                key="node_topology_layout", value="{}", updated_by="node-topology"
+            )
+            db.add(row)
+        row.value = _json_dumps_clean(clean)
+        db.commit()
+    return {"status": "ok", "saved": len(clean)}
 
 
 @router.get("/admin/nodes/{node_id}", response_class=HTMLResponse)
