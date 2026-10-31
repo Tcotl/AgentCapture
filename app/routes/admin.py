@@ -4225,6 +4225,8 @@ def admin_node_detail(node_id: int, request: Request, db: Session = Depends(get_
             select(ServiceCatalog).order_by(ServiceCatalog.category, ServiceCatalog.name)
         ).all()
     }
+    from app.services.integration_artifacts import PROTOCOL_DEFAULTS
+
     return _render(
         request,
         "admin/node_detail.html",
@@ -4233,6 +4235,7 @@ def admin_node_detail(node_id: int, request: Request, db: Session = Depends(get_
             "current_user": user,
             "nav_base": "/admin/nodes",
             "service_name_map": service_name_map,
+            "publish_services": PROTOCOL_DEFAULTS,
             **bundle,
         },
     )
@@ -4376,6 +4379,63 @@ def queue_runtime_task(
         return_to=f"/admin/nodes/{node_id}",
         title=f"投递节点任务：{node.name}",
         description="该操作会向节点任务队列投递新的执行项，请输入管理员密码确认。",
+    )
+
+
+@router.post("/admin/nodes/{node_id}/publish-honeypots")
+def publish_node_honeypots(
+    node_id: int,
+    request: Request,
+    action: str = Form("publish"),
+    services: list[str] = Form([]),
+    target_host: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """多网段集中运营：向节点下发协议蜜罐导流任务（DNAT publish / retract）。
+
+    节点侧参考执行器 scripts/node_agent.py 拉取 `honeypot-publish` /
+    `honeypot-retract` 任务，在本网段网关上落 iptables DNAT 规则，把标准
+    端口（22/3306/6379/21/9200）的扫描导流到 AC 蜜罐端口。
+    """
+    _require_admin(request, db)
+    node = db.get(Node, node_id)
+    if not node:
+        raise HTTPException(status_code=404)
+    from app.services.integration_artifacts import PROTOCOL_DEFAULTS
+
+    selected = {s.strip() for s in services if s.strip()}
+    rules = [
+        {
+            "proto": "tcp",
+            "node_port": item["node_port"],
+            "target_port": item["ac_port"],
+            "service": item["key"],
+        }
+        for item in PROTOCOL_DEFAULTS
+        if item["key"] in selected
+    ]
+    if not rules and action != "retract":
+        raise HTTPException(status_code=400, detail="未选择任何协议蜜罐服务")
+    task_type = "honeypot-retract" if action == "retract" else "honeypot-publish"
+    return _queue_sensitive_action(
+        request,
+        action="queue_node_task",
+        params={
+            "node_id": node_id,
+            "task_type": task_type,
+            "priority": 40,
+            "notes": f"{task_type}: {', '.join(r['service'] for r in rules)}",
+            "task_payload_json": {
+                "rules": rules,
+                "target_host": target_host.strip() or "<AC内网IP>",
+            },
+        },
+        return_to=f"/admin/nodes/{node_id}",
+        title=f"{'下发' if task_type == 'honeypot-publish' else '回收'}蜜罐导流：{node.name}",
+        description=(
+            "将在该节点网段落/删 iptables DNAT 导流规则（由节点执行器执行），"
+            "请确认端口清单后再提交。"
+        ),
     )
 
 
@@ -9693,6 +9753,33 @@ def admin_internet_systems_bulk_delete(request: Request, ids: str = Form(""), db
             module="internet-systems", target_type="internet-system", ref_attr="domain",
         )
     return _redirect("/admin/internet-systems")
+
+
+@router.get("/admin/internet-systems/{system_id}/artifacts")
+def internet_system_artifacts(system_id: int, request: Request, db: Session = Depends(get_db)):
+    """台账登记补齐：把一行台账渲染成可直接粘贴的接入产物。
+
+    返回 Nginx 挂载段 / DNS 记录 / 协议蜜罐 DNAT / Guard 检查单四块文本，
+    全部由台账字段（域名、upstream、模式、TLS、回退）参数化生成。
+    """
+    _require_user(request, db)
+    item = db.get(InternetSystem, system_id)
+    if not item:
+        raise HTTPException(status_code=404)
+    from app.services.integration_artifacts import build_artifacts
+
+    host = (request.url.hostname or "").lower()
+    artifacts = build_artifacts(
+        domain=item.domain,
+        upstream_url=item.upstream_url,
+        deploy_mode=item.deploy_mode,
+        tls_mode=item.tls_mode,
+        failover_mode=item.failover_mode,
+        # loopback deployments get a placeholder — the operator knows the
+        # real intranet address of AC
+        ac_host="" if host in {"127.0.0.1", "localhost", "0.0.0.0"} else host,
+    )
+    return JSONResponse(artifacts)
 
 
 @router.post("/admin/c2/agents/bulk-delete")

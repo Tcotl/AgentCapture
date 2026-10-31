@@ -17,8 +17,34 @@
     </div>
   </section>
   <section class="panel">
+    {{ section_header(_('蜜罐发布（多网段集中运营）'), _('向本节点网段下发导流任务：节点执行器（scripts/node_agent.py）在本网段网关落 iptables DNAT，把标准端口的扫描导流到 AC 蜜罐端口。')) }}
+    <form method="post" action="/admin/nodes/{{ node.id }}/publish-honeypots" class="stack">
+      <input type="hidden" name="action" value="publish">
+      <div class="publish-service-grid">
+        {% for s in publish_services %}
+        <label class="publish-service"><input type="checkbox" name="services" value="{{ s.key }}" checked><span><strong>{{ s.label }}</strong><code>{{ s.node_port }} → {{ s.ac_port }}</code></span></label>
+        {% endfor %}
+      </div>
+      <div class="grid-3">
+        <input name="target_host" placeholder="{{ _( 'AC 内网地址（默认占位 <AC内网IP>）' ) }}">
+        <span></span>
+        <span></span>
+      </div>
+      <div class="actions-inline">
+        <button type="submit" class="btn-sm">下发导流（honeypot-publish）</button>
+      </div>
+    </form>
+    <form method="post" action="/admin/nodes/{{ node.id }}/publish-honeypots" class="stack" style="margin-top:10px">
+      <input type="hidden" name="action" value="retract">
+      <div class="actions-inline">
+        <button type="submit" class="secondary btn-sm">回收全部导流（honeypot-retract）</button>
+        <span class="muted" style="font-size:11.5px">{{ _( '回收任务会移除该节点上全部 AC 相关 DNAT 规则。' ) }}</span>
+      </div>
+    </form>
+  </section>
+  <section class="panel">
     {{ section_header(_('任务分发雏形'), _('为该节点排入一个待执行任务')) }}
-    <form method="post" action="/admin/nodes/{{ node.id }}/tasks" class="stack"><div class="grid-3"><select name="task_type"><option value="sync-template">sync-template</option><option value="restart-services">restart-services</option><option value="rotate-decoys">rotate-decoys</option><option value="collect-snapshot">collect-snapshot</option></select><input type="number" name="priority" value="50" placeholder="{{ _( '优先级' ) }}"><input name="notes" placeholder="{{ _( '备注，如批量同步模板' ) }}"></div><textarea name="payload_json" placeholder='{"reason": "manual-dispatch"}'>{}</textarea><button type="submit">加入任务队列</button></form>
+    <form method="post" action="/admin/nodes/{{ node.id }}/tasks" class="stack"><div class="grid-3"><select name="task_type"><option value="sync-template">sync-template</option><option value="restart-services">restart-services</option><option value="rotate-decoys">rotate-decoys</option><option value="collect-snapshot">collect-snapshot</option><option value="honeypot-publish">honeypot-publish</option><option value="honeypot-retract">honeypot-retract</option></select><input type="number" name="priority" value="50" placeholder="{{ _( '优先级' ) }}"><input name="notes" placeholder="{{ _( '备注，如批量同步模板' ) }}"></div><textarea name="payload_json" placeholder='{"reason": "manual-dispatch"}'>{}</textarea><button type="submit">加入任务队列</button></form>
     <pre>curl -X POST http://127.0.0.1:8000/api/node/heartbeat -H 'Content-Type: application/json' -d '{"node_name":"{{ node.name }}","status":"online"}'
 
 curl -X POST http://127.0.0.1:8000/api/node/tasks/pull -H 'Content-Type: application/json' -d '{"node_name":"{{ node.name }}"}'</pre>

@@ -188,6 +188,7 @@
               <div class="internet-actions-row">
                 <button type="button" onclick="openInternetModal('internet-edit-{{ item.id }}')">{{ _( '编辑' ) }}</button>
                 <button type="button" class="secondary" data-verify="{{ item.verify_token }}" data-domain="{{ item.domain }}">{{ _( '接入自检' ) }}</button>
+                <button type="button" class="secondary" onclick="loadArtifacts({{ item.id }})">{{ _( '接入产物' ) }}</button>
                 <form method="post" action="/admin/internet-systems/{{ item.id }}/toggle">
                   <button type="submit" class="secondary">{% if item.is_enabled %}暂停{% else %}启用{% endif %}</button>
                 </form>
@@ -257,6 +258,18 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
 </div>
 {% endcall %}
 
+{% call modal_dialog('internet-artifacts-modal', _('接入产物'), _('按当前台账自动生成的可粘贴配置：Nginx 挂载段 / DNS 记录 / 协议蜜罐 DNAT / Guard 检查单。应用到对应设备后，按各块末尾的回退说明可随时脱离。'), wide=true) %}
+<div class="artifact-tabs" id="artifact-tabs" role="tablist">
+  <button type="button" class="secondary btn-sm" data-art="nginx" onclick="showArtifact('nginx')">{{ _( 'Nginx 挂载段' ) }}</button>
+  <button type="button" class="secondary btn-sm" data-art="dns" onclick="showArtifact('dns')">{{ _( 'DNS 记录' ) }}</button>
+  <button type="button" class="secondary btn-sm" data-art="dnat" onclick="showArtifact('dnat')">{{ _( '协议蜜罐 DNAT' ) }}</button>
+  <button type="button" class="secondary btn-sm" data-art="guard" onclick="showArtifact('guard')">{{ _( 'Guard 检查单' ) }}</button>
+  <span style="flex:1"></span>
+  <button type="button" class="secondary btn-sm" id="artifact-copy">{{ _( '复制当前块' ) }}</button>
+</div>
+<pre class="artifact-block" id="artifact-block">{{ _( '正在生成…' ) }}</pre>
+{% endcall %}
+
 <div class="internet-modal-backdrop" id="internet-create-modal" hidden onclick="closeInternetModalOnBackdrop(event, 'internet-create-modal')">
   <div class="internet-modal" role="dialog" aria-modal="true" aria-labelledby="internet-create-title">
     <div class="internet-modal-header">
@@ -319,6 +332,40 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
 {% endfor %}
 
 <script>
+  var ARTIFACT_TITLES = {
+    nginx: {{ _('Nginx 挂载段') | tojson }},
+    dns: {{ _('DNS 记录') | tojson }},
+    dnat: {{ _('协议蜜罐 DNAT') | tojson }},
+    guard: {{ _('Guard 检查单') | tojson }}
+  };
+  var ARTIFACT_DATA = {};
+  var ARTIFACT_KEY = 'nginx';
+  function loadArtifacts(id) {
+    fetch('/admin/internet-systems/' + id + '/artifacts', { headers: { Accept: 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(function (d) {
+        ARTIFACT_DATA = d;
+        showArtifact('nginx');
+        openInternetModal('internet-artifacts-modal');
+      })
+      .catch(function () { if (window.showToast) showToast({{ _('生成失败，请重试') | tojson }}, 'error'); });
+  }
+  function showArtifact(key) {
+    if (!ARTIFACT_DATA[key]) return;
+    ARTIFACT_KEY = key;
+    document.querySelectorAll('#artifact-tabs [data-art]').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-art') === key);
+    });
+    document.getElementById('artifact-block').textContent = ARTIFACT_DATA[key] || '';
+  }
+  document.addEventListener('click', function (ev) {
+    if (ev.target && ev.target.id === 'artifact-copy') {
+      var text = document.getElementById('artifact-block').textContent;
+      navigator.clipboard.writeText(text).then(function () {
+        if (window.showToast) showToast({{ _('已复制到剪贴板') | tojson }}, 'success');
+      }).catch(function () {});
+    }
+  });
   function openInternetModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;

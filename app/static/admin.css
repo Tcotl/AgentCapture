@@ -2954,6 +2954,38 @@ th:hover .th-resizer::after { background: rgba(96, 165, 250, 0.55); }
 }
 .health-count { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 2px; }
 
+/* integration artifacts modal (internet-systems ledger) */
+.artifact-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.artifact-tabs .btn-sm.active { border-color: var(--ring); background: var(--accent); color: var(--foreground); }
+.artifact-block {
+  max-height: 52vh;
+  overflow: auto;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-family: "Fira Code", ui-monospace, monospace;
+  font-size: 11.5px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--foreground);
+}
+
+/* node honeypot publish panel (multi-segment operations) */
+.publish-service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.publish-service {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 12px; cursor: pointer;
+  transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+.publish-service:hover { border-color: var(--border-strong); background: var(--accent); }
+.publish-service input { width: auto; }
+.publish-service span { display: flex; flex-direction: column; gap: 2px; }
+.publish-service strong { font-size: 12.5px; color: var(--foreground); }
+.publish-service code { font-size: 11px; color: var(--muted-foreground); }
+
 /* ---- disabled chip & danger ghost button ---- */
 .chip.is-disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 .btn-danger-ghost {
