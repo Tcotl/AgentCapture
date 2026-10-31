@@ -1448,6 +1448,23 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     return d.innerHTML;
   }
 
+  function setCardPos(left, top) {
+    card.style.left = Math.round(left) + 'px';
+    card.style.top = Math.round(top) + 'px';
+    // the admin shell can translate the fixed-position coordinate space
+    // (spot placements survive because both ends shift equally; the card
+    // targets absolute viewport coords and does not) — measure the real
+    // landing spot and close the residual; one pass is exact for pure
+    // offsets, two for scaled spaces
+    for (var pass = 0; pass < 2; pass++) {
+      var r = card.getBoundingClientRect();
+      var dx = left - r.left, dy = top - r.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;
+      var k = card.offsetWidth ? (r.width / card.offsetWidth) || 1 : 1;
+      card.style.left = Math.round((parseFloat(card.style.left) || left) + dx / k) + 'px';
+      card.style.top = Math.round((parseFloat(card.style.top) || top) + dy / k) + 'px';
+    }
+  }
   function positionCard(target) {
     // keep the card next to the spotlight: below the target, flip above
     // when the viewport bottom is tight, clamp into the viewport; center
@@ -1468,8 +1485,7 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
       left = Math.max(m, (vw - cr.width) / 2);
       top = Math.max(m, (vh - cr.height) / 2);
     }
-    card.style.left = Math.round(left) + 'px';
-    card.style.top = Math.round(top) + 'px';
+    setCardPos(left, top);
   }
   function show() {
     var st = step();
