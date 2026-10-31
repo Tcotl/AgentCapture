@@ -1403,16 +1403,18 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     card = document.createElement('div');
     card.className = 'tour-card';
     overlay.appendChild(card);
-    window.addEventListener('resize', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); });
+    window.addEventListener('resize', function () { if (sc >= 0 && i >= 0) { var t = targetEl(step()); position(t); positionCard(t); } });
     window.addEventListener('scroll', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); }, true);
-    window.addEventListener('load', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); });
+    window.addEventListener('load', function () { if (sc >= 0 && i >= 0) { var t = targetEl(step()); position(t); positionCard(t); } });
     // pages re-render their own toolbars after load — keep the spotlight
     // glued to the target while a step is active (no-op when idle)
     setInterval(function () {
       if (sc < 0 || i < 0 || !overlay) return;
       var st = step();
       if (!st || !overlay || document.querySelector('.tour-picker')) return;
-      position(targetEl(st));     // takes the step object, reads .sel itself
+      var t = targetEl(st);       // takes the step object, reads .sel itself
+      position(t);
+      positionCard(t);
     }, 500);
   }
   function targetEl(st) {
@@ -1446,6 +1448,29 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     return d.innerHTML;
   }
 
+  function positionCard(target) {
+    // keep the card next to the spotlight: below the target, flip above
+    // when the viewport bottom is tight, clamp into the viewport; center
+    // when there is no target (intro/finish steps and the picker)
+    if (!card) return;
+    var cr = card.getBoundingClientRect();
+    var m = 16, gap = 12;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left, top;
+    if (target && target.getBoundingClientRect && target.getBoundingClientRect().width) {
+      var r = target.getBoundingClientRect();
+      left = Math.min(Math.max(m, r.left), Math.max(m, vw - cr.width - m));
+      top = r.bottom + gap;
+      if (top + cr.height + m > vh) top = r.top - cr.height - gap;      // flip above
+      if (top < m) top = Math.min(r.bottom + gap, vh - cr.height - m);  // tall target: stay below
+      top = Math.min(Math.max(m, top), Math.max(m, vh - cr.height - m));
+    } else {
+      left = Math.max(m, (vw - cr.width) / 2);
+      top = Math.max(m, (vh - cr.height) / 2);
+    }
+    card.style.left = Math.round(left) + 'px';
+    card.style.top = Math.round(top) + 'px';
+  }
   function show() {
     var st = step();
     if (!st) { done(); return; }
@@ -1463,6 +1488,7 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     }
     position(target);
     renderCard(st);
+    positionCard(target);
   }
   function renderCard(st) {
     var s = scenario();
@@ -1511,6 +1537,7 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
       });
     });
     card.querySelector('.tour-skip').addEventListener('click', done);
+    positionCard(null);
   }
   function choose(k) {
     sc = k; i = 0;
