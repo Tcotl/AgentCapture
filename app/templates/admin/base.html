@@ -7,7 +7,7 @@
     <title>{{ title }} - AgentCapture</title>
     <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
     <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
-    <link rel="stylesheet" href="/static/admin.css?v=0.0.10" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.0.11" />
     <script>
       // Apply the stored theme & sidebar state before first paint to avoid a flash.
       (function () {
@@ -1360,30 +1360,34 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
   var TL = {};
   try { TL = JSON.parse(document.getElementById('tour-labels').textContent); } catch (e) {}
   var AP = {{ admin_access_path | tojson }};
-  // 出站中间件已给 JSON 里的路径加过安全前缀——剥掉，导航时再统一加回
+  var SEC = '/' + AP;
+  // NOTE: never write '/admin' as a literal in this script — the outbound
+  // middleware rewrites every '/admin…' occurrence in the HTML (including
+  // JS strings and the tour-data JSON payload) to the security-prefixed
+  // form. Normalize the step paths back to the raw '/admin…' convention by
+  // stripping the security prefix, and navigate by re-adding it.
   SCEN.forEach(function (sc) {
     sc.steps.forEach(function (st) {
-      var p = '/' + AP + st.path;
-      if (st.path.indexOf(p) === 0) st.path = st.path.slice(p.length);
+      if (AP && st.path.indexOf(SEC + '/') === 0) st.path = st.path.slice(SEC.length);
     });
   });
   var overlay = null, spot = null, card = null;
   var sc = -1, i = -1;
+  var spotRetries = 0, spotTimer = null;
 
   function store() { try { sessionStorage.setItem(KEY, JSON.stringify({ sc: sc, i: i })); } catch (e) {} }
   function state() { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function teardown() {
+    // remove the spotlight overlay (card included); recreated by ensureUI()
+    if (overlay) { overlay.remove(); overlay = null; spot = null; card = null; }
+  }
   function done() { sc = -1; i = -1; try { sessionStorage.removeItem(KEY); } catch (e) {} teardown(); }
   function scenario() { return SCEN[sc] || null; }
   function step() { var s = scenario(); return s ? s.steps[i] : null; }
   function localPath() {
-    // the deployed scenario paths may carry the security-path prefix
-    // (outbound middleware rewrote them inside the JSON payload) — strip
-    // whichever prefix is actually present, then the /admin root itself
+    // current pathname in the same raw '/admin…' convention as st.path
     var p = location.pathname;
-    var prefixes = ['/' + AP + '/admin', '/agentcapture/admin', '/admin'];
-    for (var i = 0; i < prefixes.length; i++) {
-      if (p.indexOf(prefixes[i]) === 0) return p.slice(prefixes[i].length) || '/admin';
-    }
+    if (AP && p.indexOf(SEC + '/') === 0) p = p.slice(SEC.length);
     return p;
   }
   function pathMatches(st) { return localPath() === st.path; }
@@ -1399,8 +1403,17 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     card = document.createElement('div');
     card.className = 'tour-card';
     overlay.appendChild(card);
-    window.addEventListener('resize', function () { if (sc >= 0 && i >= 0) { position(targetEl(step())); render(); } });
+    window.addEventListener('resize', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); });
     window.addEventListener('scroll', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); }, true);
+    window.addEventListener('load', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); });
+    // pages re-render their own toolbars after load — keep the spotlight
+    // glued to the target while a step is active (no-op when idle)
+    setInterval(function () {
+      if (sc < 0 || i < 0 || !overlay) return;
+      var st = step();
+      if (!st || !overlay || document.querySelector('.tour-picker')) return;
+      position(targetEl(st));     // takes the step object, reads .sel itself
+    }, 500);
   }
   function targetEl(st) {
     if (!st || !st.sel) return null;
@@ -1438,7 +1451,16 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     if (!st) { done(); return; }
     if (!pathMatches(st)) return;   // 等待：下一步按钮已带路跳页
     ensureUI();
-    var target = targetEl(st.sel);
+    var target = targetEl(st);      // takes the step object, reads .sel itself
+    // pages built by their own scripts may render the target long after
+    // DOMContentLoaded — retry a while before falling back to full dim
+    if (st.sel && !target && spotRetries < 40) {
+      spotRetries += 1;
+      if (spotTimer) clearTimeout(spotTimer);
+      spotTimer = setTimeout(show, 250);
+    } else {
+      spotRetries = 0;
+    }
     position(target);
     renderCard(st);
   }
@@ -1493,6 +1515,8 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
   function choose(k) {
     sc = k; i = 0;
     card.className = 'tour-card';
+    spotRetries = 0;
+    if (spotTimer) clearTimeout(spotTimer);
     store();
     var st = step();
     if (!pathMatches(st)) { teardown(); location.assign('/' + AP + st.path); }
@@ -1504,6 +1528,8 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
     if (!s) { done(); return; }
     if (i >= s.steps.length - 1) { done(); return; }
     i += 1;
+    spotRetries = 0;
+    if (spotTimer) clearTimeout(spotTimer);
     store();
     var st = step();
     if (!pathMatches(st)) { teardown(); location.assign('/' + AP + st.path); }
@@ -1512,6 +1538,8 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
   function prev() {
     if (i <= 0) return;
     i -= 1;
+    spotRetries = 0;
+    if (spotTimer) clearTimeout(spotTimer);
     store();
     var st = step();
     if (!pathMatches(st)) { teardown(); location.assign('/' + AP + st.path); }
@@ -1519,15 +1547,12 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
   }
 
   function injectLauncher() {
-    (window.__injectLog = window.__injectLog || []).push('il:enter path=' + localPath());
-    if (localPath() !== '/admin') { (window.__injectLog = window.__injectLog || []).push('il:return-path'); return; }
+    if (localPath() !== '/admin') return;
     var doneFlag = false;
     try { doneFlag = !!localStorage.getItem('ach:deployTourDone'); } catch (e) {}
     var st = null;
     try { st = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) {}
-    (window.__injectLog = window.__injectLog || []).push('il:doneFlag=' + doneFlag + ' st=' + JSON.stringify(st));
-    if (doneFlag || st) { (window.__injectLog = window.__injectLog || []).push('il:return-flags'); return; }
-    window.__injectLog = (window.__injectLog || []).concat(['enter']);
+    if (doneFlag || st) return;
     // fixed floating card: dashboard scripts re-render .content, so a
     // DOM-inserted banner would be wiped — fixed pos is immune
     var banner = document.createElement('div');
@@ -1541,7 +1566,6 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
       + '<button type="button" class="chip" id="tour-dismiss">{{ _('不再显示') }}</button>'
       + '</div></div>';
     document.body.appendChild(banner);
-    window.__injectLog = (window.__injectLog || []).concat(['inserted']);
     banner.querySelector('#tour-launch').addEventListener('click', function () {
       banner.remove();
       showPicker();
@@ -1554,8 +1578,7 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
 
   function boot() {
     try {
-      if (!SCEN.length) { (window.__injectLog = window.__injectLog || []).push('boot:no-scen'); return; }
-      (window.__injectLog = window.__injectLog || []).push('boot:enter scen=' + SCEN.length + ' st=' + sessionStorage.getItem(KEY));
+      if (!SCEN.length) return;
       var st = state();
       var resume = false;
       if (st && typeof st.sc === 'number' && SCEN[st.sc] && typeof st.i === 'number') {
@@ -1567,27 +1590,12 @@ window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
           try { sessionStorage.removeItem(KEY); } catch (e) {}  // stale state on another page: drop
         }
       }
-      (window.__injectLog = window.__injectLog || []).push('boot:resume=' + resume);
       if (resume) { show(); } else { injectLauncher(); }
     } catch (e) {
       window.__tourErr = String(e && e.stack || e);
-      (window.__injectLog = window.__injectLog || []).push('boot:exception');
       injectLauncher();          // never let a bug hide the launcher
     }
   }
-  window.__tourDebug = {
-    scen: SCEN,
-    bootInfo: function () {
-      return {
-        path: localPath(), isDash: localPath() === '/admin',
-        doneFlag: (function () { try { return localStorage.getItem('ach:deployTourDone'); } catch (e) { return 'ERR'; } })(),
-        st: (function () { try { return sessionStorage.getItem(KEY); } catch (e) { return 'ERR'; } })(),
-        content: !!document.querySelector('.content'),
-      };
-    },
-    showPicker: function () { try { showPicker(); } catch (e) { window.__tourErr = String(e && e.stack || e); } },
-    err: function () { return window.__tourErr || null; },
-  };
   window.__tourDebug = {
     scen: SCEN,
     showPicker: function () { try { showPicker(); } catch (e) { window.__tourErr = String(e && e.stack || e); } },

@@ -2913,6 +2913,7 @@ th:hover .th-resizer::after { background: rgba(96, 165, 250, 0.55); }
   flex-direction: column;
   gap: 10px;
 }
+.health-pop[hidden] { display: none; }
 .health-pop-title {
   font-size: 11px;
   font-weight: 700;
