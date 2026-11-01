@@ -33,7 +33,21 @@
       <div class="kv"><div class="key">{{ _( '最后在线' ) }}</div><div id="nt-insp-seen"></div></div>
       <div class="kv"><div class="key">{{ _( '挂载服务' ) }}</div><div id="nt-insp-services"></div></div>
       <div class="kv"><div class="key">{{ _( '待执行任务' ) }}</div><div id="nt-insp-pending"></div></div>
-      <a class="chip" id="nt-insp-link" href="#">{{ _( '打开节点详情' ) }} →</a>
+      <div class="nt-insp-menu">
+        <div class="nt-menu-title">{{ _( '蜜罐发布' ) }}</div>
+        <div class="nt-publish-grid" id="nt-pub-services">
+          {% for s in publish_services %}
+          <label class="nt-pub-item"><input type="checkbox" value="{{ s.key }}" checked><span>{{ s.label }} <code>{{ s.node_port }}→{{ s.ac_port }}</code></span></label>
+          {% endfor %}
+        </div>
+        <input type="text" id="nt-pub-host" placeholder="{{ _( 'AC 内网地址' ) }}">
+        <div class="nt-menu-actions">
+          <button type="button" class="primary btn-sm" id="nt-pub-apply">{{ _( '下发导流' ) }}</button>
+          <button type="button" class="secondary btn-sm" id="nt-pub-retract">{{ _( '回收导流' ) }}</button>
+        </div>
+        <div class="nt-menu-title">{{ _( '更多操作' ) }}</div>
+        <a class="chip" id="nt-insp-link" href="#">{{ _( '打开节点详情' ) }} →</a>
+      </div>
     </aside>
   </div>
 </section>
@@ -67,13 +81,22 @@
   #node-topo-svg .nt-core-sub { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
   #node-topo-svg g.nt-core { cursor: pointer; }
   .node-topo-insp {
-    position: absolute; top: 12px; right: 12px; width: 268px;
+    position: absolute; top: 12px; right: 12px; width: 320px;
+    max-height: calc(100% - 24px); overflow: auto;
     background: var(--card); border: 1px solid var(--border-strong); border-radius: 12px;
     padding: 12px 14px; box-shadow: var(--shadow-card); z-index: 5;
   }
   .node-topo-insp .nt-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .node-topo-insp .nt-insp-head strong { font-size: 13px; color: var(--foreground); }
   .node-topo-insp .kv { margin-bottom: 6px; }
+  .nt-insp-menu { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+  .nt-menu-title { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; margin: 8px 0 6px; }
+  .nt-publish-grid { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .nt-pub-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--foreground); cursor: pointer; padding: 2px 0; }
+  .nt-pub-item input { width: auto; }
+  .nt-pub-item code { font-size: 10.5px; color: var(--muted-foreground); }
+  #nt-pub-host { margin-bottom: 8px; }
+  .nt-menu-actions { display: flex; gap: 6px; margin-bottom: 4px; }
 </style>
 <script>
 (function () {
@@ -263,14 +286,42 @@
   var insp = document.getElementById('nt-insp');
   var STATUS_TEXT = { online: {{ _('在线') | tojson }}, offline: {{ _('离线') | tojson }} };
   var STALE_NOTE = {{ _('心跳超时') | tojson }};
+  var currentId = null;
   function clearSelection() {
     insp.hidden = true;
+    currentId = null;
     Object.keys(cardRefs).forEach(function (k) { cardRefs[k].g.classList.remove('selected'); });
   }
+  function sendPublish(action) {
+    if (!currentId) return;
+    const services = [...document.querySelectorAll('#nt-pub-services input:checked')].map(i => i.value);
+    const host = document.getElementById('nt-pub-host').value.trim();
+    const body = new URLSearchParams({ action: action, target_host: host });
+    services.forEach(s => body.append('services', s));
+    fetch('/admin/nodes/' + currentId + '/publish-honeypots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(function (r) {
+      if (r.ok) {
+        if (window.showToast) showToast({{ _('已下发到节点任务队列') | tojson }}, 'success');
+        setTimeout(function () { window.location.reload(); }, 700);
+      } else {
+        return r.json().then(function (j) {
+          if (window.showToast) showToast(j.detail || {{ _('下发失败') | tojson }}, 'error');
+        });
+      }
+    }).catch(function () {
+      if (window.showToast) showToast({{ _('网络错误') | tojson }}, 'error');
+    });
+  }
+  document.getElementById('nt-pub-apply').addEventListener('click', function () { sendPublish('publish'); });
+  document.getElementById('nt-pub-retract').addEventListener('click', function () { sendPublish('retract'); });
   function select(id) {
     var n = null;
     NODES.forEach(function (x) { if (String(x.id) === String(id)) n = x; });
     if (!n) { clearSelection(); return; }
+    currentId = n.id;
     Object.keys(cardRefs).forEach(function (k) {
       cardRefs[k].g.classList.toggle('selected', String(k) === String(id));
     });

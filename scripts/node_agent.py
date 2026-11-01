@@ -78,6 +78,8 @@ def _iptables(args: list[str], apply: bool) -> tuple[bool, str]:
         return False, str(exc)[:300]
 
 def _publish(payload: dict, fallback_host: str, allowed: set[int], apply: bool) -> tuple[bool, str]:
+    import socket
+
     rules = payload.get("rules") or []
     target = payload.get("target_host") or fallback_host
     if not rules:
@@ -86,6 +88,11 @@ def _publish(payload: dict, fallback_host: str, allowed: set[int], apply: bool) 
         # dry-run may print the placeholder so operators see the shape;
         # --apply must never run DNAT against a placeholder
         return False, "target_host placeholder not replaced (set AC intranet IP)"
+    # iptables rejects hostnames ("Bad IP address") — resolve to an IP first
+    try:
+        target_ip = socket.gethostbyname(target)
+    except OSError:
+        target_ip = target
     ok_all, details = True, []
     for rule in rules:
         port = int(rule.get("node_port") or 0)
@@ -96,7 +103,7 @@ def _publish(payload: dict, fallback_host: str, allowed: set[int], apply: bool) 
         ok, detail = _iptables(
             ["-A", "PREROUTING", "-p", str(rule.get("proto") or "tcp"),
              "--dport", str(port), "-j", "DNAT",
-             "--to-destination", f"{target}:{rule.get('target_port')}"],
+             "--to-destination", f"{target_ip}:{rule.get('target_port')}"],
             apply=apply,
         )
         ok_all = ok_all and ok
@@ -105,15 +112,22 @@ def _publish(payload: dict, fallback_host: str, allowed: set[int], apply: bool) 
 
 
 def _retract(apply: bool) -> tuple[bool, str]:
-    ok, listing = _iptables(["-S", "PREROUTING"], apply=True)  # read-only: safe in dry-run
-    if not ok:
-        return False, listing
-    lines = [ln for ln in listing.splitlines() if MARK in ln and ln.startswith("-A")]
-    if not lines:
+    # listing is read-only: plain -S without the comment matcher (_iptables
+    # always appends -m comment, which -S rejects)
+    proc = subprocess.run(
+        ["iptables", "-t", "nat", "-S", "PREROUTING"],
+        capture_output=True, text=True, timeout=15, check=False,
+    )
+    listing = (proc.stdout or proc.stderr or "").strip()
+    all_rules = [ln for ln in listing.splitlines() if ln.startswith("-A ")]
+    ours = [i + 1 for i, ln in enumerate(all_rules) if MARK in ln]
+    if not ours:
         return True, "no agentcapture rules present"
+    # delete by rule number, highest first so earlier indices stay valid
+    # (nf_tables backends are picky about -D with a full rule spec)
     ok_all, details = True, []
-    for ln in lines:
-        ok, detail = _iptables(["-D", "PREROUTING", *ln.split()[1:]], apply=apply)
+    for num in sorted(ours, reverse=True):
+        ok, detail = _iptables(["-D", "PREROUTING", str(num)], apply=apply)
         ok_all = ok_all and ok
         details.append(detail)
     return ok_all, " | ".join(details)

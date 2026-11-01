@@ -4227,6 +4227,8 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
             }
         )
     layout_row = db.get(SystemSetting, "node_topology_layout")
+    from app.services.integration_artifacts import PROTOCOL_DEFAULTS
+
     return _render(
         request,
         "admin/nodes.html",
@@ -4239,6 +4241,7 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
             "site_id": get_settings().site_id,
             "node_topology": topology_nodes,
             "node_topology_layout": _parse_json(layout_row.value, {}) if layout_row else {},
+            "publish_services": PROTOCOL_DEFAULTS,
         },
     )
 
