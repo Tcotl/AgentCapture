@@ -22,10 +22,11 @@
       <g id="nt-nodes"></g>
       <g id="nt-core"></g>
     </svg>
-    <aside class="node-topo-insp" id="nt-insp" hidden>
+    <aside class="node-topo-insp collapsed" id="nt-insp">
+      <div class="nt-insp-body" id="nt-insp-body">
       <div class="nt-insp-head">
         <strong id="nt-insp-title"></strong>
-        <button type="button" class="secondary btn-sm" id="nt-insp-close">×</button>
+        <button type="button" class="secondary btn-sm" id="nt-insp-close" title="{{ _( '收回菜单栏' ) }}">×</button>
       </div>
       <div class="kv"><div class="key">{{ _( '状态' ) }}</div><div id="nt-insp-status"></div></div>
       <div class="kv"><div class="key">{{ _( '类型' ) }}</div><div><code id="nt-insp-type"></code></div></div>
@@ -48,6 +49,8 @@
         <div class="nt-menu-title">{{ _( '更多操作' ) }}</div>
         <a class="chip" id="nt-insp-link" href="#">{{ _( '打开节点详情' ) }} →</a>
       </div>
+      </div>
+      <button type="button" class="nt-insp-rail" id="nt-insp-rail" title="{{ _( '展开节点管理菜单' ) }}"><span>{{ _( '节点管理' ) }}</span></button>
     </aside>
   </div>
 </section>
@@ -55,8 +58,8 @@
 <script id="node-topo-data" type="application/json">{{ node_topology | tojson }}</script>
 <script id="node-topo-layout" type="application/json">{{ node_topology_layout | tojson }}</script>
 <style>
-  .node-topo-wrap { position: relative; }
-  #node-topo-svg { width: 100%; height: auto; display: block; touch-action: none;
+  .node-topo-wrap { display: flex; align-items: stretch; position: relative; }
+  #node-topo-svg { flex: 1; min-width: 0; height: auto; display: block; touch-action: none;
     --nt-card: var(--card); --nt-core: var(--card);
     --nt-card-hi: color-mix(in srgb, var(--foreground) 5%, var(--card));
     --nt-core-hi: color-mix(in srgb, var(--primary, #2563eb) 20%, var(--card)); }
@@ -81,11 +84,24 @@
   #node-topo-svg .nt-core-sub { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
   #node-topo-svg g.nt-core { cursor: pointer; }
   .node-topo-insp {
-    position: absolute; top: 12px; right: 12px; width: 320px;
-    max-height: calc(100% - 24px); overflow: auto;
-    background: var(--card); border: 1px solid var(--border-strong); border-radius: 12px;
-    padding: 12px 14px; box-shadow: var(--shadow-card); z-index: 5;
+    flex: none; width: 320px;
+    border-left: 1px solid var(--border);
+    display: flex; align-items: stretch;
+    overflow: hidden;
+    transition: width 220ms var(--ease-out, ease);
   }
+  .node-topo-insp.collapsed { width: 46px; }
+  .node-topo-insp .nt-insp-body { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px; }
+  .node-topo-insp.collapsed .nt-insp-body { display: none; }
+  .nt-insp-rail {
+    display: none; width: 100%; height: 100%;
+    align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted-foreground); font-size: 12px;
+  }
+  .nt-insp-rail span { writing-mode: vertical-rl; letter-spacing: .35em; font-weight: 600; }
+  .nt-insp-rail:hover { color: var(--foreground); background: var(--accent); }
+  .node-topo-insp.collapsed .nt-insp-rail { display: flex; }
   .node-topo-insp .nt-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .node-topo-insp .nt-insp-head strong { font-size: 13px; color: var(--foreground); }
   .node-topo-insp .kv { margin-bottom: 6px; }
@@ -287,8 +303,14 @@
   var STATUS_TEXT = { online: {{ _('在线') | tojson }}, offline: {{ _('离线') | tojson }} };
   var STALE_NOTE = {{ _('心跳超时') | tojson }};
   var currentId = null;
+  var COLLAPSE_KEY = 'ach:node-topo-insp';
+  function setCollapsed(collapsed, persist) {
+    insp.classList.toggle('collapsed', collapsed);
+    if (persist) { try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {} }
+  }
+  try { setCollapsed(localStorage.getItem(COLLAPSE_KEY) === '1', false); } catch (e) {}
+  document.getElementById('nt-insp-rail').addEventListener('click', function () { setCollapsed(false, true); });
   function clearSelection() {
-    insp.hidden = true;
     currentId = null;
     Object.keys(cardRefs).forEach(function (k) { cardRefs[k].g.classList.remove('selected'); });
   }
@@ -334,9 +356,12 @@
     document.getElementById('nt-insp-services').textContent = n.services;
     document.getElementById('nt-insp-pending').textContent = n.pending;
     document.getElementById('nt-insp-link').setAttribute('href', '/admin/nodes/' + n.id);
-    insp.hidden = false;
+    setCollapsed(false, false);  // selecting a node always opens the menu bar
   }
-  document.getElementById('nt-insp-close').addEventListener('click', clearSelection);
+  document.getElementById('nt-insp-close').addEventListener('click', function () {
+    clearSelection();
+    setCollapsed(true, true);   // 收回菜单栏
+  });
   svg.addEventListener('pointerdown', function (ev) {
     if (ev.target === svg) clearSelection();
   });

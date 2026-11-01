@@ -103,6 +103,8 @@ EN = {
     "下发失败": "Publish failed",
     "网络错误": "Network error",
     "已下发到节点任务队列": "Queued on the node task queue",
+    "收回菜单栏": "Collapse menu bar",
+    "展开节点管理菜单": "Expand node management menu",
     "中心为主控制台，节点环绕排布。拖拽调整位置（自动保存）；连线流光 = 心跳活跃，琥珀实线 = 心跳超时，红虚线 = 离线。点击节点查看详情。": "The main console sits in the center with nodes around it. Drag to rearrange (auto-saved); flowing edges = fresh heartbeat, amber solid = stale, red dashed = offline. Click a node for details.",
     "蜜罐发布（多网段集中运营）": "Honeypot Publish (Multi-Segment Ops)",
     "向本节点网段下发导流任务：节点执行器（scripts/node_agent.py）在本网段网关落 iptables DNAT，把标准端口的扫描导流到 AC 蜜罐端口。": "Queue forwarding tasks for this node's segment: the node executor (scripts/node_agent.py) applies iptables DNAT on the segment gateway, steering standard-port scans to the AC honeypot ports.",
