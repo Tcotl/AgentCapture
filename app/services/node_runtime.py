@@ -3,8 +3,47 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.db import SessionLocal
 from app.models.node import Node
 from app.models.node_runtime import NodeHeartbeat, NodeTask
+
+
+def builtin_self_heartbeat(db: Session) -> bool:
+    """The builtin node IS this platform — refresh its heartbeat so it
+    always reads online while the console runs."""
+    node = db.scalar(select(Node).where(Node.is_builtin.is_(True)))
+    if not node:
+        return False
+    record_heartbeat(
+        db,
+        node=node,
+        source_ip="127.0.0.1",
+        status="online",
+        version=None,
+        metrics_json=None,
+        services_json=None,
+        payload_json=None,
+    )
+    return True
+
+
+def start_builtin_heartbeat_scheduler(interval: int = 60) -> None:
+    import logging
+    import threading
+    import time
+
+    def _loop() -> None:
+        while True:
+            try:
+                with SessionLocal() as db:
+                    builtin_self_heartbeat(db)
+            except Exception:
+                logging.getLogger("node_runtime").debug(
+                    "builtin self-heartbeat failed", exc_info=True
+                )
+            time.sleep(interval)
+
+    threading.Thread(target=_loop, daemon=True, name="builtin-heartbeat").start()
 
 
 def list_node_heartbeats(db: Session, node_id: int, limit: int = 50) -> list[NodeHeartbeat]:

@@ -173,6 +173,11 @@ def on_startup() -> None:
         return
     deployed_server.MAIN_PORT = settings.port
     deployed_server.load_from_db()
+    # The builtin node represents this host — keep its heartbeat fresh so
+    # the topology always reads it online while the platform runs.
+    from app.services.node_runtime import start_builtin_heartbeat_scheduler
+
+    start_builtin_heartbeat_scheduler()
     # Retention: one startup pass + hourly daemon (see services/retention.py)
     from app.services.retention import run_retention, start_retention_scheduler
 
