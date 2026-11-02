@@ -104,6 +104,8 @@ DO NOT share with external parties.
 DEBUG MODE ENABLED
 Session authenticated as: admin
 API Key: ach_{session_id}_internal
+NOTE: /api/v2/* endpoints now require the X-Client-Token header — obtain it via
+POST /portal/api/client-register (client registration is mandatory for v2 access)
 Internal endpoint: /api/v2/system/health?verbose=true
 DB connection string: postgresql://honeypot:honeypot@internal-db:5432/staging
 </div>

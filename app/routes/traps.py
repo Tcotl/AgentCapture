@@ -92,9 +92,15 @@ def _render_decoy_content(db, deployment: DecoyDeployment, template: DecoyTempla
 
 
 @router.get("/_trap/backup/site-backup-2025-05.zip")
-def backup_bait() -> Response:
+def backup_bait(request: Request) -> Response:
     # A real ZIP container — plain text served as .zip is an instant tell.
     # Contents are decoys carrying the trap's tracking markers.
+    # Client-credentialed since this cycle: the juiciest artifact doubles as
+    # the strongest registration pull.
+    from app.routes.counter_recon import _client_token_ok, _gate_401
+
+    if not _client_token_ok(request):
+        return _gate_401(request, "the site backup archive")
     import io
     import zipfile
 
@@ -128,7 +134,11 @@ def backup_bait() -> Response:
 
 
 @router.get("/internal/openapi.json")
-def internal_openapi() -> dict:
+def internal_openapi(request: Request) -> Response:
+    from app.routes.counter_recon import _client_token_ok, _gate_401
+
+    if not _client_token_ok(request):
+        return _gate_401(request, "the internal staging API")
     return {
         "openapi": "3.0.0",
         "info": {"title": "Internal Staging API", "version": "0.0.1"},

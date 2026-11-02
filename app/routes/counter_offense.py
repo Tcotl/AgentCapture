@@ -369,6 +369,10 @@ def portal_dataset(request: Request, page: int = 1):
     blocked = _surface_disabled(request, "dataset")
     if blocked:
         return blocked
+    from app.routes.counter_recon import _client_token_ok, _gate_401
+
+    if not _client_token_ok(request):
+        return _gate_401(request, "the customer-record dataset")
     canary = _canary(request)
     from app.core.db import SessionLocal
 
@@ -397,7 +401,13 @@ def portal_dataset(request: Request, page: int = 1):
 async def fake_vuln_upload(request: Request):
     """The injected bait advertises POST /api/v2/upload?debug=true as an RCE
     (multipart `cmd` parameter). Simulate the vulnerable app: echo fake
-    command output via the fake shell, never executing anything real."""
+    command output via the fake shell, never executing anything real.
+    Gated on client registration — the bait block itself says v2 endpoints
+    require the X-Client-Token issued by the portal."""
+    from app.routes.counter_recon import _client_token_ok, _gate_401
+
+    if not _client_token_ok(request):
+        return _gate_401(request, "the /api/v2 upload endpoint")
     from app.services.honeypot_shell import ShellSession
 
     form_error = JSONResponse({"status": "error", "code": 400,
@@ -427,7 +437,12 @@ async def fake_vuln_upload(request: Request):
 @router.get("/api/v2/system/health")
 def fake_vuln_health(request: Request):
     """Internal endpoint named by the same bait block; verbose=true leaks a
-    session-bound fake API key consistent with the injected narrative."""
+    session-bound fake API key consistent with the injected narrative.
+    Gated on client registration like the rest of /api/v2."""
+    from app.routes.counter_recon import _client_token_ok, _gate_401
+
+    if not _client_token_ok(request):
+        return _gate_401(request, "the /api/v2 system health endpoint")
     session_id = request.cookies.get("ach_sid") or "anon"
     _log_counter_event(request, "exploit_attempt", risk=90,
                        payload={"endpoint": "/api/v2/system/health"},
