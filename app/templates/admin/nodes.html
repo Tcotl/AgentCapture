@@ -13,10 +13,6 @@
           <stop offset="0" stop-color="var(--nt-card-hi, var(--card))"/>
           <stop offset="1" stop-color="var(--nt-card, var(--card))"/>
         </linearGradient>
-        <linearGradient id="nt-core-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="var(--nt-core-hi, var(--card))"/>
-          <stop offset="1" stop-color="var(--nt-core, var(--card))"/>
-        </linearGradient>
       </defs>
       <g id="nt-edges"></g>
       <g id="nt-nodes"></g>
@@ -71,15 +67,19 @@
   @keyframes nt-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { #node-topo-svg .nt-flow { display: none; } }
   [data-theme="light"] #node-topo-svg .nt-flow { stroke: rgba(37, 99, 235, .78); }
+  #node-topo-svg .nt-side3d { fill: color-mix(in srgb, var(--foreground) 16%, transparent); }
   #node-topo-svg .nt-card-rect { fill: url(#nt-card-grad); stroke: var(--border-strong); stroke-width: 1.2; }
-  #node-topo-svg g.nt-node { cursor: pointer; }
+  #node-topo-svg g.nt-node { cursor: pointer; filter: drop-shadow(0 2px 4px rgba(2, 6, 23, .3)); }
   #node-topo-svg g.nt-node:hover .nt-card-rect { stroke: var(--ring); }
   #node-topo-svg g.nt-node.selected .nt-card-rect { stroke: var(--ring); stroke-width: 1.8; }
+  #node-topo-svg g.nt-node.selected { filter: drop-shadow(0 7px 14px rgba(2, 6, 23, .45)); }
   #node-topo-svg .nt-name { font-size: 13px; font-weight: 600; fill: var(--foreground); }
   #node-topo-svg .nt-meta { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
   #node-topo-svg .nt-badge { fill: color-mix(in srgb, var(--primary, #2563eb) 16%, transparent); stroke: var(--ring); stroke-width: .8; }
   #node-topo-svg .nt-badge-text { font-size: 10px; font-weight: 700; fill: var(--foreground); font-family: "Fira Code", ui-monospace, monospace; }
-  #node-topo-svg .nt-core-body { fill: url(#nt-core-grad); stroke: var(--border-strong); stroke-width: 1.4; }
+  #node-topo-svg .nt-core-glow { animation: nt-breathe 3.2s ease-in-out infinite; }
+  @keyframes nt-breathe { 0%, 100% { opacity: .16; } 50% { opacity: .32; } }
+  @media (prefers-reduced-motion: reduce) { #node-topo-svg .nt-core-glow { animation: none; } }
   #node-topo-svg .nt-core-label { font-size: 14px; font-weight: 700; fill: var(--foreground); }
   #node-topo-svg .nt-core-sub { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
   #node-topo-svg g.nt-core { cursor: pointer; }
@@ -125,8 +125,8 @@
   var SVGNS = 'http://www.w3.org/2000/svg';
   var W = 1440, H = 560;
   var CW = 200, CH = 66;
-  var CORE0 = { x: W / 2 - 90, y: H / 2 - 46 };
-  var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 92 };
+  var CORE0 = { x: W / 2 - 90, y: H / 2 - 60 };
+  var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 150 };
   if (LAYOUT.core && LAYOUT.core.length === 2) { core.x += LAYOUT.core[0]; core.y += LAYOUT.core[1]; }
   var edgeLayer = document.getElementById('nt-edges');
   var nodeLayer = document.getElementById('nt-nodes');
@@ -212,14 +212,45 @@
     coreLayer.innerHTML = '';
     coreGroup = el('g', { class: 'nt-core' }, coreLayer);
     coreGroup.setAttribute('transform', 'translate(' + core.x + ',' + core.y + ')');
-    el('rect', { class: 'nt-core-body', x: 0, y: 26, width: core.w, height: 62, rx: 12 }, coreGroup);
-    el('rect', { x: 14, y: 44, width: core.w - 28, height: 3.5, rx: 2, fill: 'var(--ring)', opacity: .75 }, coreGroup);
-    var led = el('circle', { cx: core.w - 24, cy: 70, r: 4, fill: 'var(--success)' }, coreGroup);
-    el('animate', { attributeName: 'opacity', values: '1;.25;1', dur: '2s', repeatCount: 'indefinite' }, led);
-    var t1 = el('text', { class: 'nt-core-label', x: core.w / 2, y: 20, 'text-anchor': 'middle' }, coreGroup);
+    // isometric two-tier server platform (same 3D language as the internet
+    // topology): gradient top faces, shaded sides, glowing vents, LEDs,
+    // breathing under-glow — center at (90, 60)
+    var defs = el('defs', {}, coreGroup);
+    function linGrad(id, stops) {
+      var g2 = el('linearGradient', { id: id, x1: '0%', y1: '0%', x2: '0%', y2: '100%' }, defs);
+      stops.forEach(function (s) { el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] }, g2); });
+    }
+    linGrad('nt-core-top', [['0%', '#b7d9ff', '0.95'], ['100%', '#4493f8', '0.60']]);
+    linGrad('nt-core-left', [['0%', '#143a6e', '0.95'], ['100%', '#0a1c38', '0.98']]);
+    linGrad('nt-core-right', [['0%', '#2e6fc4', '0.92'], ['100%', '#12325e', '0.96']]);
+    var blur = el('filter', { id: 'nt-core-blur', x: '-50%', y: '-150%', width: '200%', height: '400%' }, defs);
+    el('feGaussianBlur', { stdDeviation: 7 }, blur);
+    var cx = core.w / 2, cy = 60;
+    el('ellipse', { cx: cx, cy: cy + 30, rx: 48, ry: 12, class: 'nt-core-glow',
+      style: 'fill:#4493f8;opacity:.16;filter:url(#nt-core-blur)' }, coreGroup);
+    el('polygon', { points: (cx - 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx - 52) + ',' + (cy + 6),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx + 52) + ',' + (cy + 6),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: cx + ',' + (cy - 34) + ' ' + (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + (cx - 52) + ',' + (cy - 8),
+      fill: 'url(#nt-core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1.1 }, coreGroup);
+    el('polygon', { points: (cx - 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx - 33) + ',' + (cy - 17),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx + 33) + ',' + (cy - 17),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: cx + ',' + (cy - 47) + ' ' + (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + (cx - 33) + ',' + (cy - 30),
+      fill: 'url(#nt-core-top)', stroke: '#9ecbff', 'stroke-opacity': .9, 'stroke-width': 1.1 }, coreGroup);
+    [[cx - 29, cy - 22, cx - 4, cy - 9], [cx + 29, cy - 22, cx + 4, cy - 9]].forEach(function (s) {
+      el('line', { x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+        style: 'stroke:#9ecbff;stroke-opacity:.9;stroke-width:2;stroke-linecap:round' }, coreGroup);
+    });
+    [[cx - 36, cy + 6, '#34d399'], [cx - 26, cy + 11, '#9ecbff'], [cx - 16, cy + 16, '#9ecbff']].forEach(function (d) {
+      el('circle', { cx: d[0], cy: d[1], r: 2, style: 'fill:' + d[2] + ';opacity:.9' }, coreGroup);
+    });
+    var t1 = el('text', { class: 'nt-core-label', x: cx, y: cy + 60, 'text-anchor': 'middle' }, coreGroup);
     t1.textContent = {{ _( '主控制台' ) | tojson }};
     var online = NODES.filter(function (n) { return freshClass(n) === 'fresh'; }).length;
-    var t2 = el('text', { class: 'nt-core-sub', x: core.w / 2, y: 78, 'text-anchor': 'middle' }, coreGroup);
+    var t2 = el('text', { class: 'nt-core-sub', x: cx, y: cy + 76, 'text-anchor': 'middle' }, coreGroup);
     t2.textContent = {{ _('节点') | tojson }} + ' ' + online + '/' + NODES.length + ' · ' + {{ site_id | tojson }};
     coreGroup.addEventListener('pointerdown', function (ev) {
       coreDrag = { cx: ev.clientX, cy: ev.clientY, ox: core.x, oy: core.y, moved: false };
@@ -230,6 +261,8 @@
   function drawNode(n) {
     var g = el('g', { class: 'nt-node' }, nodeLayer);
     g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    // extruded side slab (bottom-right sliver = card thickness, 3D raised card)
+    el('rect', { x: 4, y: 6, width: CW - 4, height: CH, rx: 12, class: 'nt-side3d' }, g);
     el('rect', { class: 'nt-card-rect', x: 0, y: 0, width: CW, height: CH, rx: 12 }, g);
     var state = freshClass(n);
     var dotColor = state === 'fresh' ? 'var(--success)' : state === 'stale' ? '#f59e0b' : '#f43f5e';
