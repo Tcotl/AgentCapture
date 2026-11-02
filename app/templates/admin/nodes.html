@@ -189,6 +189,18 @@
     }
   });
   var ZONE_PAD = 18, ZONE_HEAD = 34, ZONE_GAP = 14;
+  // zone names are operator data (stored values) — display-translate the
+  // well-known ones; grouping/colors keep using the raw stored name
+  var LANG = {{ lang | tojson }};
+  var ZONE_I18N = {
+    '业务内网': {{ _('业务内网') | tojson }},
+    '核心内网': {{ _('核心内网') | tojson }},
+    '管理网': {{ _('管理网') | tojson }}
+  };
+  function zoneLabel(z) {
+    if (LANG === 'en' && ZONE_I18N[z]) return ZONE_I18N[z];
+    return z;
+  }
   function zoneMembers(z) {
     return NODES.filter(function (n) { return !n.is_builtin && n.zone === z; });
   }
@@ -345,7 +357,7 @@
     zoneLayer.innerHTML = '';
     zoneBoxes().forEach(function (zb) {
       var color = zb.label === CORE_ZONE_LABEL ? '#4493f8' : zoneColor(zb.label);
-      var g = drawZoneBox(zb.x0, zb.y0, zb.x1, zb.y1, zb.label, color);
+      var g = drawZoneBox(zb.x0, zb.y0, zb.x1, zb.y1, zoneLabel(zb.label), color);
       if (!zb.fixed) {
         g.addEventListener('pointerdown', function (ev) {
           var a = zoneAnchors[zb.label];
@@ -560,7 +572,7 @@
     if (n.zone) {
       var zc = zoneColor(n.zone);
       var zt = el('text', { x: 86, y: CH - 2, style: 'fill:' + zc + ';font-size:9.5px;font-weight:700;font-family:"Fira Code",ui-monospace,monospace' }, g);
-      zt.textContent = '◈ ' + n.zone;
+      zt.textContent = '◈ ' + zoneLabel(n.zone);
     }
     cardRefs[n.id] = { g: g, node: n };
     if (n.zone) {
