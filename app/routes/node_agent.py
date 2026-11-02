@@ -215,7 +215,7 @@ def node_join_script(
     zone_clean = _re.sub(r"[^\w\u4e00-\u9fff-]", "", zone).strip()[:64]
     ports_clean = ",".join(p for p in (_re.sub(r"[^0-9]", "", x) for x in ports.split(",")) if p) or "22,3306,6379,21,9200"
     host = (request.url.hostname or "").lower()
-    ac_host = host if host not in {"127.0.0.1", "localhost", "0.0.0.0"} else "<AC内网IP>"
+    ac_host = host if host not in {"127.0.0.1", "localhost", "0.0.0.0"} else "<AC_IP>"
     ac_port = settings_.port
     token_header = f'-H "X-Node-Token: {token}" ' if token else ""
     script = f"""#!/usr/bin/env bash

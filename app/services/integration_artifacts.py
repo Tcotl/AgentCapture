@@ -38,7 +38,7 @@ def build_artifacts(
     ac_port: int = 4877,
 ) -> dict[str, str]:
     """Render the four copy-ready artifact blocks for one ledger row."""
-    ac = (ac_host or "<AC内网IP>").strip()
+    ac = (ac_host or "<AC_IP>").strip()
     base = f"http://{ac}:{ac_port}" if ac_port != 80 else f"http://{ac}"
     domain = (domain or "app.intra.example.com").strip()
 
@@ -68,15 +68,15 @@ location = /static/recon.js  {{ proxy_pass {base}/static/recon.js; }}
 # AC 侧台账 upstream = {upstream_url}｜TLS：{tls_mode}｜回退 = 删除本段后 reload"""
 
     dns = f"""# 内网 DNS（或测试用 hosts）—— 把业务域名指向 AC
-{domain}.  IN  A  <AC内网IP>
+{domain}.  IN  A  <AC_IP>
 # hosts 行等价写法：
-# <AC内网IP>    {domain}
+# <AC_IP>    {domain}
 #
 # Guard 串联生效条件：客户端解析到的 {domain} 必须是 AC（或其前置层）。
 # 回退 = 恢复原解析记录，业务立即脱离欺骗层。"""
 
     dnat_rules = " \\\n".join(
-        f"  iptables -t nat -A PREROUTING -p tcp --dport {item['node_port']:5d} -j DNAT --to-destination <AC内网IP>:{item['ac_port']}"
+        f"  iptables -t nat -A PREROUTING -p tcp --dport {item['node_port']:5d} -j DNAT --to-destination <AC_IP>:{item['ac_port']}"
         for item in PROTOCOL_DEFAULTS
     )
     dnat = f"""# 协议蜜罐端口旁挂 —— 在网段内网关/跳板机（root）执行，把标准端口扫描导流到 AC

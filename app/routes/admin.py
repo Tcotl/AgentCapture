@@ -4229,7 +4229,7 @@ def admin_nodes_onboarding(
     remote_names = [r["name"] for r in node_rows if not r["is_builtin"]]
     selected = node if node in remote_names else (remote_names[0] if remote_names else "")
     host = (request.url.hostname or "").lower()
-    ac_host = host if host not in {"127.0.0.1", "localhost", "0.0.0.0"} else "<AC内网IP>"
+    ac_host = host if host not in {"127.0.0.1", "localhost", "0.0.0.0"} else "<AC_IP>"
     token_masked = (token[:4] + "••••••") if token else ""
     return _render(
         request,
@@ -4627,7 +4627,7 @@ def publish_node_honeypots(
             "notes": f"{task_type}: {', '.join(r['service'] for r in rules)}",
             "task_payload_json": {
                 "rules": rules,
-                "target_host": target_host.strip() or "<AC内网IP>",
+                "target_host": target_host.strip() or "<AC_IP>",
             },
         },
         return_to=f"/admin/nodes/{node_id}",

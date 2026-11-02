@@ -103,12 +103,12 @@ docker compose --env-file .env.docker up -d</pre>
       <pre class="ob-cmd" id="ob-verify-cmd" data-copy># {{ _('心跳自检') }}
 curl -s -X POST http://{{ ac_host }}:{{ ac_port }}/api/node/heartbeat \
   -H 'Content-Type: application/json' \
-  -d '{"node_name":"节点名","status":"online"}'
+  -d '{"node_name":"<node-name>","status":"online"}'
 
 # {{ _('节点侧确认 DNAT（下发导流任务后）') }}
 iptables -t nat -S PREROUTING | grep agentcapture
 
-# {{ _('回退') }}：{{ _('停止 agent + 拓扑检查器「回收导流」+ 停用 systemd') }}</pre>
+# {{ _('回退') }}: {{ _('停止 agent + 拓扑检查器「回收导流」+ 停用 systemd') }}</pre>
     </div>
   </div>
 </section>
