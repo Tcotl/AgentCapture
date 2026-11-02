@@ -4222,6 +4222,7 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
                 "listen": node.listen_address,
                 "pending": entry["pending_count"],
                 "services": len(node.deployed_services_json or []),
+                "zone": getattr(node, "network_zone", "") or "",
                 "last_seen": last_seen.strftime("%m-%d %H:%M") if last_seen else "",
                 "fresh_seconds": fresh_seconds,
             }
@@ -4244,6 +4245,29 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
             "publish_services": PROTOCOL_DEFAULTS,
         },
     )
+
+
+@router.post("/admin/nodes/{node_id}/zone")
+def set_node_zone(node_id: int, request: Request, zone: str = Form(""), db: Session = Depends(get_db)):
+    """拓扑检查器快速划分网络区域（DMZ / 业务内网 / 核心内网等）。"""
+    user = _require_user(request, db)
+    node = db.get(Node, node_id)
+    if not node:
+        raise HTTPException(status_code=404)
+    node.network_zone = zone.strip()[:64]
+    node.updated_at = datetime.now(timezone.utc)
+    db.add(node)
+    db.commit()
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="set-node-zone",
+        module="nodes",
+        target_type="node",
+        target_ref=node.name,
+        detail_json={"zone": node.network_zone},
+    )
+    return {"status": "ok", "zone": node.network_zone}
 
 
 @router.post("/admin/nodes/topology/layout")
@@ -4311,6 +4335,7 @@ def create_node(
     listen_address: str = Form(...),
     callback_address: str = Form(...),
     node_type: str = Form("remote"),
+    network_zone: str = Form(""),
     template_id: int | None = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -4324,6 +4349,7 @@ def create_node(
         listen_address=listen_address,
         callback_address=callback_address,
         node_type=node_type,
+        network_zone=network_zone.strip()[:64],
         template_id=template_id,
         deployed_services_json=deployed_services,
         status="online",

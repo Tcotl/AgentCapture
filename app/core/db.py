@@ -167,6 +167,13 @@ def _ensure_legacy_columns() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE c2_agents ADD COLUMN listener_id INTEGER"))
 
+    # nodes.network_zone (intranet segmentation for the topology canvas)
+    if "nodes" in table_names:
+        nd_cols = {col["name"] for col in inspector.get_columns("nodes")}
+        if "network_zone" not in nd_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE nodes ADD COLUMN network_zone VARCHAR(64) DEFAULT ''"))
+
     # Indexes for hot-path filters. Columns added through the ALTER TABLE
     # path above never receive the model's declared indexes, and the
     # (session_id|source_ip|event_type, created_at) composite indexes the

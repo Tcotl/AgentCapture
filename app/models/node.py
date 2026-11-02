@@ -22,6 +22,7 @@ class Node(Base):
     listen_address: Mapped[str] = mapped_column(String(255), default="127.0.0.1")
     callback_address: Mapped[str] = mapped_column(String(255), default="127.0.0.1")
     status: Mapped[str] = mapped_column(String(32), default="online", index=True)
+    network_zone: Mapped[str] = mapped_column(String(64), default="")
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
     template_id: Mapped[int | None] = mapped_column(ForeignKey("service_templates.id"), nullable=True)
     deployed_services_json: Mapped[list] = mapped_column(JSON, default=list)

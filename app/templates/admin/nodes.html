@@ -14,6 +14,7 @@
           <stop offset="1" stop-color="var(--nt-card, var(--card))"/>
         </linearGradient>
       </defs>
+      <g id="nt-zones"></g>
       <g id="nt-edges"></g>
       <g id="nt-nodes"></g>
       <g id="nt-core"></g>
@@ -28,6 +29,15 @@
       <div class="kv"><div class="key">{{ _( '类型' ) }}</div><div><code id="nt-insp-type"></code></div></div>
       <div class="kv"><div class="key">{{ _( '监听地址' ) }}</div><div><code id="nt-insp-listen"></code></div></div>
       <div class="kv"><div class="key">{{ _( '最后在线' ) }}</div><div id="nt-insp-seen"></div></div>
+      <div class="kv"><div class="key">{{ _( '网络区域' ) }}</div><div>
+        <select id="nt-insp-zone" style="width:100%">
+          <option value="">{{ _( '未分区' ) }}</option>
+          <option value="DMZ">DMZ</option>
+          <option value="业务内网">{{ _( '业务内网' ) }}</option>
+          <option value="核心内网">{{ _( '核心内网' ) }}</option>
+          <option value="管理网">{{ _( '管理网' ) }}</option>
+        </select>
+      </div></div>
       <div class="kv"><div class="key">{{ _( '挂载服务' ) }}</div><div id="nt-insp-services"></div></div>
       <div class="kv"><div class="key">{{ _( '待执行任务' ) }}</div><div id="nt-insp-pending"></div></div>
       <div class="nt-insp-menu">
@@ -124,7 +134,7 @@
   if (!svg || !NODES.length) return;
   var SVGNS = 'http://www.w3.org/2000/svg';
   var W = 1440, H = 560;
-  var CW = 200, CH = 66;
+  var CW = 210, CH = 72;
   var CORE0 = { x: W / 2 - 90, y: H / 2 - 60 };
   var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 150 };
   if (LAYOUT.core && LAYOUT.core.length === 2) { core.x += LAYOUT.core[0]; core.y += LAYOUT.core[1]; }
@@ -147,15 +157,57 @@
 
   var ring = 0;
   NODES.forEach(function (n) {
+    // the builtin node lives on the AC host itself — always pinned right
+    // below the console pedestal (its saved layout is ignored)
+    if (n.is_builtin) {
+      n.x = core.x + core.w / 2 - CW / 2;
+      n.y = core.y + core.h + 8;
+      return;
+    }
     var saved = LAYOUT[String(n.id)];
     if (saved && saved.length === 2) { n.x = saved[0]; n.y = saved[1]; return; }
-    var angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(NODES.length, 1);
+    var angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(NODES.length - 1, 1);
     ring += 1;
     n.x = core.x + core.w / 2 + Math.cos(angle) * 430 - CW / 2;
-    n.y = core.y + core.h / 2 + Math.sin(angle) * 165 - CH / 2;
+    n.y = core.y + core.h / 2 + Math.sin(angle) * 175 - CH / 2;
     n.x = Math.max(12, Math.min(W - CW - 12, n.x));
     n.y = Math.max(12, Math.min(H - CH - 12, n.y));
   });
+
+  var ZONE_RULES = [[/DMZ/i, '#f59e0b'], [/业务/, '#3b82f6'], [/核心/, '#a855f7'], [/管理/, '#10b981']];
+  var ZONE_PALETTE = ['#64748b', '#0ea5e9', '#ec4899', '#22c55e'];
+  function zoneColor(z) {
+    for (var i = 0; i < ZONE_RULES.length; i++) if (ZONE_RULES[i][0].test(z)) return ZONE_RULES[i][1];
+    var h = 0;
+    for (var j = 0; j < z.length; j++) h = (h * 31 + z.charCodeAt(j)) >>> 0;
+    return ZONE_PALETTE[h % ZONE_PALETTE.length];
+  }
+  var zoneLayer = document.getElementById('nt-zones');
+  function drawZones() {
+    zoneLayer.innerHTML = '';
+    var groups = {};
+    NODES.forEach(function (n) { if (n.zone) (groups[n.zone] = groups[n.zone] || []).push(n); });
+    Object.keys(groups).forEach(function (z) {
+      var list = groups[z];
+      var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      list.forEach(function (n) {
+        x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+        x1 = Math.max(x1, n.x + CW); y1 = Math.max(y1, n.y + CH);
+      });
+      var pad = 18, color = zoneColor(z);
+      x0 -= pad; y0 -= pad + 10; x1 += pad; y1 += pad;
+      var g = el('g', {}, zoneLayer);
+      el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 16,
+        fill: color, 'fill-opacity': .07, stroke: color, 'stroke-opacity': .45,
+        'stroke-width': 1.2, 'stroke-dasharray': '6 5' }, g);
+      var labelW = z.length * 13 + 26;
+      el('rect', { x: x0 + 12, y: y0 + 8, width: labelW, height: 20, rx: 10,
+        fill: color, 'fill-opacity': .18, stroke: color, 'stroke-opacity': .5 }, g);
+      var label = el('text', { x: x0 + 12 + labelW / 2, y: y0 + 22, 'text-anchor': 'middle',
+        style: 'fill:' + color + ';font-size:11px;font-weight:700' }, g);
+      label.textContent = z;
+    });
+  }
 
   var edgePool = [];
   function edgeSlot(i) {
@@ -258,28 +310,60 @@
     });
   }
 
+  function drawTower(g, tx, ty, dotColor) {
+    // mini isometric server tower — same 3D language as the console
+    // pedestal, scaled down; gradients come from the core defs by id
+    el('polygon', { points: (tx - 32) + ',' + (ty - 5) + ' ' + tx + ',' + (ty + 11) + ' ' + tx + ',' + (ty + 19) + ' ' + (tx - 32) + ',' + (ty + 3),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .3, 'stroke-width': .9 }, g);
+    el('polygon', { points: (tx + 32) + ',' + (ty - 5) + ' ' + tx + ',' + (ty + 11) + ' ' + tx + ',' + (ty + 19) + ' ' + (tx + 32) + ',' + (ty + 3),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .3, 'stroke-width': .9 }, g);
+    el('polygon', { points: tx + ',' + (ty - 20) + ' ' + (tx + 32) + ',' + (ty - 5) + ' ' + tx + ',' + (ty + 11) + ' ' + (tx - 32) + ',' + (ty - 5),
+      fill: 'url(#nt-core-top)', stroke: '#8fbcf5', 'stroke-opacity': .7, 'stroke-width': .9 }, g);
+    el('polygon', { points: (tx - 20) + ',' + (ty - 17) + ' ' + tx + ',' + (ty - 8) + ' ' + tx + ',' + ty + ' ' + (tx - 20) + ',' + (ty - 10),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .8 }, g);
+    el('polygon', { points: (tx + 20) + ',' + (ty - 17) + ' ' + tx + ',' + (ty - 8) + ' ' + tx + ',' + ty + ' ' + (tx + 20) + ',' + (ty - 10),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .8 }, g);
+    el('polygon', { points: tx + ',' + (ty - 28) + ' ' + (tx + 20) + ',' + (ty - 17) + ' ' + tx + ',' + (ty - 8) + ' ' + (tx - 20) + ',' + (ty - 17),
+      fill: 'url(#nt-core-top)', stroke: '#9ecbff', 'stroke-opacity': .8, 'stroke-width': .8 }, g);
+    [[tx - 18, ty - 14, tx - 4, ty - 7], [tx + 18, ty - 14, tx + 4, ty - 7]].forEach(function (s) {
+      el('line', { x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+        style: 'stroke:#9ecbff;stroke-opacity:.85;stroke-width:1.6;stroke-linecap:round' }, g);
+    });
+    el('circle', { cx: tx - 22, cy: ty + 6, r: 2.6, fill: dotColor,
+      style: 'filter:drop-shadow(0 0 3px ' + dotColor + ')' }, g);
+  }
+
   function drawNode(n) {
     var g = el('g', { class: 'nt-node' }, nodeLayer);
     g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
-    // extruded side slab (bottom-right sliver = card thickness, 3D raised card)
-    el('rect', { x: 4, y: 6, width: CW - 4, height: CH, rx: 12, class: 'nt-side3d' }, g);
-    el('rect', { class: 'nt-card-rect', x: 0, y: 0, width: CW, height: CH, rx: 12 }, g);
     var state = freshClass(n);
     var dotColor = state === 'fresh' ? 'var(--success)' : state === 'stale' ? '#f59e0b' : '#f43f5e';
-    el('circle', { class: 'nt-dot', cx: 16, cy: 16, r: 4.5, fill: dotColor }, g);
-    var name = el('text', { class: 'nt-name', x: 28, y: 21 }, g);
-    name.textContent = n.name.length > 14 ? n.name.slice(0, 13) + '…' : n.name;
-    var meta = el('text', { class: 'nt-meta', x: 16, y: 40 }, g);
+    // invisible bounding box for edges / zones / hit-testing
+    el('rect', { x: 0, y: 0, width: CW, height: CH, fill: 'transparent' }, g);
+    drawTower(g, 40, 44, dotColor);
+    var name = el('text', { class: 'nt-name', x: 86, y: 22 }, g);
+    name.textContent = n.name.length > 12 ? n.name.slice(0, 11) + '…' : n.name;
+    var meta = el('text', { class: 'nt-meta', x: 86, y: 40 }, g);
     meta.textContent = (n.type || 'node') + ' · ' + fmtSeen(n);
-    var meta2 = el('text', { class: 'nt-meta', x: 16, y: 56 }, g);
+    var meta2 = el('text', { class: 'nt-meta', x: 86, y: 56 }, g);
     meta2.textContent = {{ _('挂载') | tojson }} + ' ' + n.services + ' · ' + (n.listen || '');
     if (n.pending > 0) {
-      el('rect', { class: 'nt-badge', x: CW - 52, y: 8, width: 44, height: 17, rx: 9 }, g);
-      var bt = el('text', { class: 'nt-badge-text', x: CW - 30, y: 20, 'text-anchor': 'middle' }, g);
+      el('rect', { class: 'nt-badge', x: CW - 52, y: 6, width: 44, height: 17, rx: 9 }, g);
+      var bt = el('text', { class: 'nt-badge-text', x: CW - 30, y: 18, 'text-anchor': 'middle' }, g);
       bt.textContent = {{ _('待执行') | tojson }} + ' ' + n.pending;
     }
+    if (n.zone) {
+      var zc = zoneColor(n.zone);
+      var zt = el('text', { x: 86, y: CH - 2, style: 'fill:' + zc + ';font-size:9.5px;font-weight:700;font-family:"Fira Code",ui-monospace,monospace' }, g);
+      zt.textContent = '◈ ' + n.zone;
+    }
     cardRefs[n.id] = { g: g, node: n };
-    attachDrag(g, n);
+    if (n.is_builtin) {
+      // pinned under the console: click selects, dragging is disabled
+      g.addEventListener('click', function () { select(n.id); });
+    } else {
+      attachDrag(g, n);
+    }
   }
 
   var drag = null;
@@ -300,6 +384,7 @@
       drag.n.y = drag.oy + dy;
       cardRefs[drag.n.id].g.setAttribute('transform', 'translate(' + drag.n.x + ',' + drag.n.y + ')');
       drawEdges();
+      drawZones();
     } else if (coreDrag) {
       var cdx = (ev.clientX - coreDrag.cx) * kx, cdy = (ev.clientY - coreDrag.cy) * ky;
       if (Math.abs(ev.clientX - coreDrag.cx) + Math.abs(ev.clientY - coreDrag.cy) > 4) coreDrag.moved = true;
@@ -324,7 +409,7 @@
 
   function saveLayout() {
     var payload = { core: [Math.round(core.x - CORE0.x), Math.round(core.y - CORE0.y)] };
-    NODES.forEach(function (n) { payload[String(n.id)] = [Math.round(n.x), Math.round(n.y)]; });
+    NODES.forEach(function (n) { if (!n.is_builtin) payload[String(n.id)] = [Math.round(n.x), Math.round(n.y)]; });
     fetch('/admin/nodes/topology/layout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -388,9 +473,30 @@
     document.getElementById('nt-insp-seen').textContent = fmtSeen(n);
     document.getElementById('nt-insp-services').textContent = n.services;
     document.getElementById('nt-insp-pending').textContent = n.pending;
+    document.getElementById('nt-insp-zone').value = n.zone || '';
     document.getElementById('nt-insp-link').setAttribute('href', '/admin/nodes/' + n.id);
     setCollapsed(false, false);  // selecting a node always opens the menu bar
   }
+  document.getElementById('nt-insp-zone').addEventListener('change', function () {
+    if (!currentId) return;
+    const zone = document.getElementById('nt-insp-zone').value;
+    const body = new URLSearchParams({ zone: zone });
+    fetch('/admin/nodes/' + currentId + '/zone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(function (r) {
+      if (!r.ok) throw new Error(String(r.status));
+      NODES.forEach(function (x) { if (String(x.id) === String(currentId)) x.zone = zone; });
+      Object.keys(cardRefs).forEach(function (k) {
+        if (String(k) === String(currentId)) cardRefs[k].node.zone = zone;
+      });
+      drawZones();
+      if (window.showToast) showToast({{ _('网络区域已更新') | tojson }}, 'success');
+    }).catch(function () {
+      if (window.showToast) showToast({{ _('区域更新失败') | tojson }}, 'error');
+    });
+  });
   document.getElementById('nt-insp-close').addEventListener('click', function () {
     clearSelection();
     setCollapsed(true, true);   // 收回菜单栏
@@ -402,6 +508,7 @@
   drawCore();
   NODES.forEach(drawNode);
   drawEdges();
+  drawZones();
 })();
 </script>
 <style>
