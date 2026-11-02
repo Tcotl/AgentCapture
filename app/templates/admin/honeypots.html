@@ -3,6 +3,18 @@
 {% block content %}
 {{ page_header('IP', _('蜜罐部署'), _('同一套蜜饵与捕获引擎，三种挂载方式。每个蜜罐类型在这里选择部署哪些诱饵面；各诱饵面的具体内容在「配置」页独立维护。')) }}
 
+<div class="grid-2" style="margin-bottom:16px;align-items:stretch">
+  <div class="panel" style="margin:0">
+    <strong style="display:flex;align-items:center;gap:8px;font-size:13.5px"><span class="state-dot is-on"></span>{{ _( '主控制台部署（本机）' ) }}</strong>
+    <p class="muted" style="margin:8px 0 10px;font-size:12.5px;line-height:1.7">{{ _( '蜜罐进程直接运行在主控制台本机：下方按类型选择页签部署——Web 应用 / 嵌入式 / 端口服务蜜罐。' ) }}</p>
+  </div>
+  <div class="panel" style="margin:0">
+    <strong style="display:flex;align-items:center;gap:8px;font-size:13.5px"><span class="state-dot"></span>{{ _( '子节点部署（远程网段）' ) }}</strong>
+    <p class="muted" style="margin:8px 0 10px;font-size:12.5px;line-height:1.7">{{ _( '子节点接入主控制台后，在拓扑或节点详情「蜜罐发布」下发导流任务，由节点执行器把本网段扫描引流到主控制台蜜罐。' ) }}</p>
+    <a class="chip primary" href="/admin/nodes/onboarding">{{ _( '子节点接入配置' ) }} →</a>
+  </div>
+</div>
+
 {% if hp_ok %}<div class="panel page-banner page-banner-success" style="margin-bottom:14px">{{ hp_ok }}</div>{% endif %}
 {% if hp_err %}<div class="panel page-banner page-banner-warning" style="margin-bottom:14px">{{ hp_err }}</div>{% endif %}
 

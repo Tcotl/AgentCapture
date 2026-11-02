@@ -1,0 +1,133 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state with context %}
+{% block content %}
+{{ page_header('ON', _('子节点接入'), _('把远程网段的子节点接入主控制台：注册节点 → 部署执行器 → 下发蜜罐导流任务，全程心跳回连、集中运营。'), [_('主控制台'), _('节点执行器'), _('心跳回连')]) }}
+
+{% if created %}
+<div class="panel page-banner page-banner-success" style="margin-bottom:14px">
+  {{ _('节点已创建') }}：<code>{{ created }}</code> —— {{ _('继续完成 ② 节点侧接入命令。') }}
+</div>
+{% endif %}
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header(_('① 主控制台准备'), _('以下都在本页（主控制台）完成：令牌、节点台账。')) }}
+  <div class="grid-2" style="align-items:start">
+    <div>
+      <strong style="display:block;margin-bottom:6px">{{ _('节点 API 令牌（NODE_AUTH_TOKEN）') }}</strong>
+      {% if token_configured %}
+      <p style="margin:0 0 8px">{{ _('已配置：') }}<code>{{ token_masked }}</code>（{{ _('完整值仅存于 .env.docker') }}）</p>
+      {% else %}
+      <p style="margin:0 0 8px;color:var(--warning,#f59e0b)">{{ _('未配置：节点 API 当前不校验令牌，生产环境建议设置。') }}</p>
+      {% endif %}
+      <pre style="background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.8;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># {{ _('主控制台（AC 主机）生成并写入环境') }}
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+echo 'NODE_AUTH_TOKEN=<{{ _('令牌') }}>' >> .env.docker
+docker compose --env-file .env.docker up -d</pre>
+    </div>
+    <div>
+      <strong style="display:block;margin-bottom:6px">{{ _('创建节点台账') }}</strong>
+      <p class="muted" style="margin:0 0 8px;font-size:12px">{{ _('每个远程网段一个节点记录；心跳 node_name 必须与之一致，否则心跳 404。') }}</p>
+      <form method="post" action="/admin/nodes?next=/admin/nodes/onboarding" class="stack">
+        <input name="name" placeholder="{{ _('节点名，如 dc1-edge' ) }}" required>
+        <div class="grid-2">
+          <input name="listen_address" placeholder="{{ _('监听地址，如 10.20.1.1' ) }}" value="0.0.0.0" required>
+          <input name="callback_address" placeholder="{{ _('回连地址' ) }}" value="0.0.0.0">
+        </div>
+        <select name="network_zone">
+          <option value="">{{ _( '未分区' ) }}</option>
+          <option value="DMZ">DMZ</option>
+          <option value="业务内网">{{ _( '业务内网' ) }}</option>
+          <option value="核心内网">{{ _( '核心内网' ) }}</option>
+          <option value="管理网">{{ _( '管理网' ) }}</option>
+        </select>
+        <input type="hidden" name="node_type" value="remote">
+        <button type="submit">{{ _( '创建节点' ) }}</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header(_('② 节点侧接入命令'), _('在子节点（网关/跳板机，Linux + Python 3.9+ + iptables，需 root）上执行。选择节点自动生成。')) }}
+  {% if not remote_names %}
+  {{ empty_state(_('还没有可接入的节点'), _('先在上方创建节点台账。'), 1, 'ON') }}
+  {% else %}
+  <form method="get" style="margin-bottom:12px">
+    <label class="muted" style="font-size:12px;margin-right:8px">{{ _('选择节点') }}</label>
+    <select name="node" onchange="this.form.submit()" style="min-width:220px">
+      {% for name in remote_names %}
+      <option value="{{ name }}" {% if name == selected %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% if selected_row %}
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+    {{ badge(selected_row.status, 'success' if selected_row.status == 'online' else 'warning') }}
+    <span class="muted" style="font-size:12px">{{ _('最后上报：') }}{{ selected_row.last_seen or _('从未上报') }}</span>
+    <span class="pill">{{ selected_row.zone or _('未分区') }}</span>
+  </div>
+  <pre style="background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11.5px;line-height:1.9;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># 1) {{ _('获取执行器（二选一）') }}
+curl -fL -o node_agent.py https://raw.githubusercontent.com/Tcotl/AgentCapture/main/scripts/node_agent.py
+# {{ _('或从 AC 主机拷贝：') }}
+# scp <{{ _('用户') }}>@<AC内网IP>:<{{ _('部署目录') }}>/scripts/node_agent.py .
+
+# 2) {{ _('调试运行（dry-run：只打印 iptables，不实际执行）') }}
+sudo python3 node_agent.py --server http://{{ ac_host }}:{{ ac_port }} \
+  --name {{ selected }} \
+  --token '${NODE_AUTH_TOKEN:-x}' \
+  --target-host {{ ac_host }} \
+  --allow-ports 22,3306,6379,21,9200
+
+# 3) {{ _('正式运行（--apply 真正落 DNAT 导流规则）') }}
+sudo NODE_AUTH_TOKEN='<{{ _('令牌') }}>' python3 node_agent.py \
+  --server http://{{ ac_host }}:{{ ac_port }} \
+  --name {{ selected }} \
+  --token "$NODE_AUTH_TOKEN" \
+  --apply --target-host {{ ac_host }} \
+  --allow-ports 22,3306,6379,21,9200</pre>
+
+  <strong style="display:block;margin:14px 0 6px">{{ _('开机自启（systemd）') }}</strong>
+  <pre style="background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11.5px;line-height:1.9;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># /etc/systemd/system/agentcapture-node.service
+[Unit]
+Description=AgentCapture node agent
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/agentcapture-node
+Environment=NODE_AUTH_TOKEN=<{{ _('令牌' ) }}>
+ExecStart=/usr/bin/python3 /opt/agentcapture-node/node_agent.py --server http://{{ ac_host }}:{{ ac_port }} --name {{ selected }} --token ${NODE_AUTH_TOKEN} --apply --target-host {{ ac_host }} --allow-ports 22,3306,6379,21,9200
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# systemctl daemon-reload && systemctl enable --now agentcapture-node</pre>
+  {% endif %}
+  {% endif %}
+</section>
+
+<section class="panel" style="margin-bottom:16px">
+  {{ section_header(_('③ 下发蜜罐与验证'), _('节点上线后，从拓扑或节点详情把蜜罐导流任务下发给对应网段。')) }}
+  <div class="grid-2" style="align-items:start">
+    <div>
+      <strong style="display:block;margin-bottom:6px">{{ _('下发蜜罐导流') }}</strong>
+      <p class="muted" style="margin:0 0 8px;font-size:12.5px;line-height:1.7">{{ _('接入拓扑页点击节点 → 右侧「蜜罐发布」勾选协议端口并下发；或节点详情页同款面板。节点执行器会把本网段对标准端口的扫描导流到主控制台蜜罐。') }}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="chip primary" href="/admin/nodes">{{ _( '接入拓扑与节点清单' ) }}</a>
+      </div>
+    </div>
+    <div>
+      <strong style="display:block;margin-bottom:6px">{{ _('验证与回退') }}</strong>
+      <pre style="background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11px;line-height:1.8;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># {{ _('心跳自检') }}
+curl -s -X POST http://{{ ac_host }}:{{ ac_port }}/api/node/heartbeat \
+  -H 'Content-Type: application/json' -H 'X-Node-Token: ${NODE_AUTH_TOKEN}' \
+  -d '{"node_name":"{{ selected or '节点名' }}","status":"online"}'
+
+# {{ _('节点侧确认 DNAT（下发导流任务后）') }}
+iptables -t nat -S PREROUTING | grep agentcapture
+
+# {{ _('回退') }}：{{ _('停止 agent + 拓扑检查器「回收导流」+ 停用 systemd') }}</pre>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -352,6 +352,7 @@ NAV_GROUPS = [
             ("MCP Server 蜜罐管理", "/admin/counter-offense/mcp"),
             ("嵌入式蜜罐管理", "/admin/internet-systems"),
             ("端口服务蜜罐管理", "/admin/services"),
+            ("子节点接入", "/admin/nodes/onboarding"),
             ("节点管理", "/admin/nodes"),
             ("接入拓扑", "/admin/internet-topology"),
         ],
@@ -4189,6 +4190,66 @@ def admin_credentials_export(
     )
 
 
+@router.get("/admin/nodes/onboarding", response_class=HTMLResponse)
+def admin_nodes_onboarding(
+    request: Request,
+    node: str = "",
+    created: str = "",
+    db: Session = Depends(get_db),
+):
+    """子节点接入主控制台配置页：注册节点 → 部署执行器 → 下发蜜罐导流。"""
+    user = _require_user(request, db)
+    from app.services.node_runtime import node_listing_with_runtime
+
+    settings_ = get_settings()
+    token = settings_.node_auth_token or ""
+    entries = node_listing_with_runtime(db)
+    now = datetime.now(timezone.utc)
+    node_rows = []
+    for entry in entries:
+        n = entry["node"]
+        hb = entry["latest_heartbeat"]
+        seen = getattr(hb, "created_at", None) or n.last_seen_at
+        fresh = None
+        if seen is not None:
+            seen_dt = seen if seen.tzinfo else seen.replace(tzinfo=timezone.utc)
+            fresh = max(0, round((now - seen_dt).total_seconds()))
+        node_rows.append(
+            {
+                "name": n.name,
+                "type": n.node_type,
+                "zone": getattr(n, "network_zone", "") or "",
+                "status": n.status,
+                "is_builtin": n.is_builtin,
+                "pending": entry["pending_count"],
+                "last_seen": seen.strftime("%m-%d %H:%M") if seen else "",
+                "fresh_seconds": fresh,
+            }
+        )
+    remote_names = [r["name"] for r in node_rows if not r["is_builtin"]]
+    selected = node if node in remote_names else (remote_names[0] if remote_names else "")
+    host = (request.url.hostname or "").lower()
+    ac_host = host if host not in {"127.0.0.1", "localhost", "0.0.0.0"} else "<AC内网IP>"
+    token_masked = (token[:4] + "••••••") if token else ""
+    return _render(
+        request,
+        "admin/nodes_onboarding.html",
+        {
+            "title": "子节点接入",
+            "current_user": user,
+            "node_rows": node_rows,
+            "remote_names": remote_names,
+            "selected": selected,
+            "selected_row": next((r for r in node_rows if r["name"] == selected), None),
+            "token_configured": bool(token),
+            "token_masked": token_masked,
+            "ac_host": ac_host,
+            "ac_port": settings_.port,
+            "created": quote(created) if created else "",
+        },
+    )
+
+
 @router.get("/admin/nodes", response_class=HTMLResponse)
 def admin_nodes(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
@@ -4408,6 +4469,11 @@ def create_node(
         target_type="node",
         target_ref=name,
     )
+    next_url = request.query_params.get("next") or ""
+    if next_url.startswith("/admin/nodes/onboarding"):
+        from urllib.parse import quote
+
+        return _redirect(f"{next_url}?created={quote(name)}")
     return _redirect("/admin/nodes")
 
 
