@@ -200,15 +200,28 @@
     var cols, rows;
     if (o === 'h') { cols = Math.min(4, nodes.length); rows = Math.ceil(nodes.length / 4); }
     else { cols = Math.ceil(nodes.length / 4); rows = Math.min(4, nodes.length); }
+    // cell pitch follows the widest/tallest RENDERED node (getBBox covers
+    // every text line) so long values never escape the zone box
+    var cellW = CW, cellH = CH;
+    nodes.forEach(function (n) {
+      var ref = cardRefs[n.id];
+      if (!ref) return;
+      var b = ref.g.getBBox();
+      cellW = Math.max(cellW, b.width + 12);
+      cellH = Math.max(cellH, b.height + 8);
+    });
     nodes.forEach(function (n, i) {
       var col, row;
       if (o === 'h') { col = i % 4; row = Math.floor(i / 4); }
       else { col = Math.floor(i / 4); row = i % 4; }
-      n.x = a.x + ZONE_PAD + col * (CW + ZONE_GAP);
-      n.y = a.y + ZONE_HEAD + row * (CH + 12);
+      n.x = a.x + ZONE_PAD + col * cellW;
+      n.y = a.y + ZONE_HEAD + row * cellH;
     });
-    var w = ZONE_PAD * 2 + cols * CW + (cols - 1) * ZONE_GAP;
-    var h = ZONE_HEAD + rows * CH + (rows - 1) * 12 + ZONE_PAD;
+    nodes.forEach(function (n) {
+      if (cardRefs[n.id]) cardRefs[n.id].g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    });
+    var w = ZONE_PAD * 2 + cols * cellW;
+    var h = ZONE_HEAD + rows * cellH + ZONE_PAD;
     return { label: z, fixed: false, nodes: nodes, o: o,
       x0: a.x, y0: a.y, x1: a.x + w, y1: a.y + h };
   }
