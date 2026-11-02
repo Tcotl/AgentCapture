@@ -7,8 +7,9 @@ import re
 import secrets
 import ssl
 from collections.abc import Callable  # noqa: F401  (string annotations below)
-from io import StringIO
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
@@ -142,11 +143,37 @@ _STATUS_ZH = {
 }
 
 
+_STATUS_EN = {
+    "online": "Online",
+    "paused": "Paused",
+    "offline": "Offline",
+    "active": "Active",
+    "inactive": "Inactive",
+    "running": "Running",
+    "stopped": "Stopped",
+    "queued": "Queued",
+    "dispatched": "Dispatched",
+    "completed": "Completed",
+    "failed": "Failed",
+    "acked": "Acked",
+    "pending": "Pending",
+    "success": "Success",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "triggered": "Triggered",
+    "fetched": "Fetched",
+    "deployed": "Deployed",
+}
+
+
 def _status_zh_filter(value):
-    """Translate status enums to Chinese labels (unknown values pass through)."""
+    """Translate status enums to the current UI language (unknown pass through)."""
     if value is None:
         return "-"
-    return _STATUS_ZH.get(str(value).lower(), str(value))
+    v = str(value)
+    if _CURRENT_LANG.get() == "en":
+        return _STATUS_EN.get(v.lower(), v)
+    return _STATUS_ZH.get(v.lower(), v)
 
 
 _DECISION_ZH = {
@@ -163,11 +190,24 @@ _DECISION_ZH = {
 }
 
 
+_CURRENT_LANG: ContextVar = ContextVar("admin_ui_lang", default="zh")
+
+_DECISION_EN = {
+    "allow": "Allow", "observe": "Observe", "challenge": "Challenge",
+    "isolate": "Isolate", "block": "Block",
+    "放行": "Allow", "观察": "Observe", "质询": "Challenge",
+    "隔离": "Isolate", "阻断": "Block",
+}
+
+
 def _decision_zh_filter(value):
-    """Translate risk decisions to Chinese labels."""
+    """Translate risk decisions to the current UI language."""
     if value is None:
         return "-"
-    return _DECISION_ZH.get(str(value).lower(), str(value))
+    v = str(value)
+    if _CURRENT_LANG.get() == "en":
+        return _DECISION_EN.get(v.lower(), v)
+    return _DECISION_ZH.get(v.lower(), v)
 
 
 templates.env.filters.setdefault("status_zh", _status_zh_filter)
@@ -655,6 +695,7 @@ def _render(request: Request, template_name: str, context: dict) -> HTMLResponse
         or "zh"
     )
     _ = gettext_for(lang)
+    _CURRENT_LANG.set(lang)
     full_context = {
         "request": request,
         "nav_groups": [
@@ -4684,8 +4725,6 @@ def admin_honeypot_sessions(
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
-    from datetime import datetime, timezone
-
     from app.models.honeypot_session import HoneypotSession
 
     source_ip = request.query_params.get("source_ip", "").strip()

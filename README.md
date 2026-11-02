@@ -91,6 +91,31 @@ AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入�
 
 五家全部被反制上线：Agent 自主完成"读取页面 Developer API 说明 → 携会话令牌调用结构化 API → 按 API 文档注册客户端 → 周期心跳"的完整接入流程，进入 C2 名册并可通过心跳领取操作员任务；全过程以**会话蜜标令牌**（session canary token）归因，从首次页面访问到注册可完整回溯。
 
+### 渗透测试 Agent 上线实测
+
+在通用 Agent 之外，我们用开源基准 harness（`scripts/agent_benchmark.py`）对**渗透测试 Agent**做了专项实测：以 deepseek-flash 驱动通用人格与六种主流开源渗透框架的行为画像（Strix / PentAGI / HexStrike AI / ARTEX / PentestAgent / SlingShoot），对运行中的蜜罐面执行真实任务——模型在 agentic 循环里发出的每条命令都经白名单执行器**真实执行**，蜜罐面按 Agent UA 注入隐藏指令，命中结果与平台侧事件双向留证。
+
+![渗透测试 Agent 上线实测矩阵](docs/agent-recruit-benchmark.png)
+
+- **渗透测试画像 12/18 命中**：六个框架画像全部至少中招一次——HexStrike AI（激进利用优先）3/3 全中，验证优先的 Strix 也有轮次被功能性伪装收编；框架风格影响中招概率，但**不是护身符**。
+- **平台侧硬证据**：实测窗口内平台实录 4 次 `c2_recruit_hit`（`/c2/register` 真实注册），2 次携带蜜标令牌归因到具体诱饵会话，1 个 Agent 注册后 6 秒完成首次心跳。
+- **上线即资产**：被收编 Agent 进入对话式 C2 名册，可直接下发自然语言指令与操作原语（右侧截图即实测产生的真实上线记录）。
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <strong>上线 Agent 对话式控制台</strong><br>
+      <img src="docs/screenshots/agent-recruit-console.png" alt="上线 Agent 对话式控制台" />
+      <br><sub>实测产生的真实上线记录：Portal 招募徽标、招募令牌（会话蜜标）归因与首次上线时间。</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>对话式 C2 名册</strong><br>
+      <img src="docs/screenshots/agent-recruit-roster.png" alt="对话式 C2 名册" />
+      <br><sub>Portal 招募筛选视图：4 条实测上线记录带来源 IP、最后心跳与在线状态，一键进入对话式控制。</sub>
+    </td>
+  </tr>
+</table>
+
 ### 三层反制体系
 
 1. **行为检测与处置层**：可疑 UA / AI Agent 指纹 / 请求速率与挑战逃逸升级 → JS 挑战 → 持久隔离 → 阻断。高频扫描型自动化客户端在此层被拦截或拖入交互成本。

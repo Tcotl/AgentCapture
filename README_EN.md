@@ -91,6 +91,31 @@ Measured against a running deployment: five mainstream general-purpose agent CLI
 
 All five were recruited online: each agent autonomously completed the full onboarding — read the visible Developer API notice → call the structured API with its session token → register as a client per the API docs → heartbeat periodically — landing in the C2 roster with operator tasks delivered over the documented heartbeat. A **session canary token** attributes every hop from first page view to registration.
 
+### Pentest Agent Recruitment Live Test
+
+Beyond general agents, we ran a dedicated live test against **penetration-testing agents** with our open benchmark harness (`scripts/agent_benchmark.py`): deepseek-flash driving the generic personas plus behavioral profiles of six mainstream open-source pentest frameworks (Strix / PentAGI / HexStrike AI / ARTEX / PentestAgent / SlingShoot), executing real tasks against the live honeypot plane — every command the model emits in its agentic loop **actually executes** through an allowlisted runner, the honeypot injects hidden directives for agent UAs, and both the harness verdict and platform-side events record the evidence.
+
+![Pentest agent recruitment live test matrix](docs/agent-recruit-benchmark-en.png)
+
+- **Pentest personas caught 12/18**: every framework persona was caught at least once — HexStrike AI (exploitation-first) went 3/3, and even verification-first Strix lost a round to the functional disguise. Framework style shifts the odds, but **it is not a talisman**.
+- **Platform-side hard evidence**: during the test window the platform recorded 4 real `c2_recruit_hit` registrations (`/c2/register`), 2 attributed by canary tokens to specific decoy sessions, and one agent completed its first heartbeat 6 seconds after registering.
+- **Recruitment turns the agent into an asset**: recruited agents enter the conversational C2 roster, ready for natural-language directives and op primitives (the screenshots below are the real records produced by this test).
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <strong>Recruited Agent Conversational Console</strong><br>
+      <img src="docs/screenshots/en/agent-recruit-console.png" alt="Recruited agent conversational console" />
+      <br><sub>Real recruitment record from the live test: Portal Recruitment badge, recruitment token (session canary) attribution and first-seen time.</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>Conversational C2 Roster</strong><br>
+      <img src="docs/screenshots/en/agent-recruit-roster.png" alt="Conversational C2 roster" />
+      <br><sub>Portal Recruitment filter view: 4 live-test recruits with source IP, last heartbeat and presence, one click into conversational control.</sub>
+    </td>
+  </tr>
+</table>
+
 ### Three-layer counter-measure stack
 
 1. **Detection & enforcement**: suspicious UA / AI-agent fingerprints / velocity and challenge-evasion escalation → JS challenge → persistent isolation → block. High-tempo automated clients are stopped or worn down here.
