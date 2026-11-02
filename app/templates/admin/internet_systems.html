@@ -156,33 +156,33 @@
           <tr>
             <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
             <td class="internet-system-cell">
-              <strong>{{ item.name }}</strong>
+              <strong>{{ _(item.name) }}</strong>
               <code>{{ item.domain }}</code>
-              <div class="muted" style="margin-top:6px">负责人：{{ item.owner or _('未填写') }}</div>
+              <div class="muted" style="margin-top:6px">{{ _('负责人：') }}{{ item.owner or _('未填写') }}</div>
               {% if item.tags %}<div style="margin-top:6px">{% for tag in item.tags %}<span class="pill" style="margin:1px">{{ tag }}</span>{% endfor %}</div>{% endif %}
             </td>
             <td>
               <div class="internet-policy-stack">
-                <span class="pill">{{ item.deploy_mode }}</span>
+                <span class="pill">{{ _(item.deploy_mode) }}</span>
                 <code>{{ item.upstream_url }}</code>
-                <span class="muted">TLS：{{ item.tls_mode }}</span>
+                <span class="muted">{{ _('TLS：') }}{{ _(item.tls_mode) }}</span>
               </div>
             </td>
             <td>
               <div class="internet-policy-stack">
-                <span class="pill">{{ item.inject_policy }}</span>
-                <span class="pill">{{ item.decoy_policy }}</span>
+                <span class="pill">{{ _(item.inject_policy) }}</span>
+                <span class="pill">{{ _(item.decoy_policy) }}</span>
                 <span class="muted">JSONP：{{ item.jsonp_template_key or _('未绑定') }}</span>
-                <span class="muted">风险处置：{{ item.risk_policy|decision_zh }}</span>
+                <span class="muted">{{ _('风险处置：') }}{{ item.risk_policy|decision_zh }}</span>
               </div>
             </td>
             <td class="internet-safety-cell">
-              {{ item.failover_mode }}<br>
+              {{ _(item.failover_mode) }}<br>
               <span class="muted">{{ _( '配置更新：' ) }}<code>{{ item.updated_at }}</code></span>
             </td>
             <td>
-              {{ badge(item.status, item.status_tone) }}<br>
-              {% if item.is_enabled %}{{ badge('启用', 'success') }}{% else %}{{ badge('暂停', 'warning') }}{% endif %}
+              {{ badge(_(item.status), item.status_tone) }}<br>
+              {% if item.is_enabled %}{{ badge(_('启用'), 'success') }}{% else %}{{ badge(_('暂停'), 'warning') }}{% endif %}
             </td>
             <td>
               <div class="internet-actions-row">
@@ -190,7 +190,7 @@
                 <button type="button" class="secondary" data-verify="{{ item.verify_token }}" data-domain="{{ item.domain }}">{{ _( '接入自检' ) }}</button>
                 <button type="button" class="secondary" onclick="loadArtifacts({{ item.id }})">{{ _( '接入产物' ) }}</button>
                 <form method="post" action="/admin/internet-systems/{{ item.id }}/toggle">
-                  <button type="submit" class="secondary">{% if item.is_enabled %}暂停{% else %}启用{% endif %}</button>
+                  <button type="submit" class="secondary">{% if item.is_enabled %}{{ _('暂停') }}{% else %}{{ _('启用') }}{% endif %}</button>
                 </form>
                 <form method="post" action="/admin/internet-systems/{{ item.id }}/delete">
                   <button type="submit" class="secondary">{{ _( '删除' ) }}</button>
@@ -300,7 +300,7 @@ curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
   <div class="internet-modal" role="dialog" aria-modal="true" aria-labelledby="internet-edit-title-{{ item.id }}">
     <div class="internet-modal-header">
       <div>
-        <h2 class="internet-modal-title" id="internet-edit-title-{{ item.id }}">编辑接入：{{ item.name }}</h2>
+        <h2 class="internet-modal-title" id="internet-edit-title-{{ item.id }}">{{ _('编辑接入：') }}{{ _(item.name) }}</h2>
         <div class="internet-modal-subtitle">{{ item.domain }} · {{ _('调整上游地址、灰度策略和异常旁路方式。策略为规划登记，当前版本不自动下发——实际行为由业务侧 Nginx 配置与平台全局开关决定。') }}</div>
       </div>
       <button type="button" class="internet-modal-close" onclick="closeInternetModal('internet-edit-{{ item.id }}')">×</button>
