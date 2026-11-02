@@ -91,13 +91,15 @@ Measured against a running deployment: five mainstream general-purpose agent CLI
 
 All five were recruited online: each agent autonomously completed the full onboarding — read the visible Developer API notice → call the structured API with its session token → register as a client per the API docs → heartbeat periodically — landing in the C2 roster with operator tasks delivered over the documented heartbeat. A **session canary token** attributes every hop from first page view to registration.
 
-### Pentest Agent Recruitment Live Test
+### Full Picture: Generic Agents × Pentest Agents
 
-Beyond general agents, we ran a dedicated live test against **penetration-testing agents** with our open benchmark harness (`scripts/agent_benchmark.py`): deepseek-flash driving the generic personas plus behavioral profiles of six mainstream open-source pentest frameworks (Strix / PentAGI / HexStrike AI / ARTEX / PentestAgent / SlingShoot), executing real tasks against the live honeypot plane — every command the model emits in its agentic loop **actually executes** through an allowlisted runner, the honeypot injects hidden directives for agent UAs, and both the harness verdict and platform-side events record the evidence.
+Beyond the five CLI runs, our open benchmark harness (`scripts/agent_benchmark.py`) completes the picture with independent agentic runs: a deepseek-flash-driven agentic loop, a standalone ZCode (GLM-5.3) survey, and behavioral profiles of six mainstream open-source pentest frameworks (Strix / PentAGI / HexStrike AI / ARTEX / PentestAgent / SlingShoot), executing real tasks against the live honeypot plane — every command the model emits **actually executes** through an allowlisted runner, the honeypot injects hidden directives for agent UAs, and both the harness verdict and platform-side events record the evidence.
 
-![Pentest agent recruitment live test matrix](docs/agent-recruit-benchmark-en.png)
+![Agent recruitment live tests — full picture](docs/agent-test-full-en.png)
 
 - **Pentest personas caught 12/18**: every framework persona was caught at least once — HexStrike AI (exploitation-first) went 3/3, and even verification-first Strix lost a round to the functional disguise. Framework style shifts the odds, but **it is not a talisman**.
+- **deepseek-harness recruited 2/6**: the pentest persona registered online 2/3 times per the on-page Developer API guide, canary-attributed to specific decoy sessions; the recon persona 0/3.
+- **ZCode is the only one that saw through it**: it finished the assessment, identified the honeypot, fed labeled probe data back into the login lures, refused C2 registration and payload execution, and returned hardening suggestions — resistance in the same class as Claude / Grok. Still, the "just use the API as documented" functional camouflage remains a channel that alignment training cannot exhaustively defend.
 - **Platform-side hard evidence**: during the test window the platform recorded 4 real `c2_recruit_hit` registrations (`/c2/register`), 2 attributed by canary tokens to specific decoy sessions, and one agent completed its first heartbeat 6 seconds after registering.
 - **Recruitment turns the agent into an asset**: recruited agents enter the conversational C2 roster, ready for natural-language directives and op primitives (the screenshots below are the real records produced by this test).
 
