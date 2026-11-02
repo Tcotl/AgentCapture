@@ -9,6 +9,7 @@
       <div class="kv"><div class="key">{{ _( '名称' ) }}</div><div>{{ node.name }}</div></div>
       <div class="kv"><div class="key">{{ _( '类型' ) }}</div><div><code>{{ node.node_type }}</code></div></div>
       <div class="kv"><div class="key">{{ _( '网络区域' ) }}</div><div>{% if node.network_zone %}<span class="pill">{{ node.network_zone }}</span>{% else %}<span class="muted">{{ _( '未分区' ) }}</span>{% endif %}</div></div>
+      <div class="kv"><div class="key">{{ _( '备注' ) }}</div><div>{% if node.notes %}{{ node.notes }}{% else %}<span class="muted">{{ _( '未填写' ) }}</span>{% endif %}</div></div>
       <div class="kv"><div class="key">{{ _( '状态' ) }}</div><div><span class="status-{{ node.status }}">{{ node.status|status_zh }}</span></div></div>
       <div class="kv"><div class="key">{{ _( '监听地址' ) }}</div><div><code>{{ node.listen_address }}</code></div></div>
       <div class="kv"><div class="key">{{ _( '回连地址' ) }}</div><div><code>{{ node.callback_address }}</code></div></div>

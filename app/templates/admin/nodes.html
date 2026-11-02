@@ -46,6 +46,12 @@
       <div class="kv"><div class="key">{{ _( '挂载服务' ) }}</div><div id="nt-insp-services"></div></div>
       <div class="kv"><div class="key">{{ _( '待执行任务' ) }}</div><div id="nt-insp-pending"></div></div>
       <div class="nt-insp-menu">
+        <div class="nt-menu-title">{{ _( '重命名与备注' ) }}</div>
+        <input type="text" id="nt-rename-input" placeholder="{{ _( '节点名称' ) }}" style="margin-bottom:6px">
+        <textarea id="nt-notes-input" rows="2" placeholder="{{ _( '备注，如网段/负责人/用途' ) }}" style="margin-bottom:6px"></textarea>
+        <div class="nt-menu-actions" style="margin-bottom:4px">
+          <button type="button" class="primary btn-sm" id="nt-rename-save">{{ _( '保存' ) }}</button>
+        </div>
         <div class="nt-menu-title">{{ _( '蜜罐发布' ) }}</div>
         <div class="nt-publish-grid" id="nt-pub-services">
           {% for s in publish_services %}
@@ -713,6 +719,37 @@
   }
   document.getElementById('nt-pub-apply').addEventListener('click', function () { sendPublish('publish'); });
   document.getElementById('nt-pub-retract').addEventListener('click', function () { sendPublish('retract'); });
+  document.getElementById('nt-rename-save').addEventListener('click', function () {
+    if (!currentId) return;
+    var changedNode = null;
+    NODES.forEach(function (x) { if (String(x.id) === String(currentId)) changedNode = x; });
+    if (!changedNode || changedNode.is_builtin) return;
+    const name = document.getElementById('nt-rename-input').value.trim();
+    const notes = document.getElementById('nt-notes-input').value;
+    if (!name) { if (window.showToast) showToast({{ _('节点名不能为空') | tojson }}, 'error'); return; }
+    const body = new URLSearchParams({ name: name, notes: notes });
+    fetch('/admin/nodes/' + currentId + '/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+    }).then(function (res) {
+      if (!res.ok) { if (window.showToast) showToast(res.j.detail || {{ _('保存失败') | tojson }}, 'error'); return; }
+      changedNode.name = name;
+      changedNode.notes = notes;
+      const ref = cardRefs[currentId];
+      if (ref) {
+        const nameEl = ref.g.querySelector('.nt-name');
+        if (nameEl) nameEl.textContent = name.length > 12 ? name.slice(0, 11) + '…' : name;
+      }
+      document.getElementById('nt-insp-title').textContent = name;
+      drawZones();
+      if (window.showToast) showToast({{ _('已保存') | tojson }}, 'success');
+    }).catch(function () {
+      if (window.showToast) showToast({{ _('网络错误') | tojson }}, 'error');
+    });
+  });
   function select(id) {
     var n = null;
     NODES.forEach(function (x) { if (String(x.id) === String(id)) n = x; });
@@ -723,6 +760,11 @@
     });
     var state = freshClass(n);
     document.getElementById('nt-insp-title').textContent = n.name;
+    document.getElementById('nt-rename-input').value = n.name;
+    document.getElementById('nt-notes-input').value = n.notes || '';
+    document.getElementById('nt-rename-save').style.display = n.is_builtin ? 'none' : '';
+    document.getElementById('nt-rename-input').disabled = !!n.is_builtin;
+    document.getElementById('nt-notes-input').disabled = !!n.is_builtin;
     document.getElementById('nt-insp-status').innerHTML = '<span class="status-' + (n.status || 'unknown') + '">' + (STATUS_TEXT[n.status] || n.status) + '</span>' + (state === 'stale' ? ' <span class="muted">(' + STALE_NOTE + ')</span>' : '');
     document.getElementById('nt-insp-type').textContent = n.type || '-';
     document.getElementById('nt-insp-listen').textContent = n.listen || '-';

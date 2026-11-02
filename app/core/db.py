@@ -173,6 +173,9 @@ def _ensure_legacy_columns() -> None:
         if "network_zone" not in nd_cols:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE nodes ADD COLUMN network_zone VARCHAR(64) DEFAULT ''"))
+        if "notes" not in nd_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE nodes ADD COLUMN notes TEXT"))
 
     # Indexes for hot-path filters. Columns added through the ALTER TABLE
     # path above never receive the model's declared indexes, and the

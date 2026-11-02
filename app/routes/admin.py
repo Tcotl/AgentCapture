@@ -4223,6 +4223,7 @@ def admin_nodes(request: Request, db: Session = Depends(get_db)):
                 "pending": entry["pending_count"],
                 "services": len(node.deployed_services_json or []),
                 "zone": getattr(node, "network_zone", "") or "",
+                "notes": getattr(node, "notes", "") or "",
                 "last_seen": last_seen.strftime("%m-%d %H:%M") if last_seen else "",
                 "fresh_seconds": fresh_seconds,
             }
@@ -4268,6 +4269,40 @@ def set_node_zone(node_id: int, request: Request, zone: str = Form(""), db: Sess
         detail_json={"zone": node.network_zone},
     )
     return {"status": "ok", "zone": node.network_zone}
+
+
+@router.post("/admin/nodes/{node_id}/update")
+def update_node_info(node_id: int, request: Request, name: str = Form(...), notes: str = Form(""), db: Session = Depends(get_db)):
+    """重命名节点 / 维护备注（拓扑检查器与节点详情共用）。"""
+    user = _require_admin(request, db)
+    node = db.get(Node, node_id)
+    if not node:
+        raise HTTPException(status_code=404)
+    new_name = name.strip()[:120]
+    if not new_name:
+        raise HTTPException(status_code=400, detail="节点名不能为空")
+    duplicate = db.scalar(
+        select(Node).where(Node.name == new_name, Node.id != node_id)
+    )
+    if duplicate:
+        raise HTTPException(status_code=400, detail=f"节点名已存在：{new_name}")
+    changed = node.name != new_name or (node.notes or "") != notes
+    node.name = new_name
+    node.notes = notes.strip() or None
+    node.updated_at = datetime.now(timezone.utc)
+    db.add(node)
+    db.commit()
+    if changed:
+        log_execution(
+            db,
+            actor_username=user.username,
+            action="update-node",
+            module="nodes",
+            target_type="node",
+            target_ref=new_name,
+            detail_json={"notes": (node.notes or "")[:200]},
+        )
+    return {"status": "ok", "name": node.name, "notes": node.notes or ""}
 
 
 @router.post("/admin/nodes/topology/layout")
