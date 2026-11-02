@@ -624,6 +624,12 @@
       var c = coreDrag;
       coreDrag = null;
       if (c.moved) { saveLayout(); resolveZoneOverlaps(); fitViewBox(); }
+      else {
+        // plain click on the console = edit the builtin node it hosts
+        var bn = null;
+        NODES.forEach(function (x) { if (x.is_builtin) bn = x; });
+        if (bn) select(bn.id);
+      }
     } else if (panDrag) {
       var p = panDrag;
       panDrag = null;
@@ -726,11 +732,16 @@
     const zoneSel = document.getElementById('nt-insp-zone');
     zoneSel.value = n.is_builtin ? {{ _('平台控制区') | tojson }} : (n.zone || '');
     zoneSel.disabled = !!n.is_builtin;  // the builtin node belongs to the console zone
+    zoneSel.dispatchEvent(new Event('change'));  // re-sync the sel-x button label
     document.getElementById('nt-insp-link').setAttribute('href', '/admin/nodes/' + n.id);
     setCollapsed(false, false);  // selecting a node always opens the menu bar
   }
   document.getElementById('nt-insp-zone').addEventListener('change', function () {
     if (!currentId) return;
+    var changedNode = null;
+    NODES.forEach(function (x) { if (String(x.id) === String(currentId)) changedNode = x; });
+    if (!changedNode || changedNode.is_builtin) return;       // console zone is fixed
+    if (changedNode.zone === document.getElementById('nt-insp-zone').value) return;  // sel-x re-sync, not a real change
     const zone = document.getElementById('nt-insp-zone').value;
     const body = new URLSearchParams({ zone: zone });
     fetch('/admin/nodes/' + currentId + '/zone', {
