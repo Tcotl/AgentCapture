@@ -174,18 +174,18 @@
         {% for item in items %}
         <tr>
           <td><input type="checkbox" class="bulk-check" value="{{ item.id }}" style="cursor:pointer"></td>
-          <td class="prompt-template-name"><strong>{{ item.name }}</strong><span>{{ item.template_key }}</span></td>
+          <td class="prompt-template-name"><strong>{{ _(item.name) }}</strong><span>{{ item.template_key }}</span></td>
           <td>{{ badge({'html_response': _('HTML 页面'), 'api_response': _('API 响应'), 'all': _('全部范围')}.get(item.target_scope, item.target_scope), 'info') }}</td>
           <td>{{ badge({'always': _('始终启用'), 'agent_only': _('命中 Agent 时'), 'high_risk': _('高风险会话'), 'agent_or_high_risk': _('Agent 或高风险')}.get(item.trigger_type, item.trigger_type), 'warning') }}</td>
           <td>{% if item.variables_json %}{% for variable in item.variables_json %}<span class="pill" style="margin:1px">{{ variable }}</span>{% endfor %}{% else %}<span class="muted">-</span>{% endif %}</td>
           <td><span class="pill">P{{ item.priority }}</span></td>
-          <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
-          <td class="prompt-description-cell cell-prose">{{ item.description or _('暂无说明') }}</td>
+          <td>{% if item.is_active %}{{ badge(_('启用'), 'success') }}{% else %}{{ badge(_('停用'), 'danger') }}{% endif %}</td>
+          <td class="prompt-description-cell cell-prose">{{ _(item.description or '') or _('暂无说明') }}</td>
           <td>
             <div class="prompt-actions-row">
               <button type="button" onclick="openPromptModal('prompt-edit-{{ item.id }}')">{{ _( '编辑' ) }}</button>
               <form method="post" action="/admin/prompt-injection/{{ item.id }}/toggle">
-                <button type="submit" class="secondary">{% if item.is_active %}停用{% else %}启用{% endif %}</button>
+                <button type="submit" class="secondary">{% if item.is_active %}{{ _('停用') }}{% else %}{{ _('启用') }}{% endif %}</button>
               </form>
               <form method="post" action="/admin/prompt-injection/{{ item.id }}/delete">
                 <button type="submit" class="danger">{{ _( '删除' ) }}</button>
@@ -247,7 +247,7 @@
   <div class="prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-edit-title-{{ item.id }}">
     <div class="prompt-modal-header">
       <div>
-        <h2 class="prompt-modal-title" id="prompt-edit-title-{{ item.id }}">编辑模板：{{ item.name }}</h2>
+        <h2 class="prompt-modal-title" id="prompt-edit-title-{{ item.id }}">{{ _('编辑模板：') }}{{ _(item.name) }}</h2>
         <div class="prompt-modal-subtitle"><code>{{ item.template_key }}</code> {{ _( '· 在弹窗中维护正文内容与运行策略。' ) }}</div>
       </div>
       <button type="button" class="prompt-modal-close" onclick="closePromptModal('prompt-edit-{{ item.id }}')">×</button>
@@ -283,7 +283,7 @@
           </label>
         </div>
         <label class="field-label"><span>{{ _( '变量列表' ) }}</span><input name="variables_csv" value="{{ (item.variables_json or [])|join(',') }}" placeholder="{{ _('如 source_ip,session_id,canary_token') }}"></label>
-        <label class="field-label"><span>用途说明</span><textarea name="description" placeholder="{{ _( '用途说明' ) }}">{{ item.description }}</textarea></label>
+        <label class="field-label"><span>{{ _( '用途说明' ) }}</span><textarea name="description" placeholder="{{ _( '用途说明' ) }}">{{ item.description }}</textarea></label>
         <label class="field-label"><span>{{ _( '注入正文 *' ) }}</span><textarea class="prompt-editor" name="content_template" required>{{ item.content_template }}</textarea></label>
         <div class="prompt-help">{{ _( '可用变量：' ) }}<code>{source_ip}</code><code>{session_id}</code><code>{canary_token}</code><code>{callback_url}</code><code>{risk_score}</code><code>{agent_type}</code></div>
         <div class="prompt-modal-footer">
