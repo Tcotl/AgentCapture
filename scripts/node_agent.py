@@ -150,7 +150,7 @@ def handle_task(task: dict, opts: argparse.Namespace) -> tuple[str, dict]:
 
 def enroll(args: argparse.Namespace) -> None:
     """Self-register this node on the console (idempotent)."""
-    body = {"node_name": args.name, "listen_address": args.listen}
+    body = {"node_name": args.name, "listen_address": args.listen, "zone": args.zone}
     resp = _post(args.server, "/api/node/enroll", args.token, body)
     print(f"[enroll] {json.dumps(resp, ensure_ascii=False)[:220]}")
 
@@ -218,6 +218,7 @@ def main() -> None:
     ap.add_argument("--apply", action="store_true", help="really run iptables (default: dry-run)")
     ap.add_argument("--enroll", action="store_true", help="self-register this node on the console at startup (idempotent)")
     ap.add_argument("--listen", default="0.0.0.0", help="listen address reported at enrollment")
+    ap.add_argument("--zone", default="", help="network zone reported at enrollment, e.g. DMZ")
     ap.add_argument("--target-host", default="", help="AC intranet IP for DNAT targets (falls back to the task payload)")
     ap.add_argument("--allow-ports", default="", help="comma-separated local ports that may be forwarded, e.g. 22,3306")
     args = ap.parse_args()

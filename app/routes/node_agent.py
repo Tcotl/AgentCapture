@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -71,6 +73,11 @@ def node_enroll(payload: NodeEnrollPayload, request: Request, db: Session = Depe
     _require_node_token(request)
     node = db.scalar(select(Node).where(Node.name == payload.node_name))
     created = False
+    zone_provided = bool(payload.zone.strip())
+    if node and zone_provided and node.network_zone != payload.zone.strip()[:64]:
+        node.network_zone = payload.zone.strip()[:64]
+        db.add(node)
+        db.commit()
     if not node:
         node = Node(
             name=payload.node_name.strip(),
@@ -166,3 +173,96 @@ def node_ack_task(payload: NodeAckPayload, request: Request, db: Session = Depen
     if not task:
         raise HTTPException(status_code=404, detail="task not found")
     return {"status": "ok", "task_id": task.id, "task_status": task.status}
+
+
+@router.get("/agent-script")
+def node_agent_script():
+    """下发节点执行器脚本（子节点快捷接入直接 curl 下载）。"""
+    path = Path(__file__).resolve().parents[2] / "scripts" / "node_agent.py"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="node agent script not bundled in this deployment")
+    return Response(
+        path.read_text(encoding="utf-8"),
+        media_type="text/x-python",
+        headers={"Content-Disposition": 'attachment; filename="node_agent.py"'},
+    )
+
+
+@router.get("/join")
+def node_join_script(
+    request: Request,
+    name: str = "",
+    token: str = "",
+    zone: str = "",
+    listen: str = "0.0.0.0",
+    ports: str = "22,3306,6379,21,9200",
+):
+    """快捷接入：生成子节点一键接入脚本（下载执行器 + 自助注册 + systemd 常驻）。
+
+    令牌已配置时必须携带匹配的 token 查询参数；生成的链接内嵌令牌，
+    请通过内部渠道分发给下属单位。
+    """
+    settings_ = get_settings()
+    expected = settings_.node_auth_token
+    if expected and token != expected:
+        raise HTTPException(status_code=403, detail="invalid join token")
+    token = token.replace('"', "").replace("\\", "").replace("$", "").replace("`", "")
+    import re as _re
+
+    clean_name = _re.sub(r"[^A-Za-z0-9._-]", "", name).strip("-._")[:120]
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="name required")
+    zone_clean = _re.sub(r"[^\w\u4e00-\u9fff-]", "", zone).strip()[:64]
+    ports_clean = ",".join(p for p in (_re.sub(r"[^0-9]", "", x) for x in ports.split(",")) if p) or "22,3306,6379,21,9200"
+    host = (request.url.hostname or "").lower()
+    ac_host = host if host not in {"127.0.0.1", "localhost", "0.0.0.0"} else "<AC内网IP>"
+    ac_port = settings_.port
+    token_header = f'-H "X-Node-Token: {token}" ' if token else ""
+    script = f"""#!/usr/bin/env bash
+# AgentCapture 快捷接入脚本 — {clean_name} @ http://{ac_host}:{ac_port}
+# 生成于 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}；链接内嵌令牌，请勿外传
+set -e
+
+AC="{ac_host}"
+PORT="{ac_port}"
+NAME="{clean_name}"
+ZONE="{zone_clean}"
+PORTS="{ports_clean}"
+TOKEN="{token}"
+INSTALL_DIR=/opt/agentcapture-node
+
+mkdir -p "$INSTALL_DIR"
+curl -fsS {token_header}"http://$AC:$PORT/api/node/agent-script" -o "$INSTALL_DIR/node_agent.py"
+
+cat > /etc/systemd/system/agentcapture-node.service <<UNIT
+[Unit]
+Description=AgentCapture node agent
+After=network.target
+
+[Service]
+WorkingDirectory=$INSTALL_DIR
+Environment=NODE_AUTH_TOKEN=$TOKEN
+Environment=ZONE=$ZONE\nExecStart=/usr/bin/python3 $INSTALL_DIR/node_agent.py --server http://$AC:$PORT --name $NAME --token "$TOKEN" --enroll --zone "$ZONE" --apply --target-host $AC --allow-ports $PORTS
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload
+  systemctl enable --now agentcapture-node
+  echo "agentcapture-node service started (journalctl -u agentcapture-node -f)"
+else
+  echo "systemd unavailable, falling back to nohup"
+  nohup python3 -u $INSTALL_DIR/node_agent.py --server http://$AC:$PORT --name $NAME --token "$TOKEN" --enroll --zone "$ZONE" --apply --target-host $AC --allow-ports $PORTS >/var/log/agentcapture-node.log 2>&1 &
+  echo "agent started, log: /var/log/agentcapture-node.log"
+fi
+
+echo "AgentCapture node '$NAME' joined -> http://$AC:$PORT"
+"""
+    return Response(
+        script,
+        media_type="application/x-sh",
+        headers={"Content-Disposition": f'attachment; filename="join-{clean_name}.sh"'},
+    )

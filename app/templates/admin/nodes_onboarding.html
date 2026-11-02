@@ -5,7 +5,7 @@
 
 {% if created %}
 <div class="panel page-banner page-banner-success" style="margin-bottom:14px">
-  {{ _('节点已创建') }}：<code>{{ created }}</code> —— {{ _('继续完成 ② 节点侧接入命令。') }}
+  {{ _('节点已创建') }}：<code>{{ created }}</code> —— {{ _('可跳过手动登记，直接使用 ② 快捷接入。') }}
 </div>
 {% endif %}
 
@@ -48,7 +48,38 @@ docker compose --env-file .env.docker up -d</pre>
 </section>
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header(_('② 节点侧接入命令'), _('在子节点（网关/跳板机，Linux + Python 3.9+ + iptables，需 root）上执行。选择节点自动生成；带 --enroll 可自助注册，无需提前建台账。')) }}
+  {{ section_header(_('② 快捷接入（推荐）'), _('生成一行命令，在子节点上以 root 执行即可完成：下载执行器 → 自助注册 → systemd 常驻。')) }}
+  <div class="grid-2" style="align-items:end">
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _('节点名（仅限字母/数字/._-）') }}</label>
+      <input id="qj-name" placeholder="dc3-edge">
+    </div>
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _('网络区域') }}</label>
+      <select id="qj-zone">
+        <option value="">{{ _('未分区') }}</option>
+        <option value="DMZ">DMZ</option>
+        <option value="业务内网">{{ _('业务内网') }}</option>
+        <option value="核心内网">{{ _('核心内网') }}</option>
+        <option value="管理网">{{ _('管理网') }}</option>
+      </select>
+    </div>
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _('导流端口白名单') }}</label>
+      <input id="qj-ports" value="22,3306,6379,21,9200">
+    </div>
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _('主控制台地址' ) }}</label>
+      <input id="qj-ac" value="{{ ac_host }}:{{ ac_port }}">
+    </div>
+  </div>
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button type="button" class="primary btn-sm" id="qj-copy">{{ _('复制快捷接入命令') }}</button>
+    <span class="muted" style="font-size:11.5px">{{ _('命令内嵌接入令牌，请通过内部渠道分发给下属单位。') }}</span>
+  </div>
+  <pre id="qj-cmd" style="margin-top:10px;background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.8;overflow:auto;font-family:'Fira Code',ui-monospace,monospace;white-space:pre-wrap;word-break:break-all"></pre>
+
+  {{ section_header(_('③ 手动接入（高级）'), _('在子节点（网关/跳板机，Linux + Python 3.9+ + iptables，需 root）上执行。选择节点自动生成；带 --enroll 可自助注册，无需提前建台账。')) }}
   {% if not remote_names %}
   {{ empty_state(_('还没有可接入的节点'), _('先在上方创建节点台账。'), 1, 'ON') }}
   {% else %}
@@ -115,7 +146,7 @@ WantedBy=multi-user.target
 </section>
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header(_('③ 下发蜜罐与验证'), _('节点上线后，从拓扑或节点详情把蜜罐导流任务下发给对应网段。')) }}
+  {{ section_header(_('④ 下发蜜罐与验证'), _('节点上线后，从拓扑或节点详情把蜜罐导流任务下发给对应网段。')) }}
   <div class="grid-2" style="align-items:start">
     <div>
       <strong style="display:block;margin-bottom:6px">{{ _('下发蜜罐导流') }}</strong>
@@ -138,4 +169,31 @@ iptables -t nat -S PREROUTING | grep agentcapture
     </div>
   </div>
 </section>
+<script>
+(function () {
+  var TOKEN = {{ token_value | tojson }};
+  function buildCmd() {
+    const name = (document.getElementById('qj-name').value || '').trim();
+    const zone = document.getElementById('qj-zone').value;
+    const ports = (document.getElementById('qj-ports').value || '').trim();
+    const ac = (document.getElementById('qj-ac').value || '').trim();
+    const q = new URLSearchParams();
+    if (name) q.set('name', name);
+    if (TOKEN) q.set('token', TOKEN);
+    if (zone) q.set('zone', zone);
+    if (ports) q.set('ports', ports);
+    return 'curl -fsSL "http://' + ac + '/api/node/join?' + q.toString() + '" -o join.sh && sudo bash join.sh';
+  }
+  function refresh() { document.getElementById('qj-cmd').textContent = buildCmd(); }
+  ['qj-name', 'qj-zone', 'qj-ports', 'qj-ac'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', refresh);
+  });
+  refresh();
+  document.getElementById('qj-copy').addEventListener('click', function () {
+    navigator.clipboard.writeText(document.getElementById('qj-cmd').textContent).then(function () {
+      if (window.showToast) showToast({{ _('已复制到剪贴板') | tojson }}, 'success');
+    });
+  });
+})();
+</script>
 {% endblock %}
