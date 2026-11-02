@@ -36,6 +36,7 @@
       <div class="kv"><div class="key">{{ _( '网络区域' ) }}</div><div>
         <select id="nt-insp-zone" style="width:100%">
           <option value="">{{ _( '未分区' ) }}</option>
+          <option value="平台控制区" disabled>◈ {{ _( '平台控制区' ) }}</option>
           <option value="DMZ">DMZ</option>
           <option value="业务内网">{{ _( '业务内网' ) }}</option>
           <option value="核心内网">{{ _( '核心内网' ) }}</option>
@@ -83,6 +84,7 @@
     --nt-core-hi: color-mix(in srgb, var(--primary, #2563eb) 20%, var(--card)); }
   #node-topo-svg .nt-edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .34; stroke-width: 1.5; stroke-dasharray: 7 6; }
   #node-topo-svg #nt-edges, #node-topo-svg #nt-zones { pointer-events: none; }
+  #node-topo-svg .nt-zone-box { pointer-events: all; cursor: move; }
   #node-topo-svg .nt-edge.stale { stroke: #f59e0b; stroke-opacity: .6; }
   #node-topo-svg .nt-edge.off { stroke: #f43f5e; stroke-opacity: .6; }
   #node-topo-svg .nt-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
@@ -149,7 +151,7 @@
   var VW = 1440, VH = 560;  // live viewBox extents (auto-fits content)
   var CW = 210, CH = 72;
   var CORE0 = { x: VW / 2 - 90, y: VH / 2 - 60 };
-  var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 150 };
+  var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 168 };
   if (LAYOUT.core && LAYOUT.core.length === 2) { core.x += LAYOUT.core[0]; core.y += LAYOUT.core[1]; }
   var edgeLayer = document.getElementById('nt-edges');
   var nodeLayer = document.getElementById('nt-nodes');
@@ -168,31 +170,60 @@
     return n.fresh_seconds <= 300 ? 'fresh' : 'stale';
   }
 
-  var ring = 0;
-  var others = NODES.filter(function (n) { return !n.is_builtin; });
-  NODES.forEach(function (n) {
-    // the builtin node lives on the AC host itself — always pinned right
-    // below the console pedestal (its saved layout is ignored)
-    if (n.is_builtin) {
-      n.x = core.x + core.w / 2 - CW / 2;
-      n.y = core.y + core.h + 8;
-      return;
+  // ── zone grid layout ─────────────────────────────────────────────
+  // Zones are draggable clusters anchored around the console: a zone
+  // parked left/right of the console stacks its nodes vertically, one
+  // parked above/below lays them out in rows — 4 nodes per row/column,
+  // overflow wraps to the next row/column. Zone anchors persist in the
+  // layout payload as zone:<name> keys.
+  var zoneAnchors = {};
+  Object.keys(LAYOUT).forEach(function (k) {
+    if (k.indexOf('zone:') === 0 && LAYOUT[k] && typeof LAYOUT[k] === 'object' && LAYOUT[k].x != null) {
+      zoneAnchors[k.slice(5)] = { x: LAYOUT[k].x, y: LAYOUT[k].y, o: LAYOUT[k].o === 'v' ? 'v' : 'h' };
     }
+  });
+  var ZONE_PAD = 18, ZONE_HEAD = 34, ZONE_GAP = 14;
+  function zoneMembers(z) {
+    return NODES.filter(function (n) { return !n.is_builtin && n.zone === z; });
+  }
+  function zoneOrient(z) {
+    if (zoneAnchors[z]) return zoneAnchors[z].o;
+    var idx = Object.keys(zoneAnchors).length;
+    zoneAnchors[z] = { x: core.x + core.w + 180, y: core.y + idx * 60, o: 'v' };
+    return 'v';
+  }
+  function arrangeZone(z) {
+    var nodes = zoneMembers(z);
+    if (!nodes.length) { delete zoneAnchors[z]; return null; }
+    var o = zoneOrient(z);
+    var a = zoneAnchors[z];
+    var cols, rows;
+    if (o === 'h') { cols = Math.min(4, nodes.length); rows = Math.ceil(nodes.length / 4); }
+    else { cols = Math.ceil(nodes.length / 4); rows = Math.min(4, nodes.length); }
+    nodes.forEach(function (n, i) {
+      var col, row;
+      if (o === 'h') { col = i % 4; row = Math.floor(i / 4); }
+      else { col = Math.floor(i / 4); row = i % 4; }
+      n.x = a.x + ZONE_PAD + col * (CW + ZONE_GAP);
+      n.y = a.y + ZONE_HEAD + row * (CH + 12);
+    });
+    var w = ZONE_PAD * 2 + cols * CW + (cols - 1) * ZONE_GAP;
+    var h = ZONE_HEAD + rows * CH + (rows - 1) * 12 + ZONE_PAD;
+    return { label: z, fixed: false, nodes: nodes, o: o,
+      x0: a.x, y0: a.y, x1: a.x + w, y1: a.y + h };
+  }
+
+  var ring = 0;
+  NODES.forEach(function (n) {
+    if (n.is_builtin) return;          // rides on the console, no tower
+    if (n.zone) return;                // zoned nodes are grid-arranged
     var saved = LAYOUT[String(n.id)];
     if (saved && saved.length === 2) { n.x = saved[0]; n.y = saved[1]; return; }
-    // adaptive ring placement: one ring up to 6 nodes, two rings beyond
-    var total = others.length, angle, radius;
-    if (total <= 6) {
-      angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(total, 1);
-      radius = 430;
-    } else {
-      var inner = Math.ceil(total / 2);
-      if (ring < inner) { angle = -Math.PI / 2 + (ring * 2 * Math.PI) / inner; radius = 300; }
-      else { angle = -Math.PI / 2 + ((ring - inner) * 2 * Math.PI) / (total - inner); radius = 520; }
-    }
+    var unzoned = NODES.filter(function (x) { return !x.is_builtin && !x.zone; });
+    var angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(unzoned.length, 1);
     ring += 1;
-    n.x = core.x + core.w / 2 + Math.cos(angle) * radius - CW / 2;
-    n.y = core.y + core.h / 2 + Math.sin(angle) * radius * 0.42 - CH / 2;
+    n.x = core.x + core.w / 2 + Math.cos(angle) * 430 - CW / 2;
+    n.y = core.y + core.h / 2 + Math.sin(angle) * 175 - CH / 2;
   });
 
   var ZONE_RULES = [[/DMZ/i, '#f59e0b'], [/业务/, '#3b82f6'], [/核心/, '#a855f7'], [/管理/, '#10b981']];
@@ -214,7 +245,7 @@
   }
 
   function drawZoneBox(x0, y0, x1, y1, label, color) {
-    var g = el('g', {}, zoneLayer);
+    var g = el('g', { class: 'nt-zone-box' }, zoneLayer);
     el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 16,
       fill: color, 'fill-opacity': .07, stroke: color, 'stroke-opacity': .45,
       'stroke-width': 1.2, 'stroke-dasharray': '6 5' }, g);
@@ -224,6 +255,7 @@
     var labelEl = el('text', { x: x0 + 12 + labelW / 2, y: y0 + 22, 'text-anchor': 'middle',
       style: 'fill:' + color + ';font-size:11px;font-weight:700' }, g);
     labelEl.textContent = label;
+    return g;
   }
 
   var CORE_ZONE_LABEL = {{ _('平台控制区') | tojson }};
@@ -231,27 +263,14 @@
     var boxes = [];
     var cz = { label: CORE_ZONE_LABEL, fixed: true, nodes: [],
       x0: core.x - 18, y0: core.y - 6, x1: core.x + core.w + 18, y1: core.y + core.h + 4 };
-    NODES.forEach(function (n) {
-      if (!n.is_builtin) return;
-      var b = contentBBox(n);
-      if (b) {
-        cz.x0 = Math.min(cz.x0, b.x - 14); cz.y0 = Math.min(cz.y0, b.y - 14);
-        cz.x1 = Math.max(cz.x1, b.x + b.w + 14); cz.y1 = Math.max(cz.y1, b.y + b.h + 14);
-      }
-    });
     boxes.push(cz);
-    var groups = {};
-    NODES.forEach(function (n) { if (!n.is_builtin && n.zone) (groups[n.zone] = groups[n.zone] || []).push(n); });
-    Object.keys(groups).forEach(function (z) {
-      var nodes = groups[z];
-      var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-      nodes.forEach(function (n) {
-        var b = contentBBox(n);
-        x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
-        x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
-      });
-      boxes.push({ label: z, fixed: false, nodes: nodes,
-        x0: x0 - 18, y0: y0 - 18, x1: x1 + 18, y1: y1 + 18 });
+    var zoneNames = [];
+    NODES.forEach(function (n) {
+      if (!n.is_builtin && n.zone && zoneNames.indexOf(n.zone) < 0) zoneNames.push(n.zone);
+    });
+    zoneNames.forEach(function (z) {
+      var b = arrangeZone(z);
+      if (b) boxes.push(b);
     });
     return boxes;
   }
@@ -292,6 +311,14 @@
       }
       if (!any) break;
     }
+    // keep anchors in sync with the resolved positions
+    boxes.forEach(function (b) {
+      if (!b.fixed && b.label) {
+        if (!zoneAnchors[b.label]) zoneAnchors[b.label] = { x: b.x0, y: b.y0, o: b.o || 'h' };
+        zoneAnchors[b.label].x = b.x0;
+        zoneAnchors[b.label].y = b.y0;
+      }
+    });
     drawEdges();
     drawZones();
   }
@@ -299,7 +326,14 @@
     zoneLayer.innerHTML = '';
     zoneBoxes().forEach(function (zb) {
       var color = zb.label === CORE_ZONE_LABEL ? '#4493f8' : zoneColor(zb.label);
-      drawZoneBox(zb.x0, zb.y0, zb.x1, zb.y1, zb.label, color);
+      var g = drawZoneBox(zb.x0, zb.y0, zb.x1, zb.y1, zb.label, color);
+      if (!zb.fixed) {
+        g.addEventListener('pointerdown', function (ev) {
+          var a = zoneAnchors[zb.label];
+          zoneDrag = { z: zb.label, cx: ev.clientX, cy: ev.clientY, ax: a.x, ay: a.y, moved: false };
+          ev.preventDefault();
+        });
+      }
     });
   }
 
@@ -373,6 +407,7 @@
     var i = 0;
     var ccx = core.x + core.w / 2, ccy = core.y + core.h / 2;
     NODES.forEach(function (n) {
+      if (n.is_builtin) return;  // rides on the console — no edge, no tower
       var state = freshClass(n);
       var slot = edgeSlot(i++);
       slot.base.setAttribute('d', curve(ccx, ccy, n.x + CW / 2, n.y + CH / 2));
@@ -445,6 +480,16 @@
     var online = NODES.filter(function (n) { return freshClass(n) === 'fresh'; }).length;
     var t2 = el('text', { class: 'nt-core-sub', x: cx, y: cy + 76, 'text-anchor': 'middle' }, coreGroup);
     t2.textContent = {{ _('节点') | tojson }} + ' ' + online + '/' + NODES.length + ' · ' + {{ site_id | tojson }};
+    // the builtin node lives on this host — its info rides on the console
+    // instead of a separate tower
+    var bn = null;
+    NODES.forEach(function (x) { if (x.is_builtin) bn = x; });
+    if (bn) {
+      var bnUp = freshClass(bn) === 'fresh';
+      var t3 = el('text', { class: 'nt-core-sub', x: cx, y: cy + 91, 'text-anchor': 'middle' }, coreGroup);
+      t3.textContent = '◈ ' + {{ _('内置节点') | tojson }} + ' · ' + (bnUp ? {{ _('在线') | tojson }} : {{ _('离线') | tojson }}) + ' · ' + (bn.listen || '');
+      t3.style.fill = bnUp ? 'var(--success)' : '#f43f5e';
+    }
     coreGroup.addEventListener('pointerdown', function (ev) {
       coreDrag = { cx: ev.clientX, cy: ev.clientY, ox: core.x, oy: core.y, moved: false };
       ev.preventDefault();
@@ -499,8 +544,8 @@
       zt.textContent = '◈ ' + n.zone;
     }
     cardRefs[n.id] = { g: g, node: n };
-    if (n.is_builtin) {
-      // pinned under the console: click selects, dragging is disabled
+    if (n.zone) {
+      // zoned nodes are grid-arranged — the zone box moves the cluster
       g.addEventListener('click', function () { select(n.id); });
     } else {
       attachDrag(g, n);
@@ -542,6 +587,18 @@
       view.y = panDrag.y - pdy;
       clampView();
       applyView();
+    } else if (zoneDrag) {
+      var rect = svg.getBoundingClientRect();
+      var zdx = (ev.clientX - zoneDrag.cx) / rect.width * view.w;
+      var zdy = (ev.clientY - zoneDrag.cy) / rect.height * view.h;
+      if (Math.abs(ev.clientX - zoneDrag.cx) + Math.abs(ev.clientY - zoneDrag.cy) > 4) zoneDrag.moved = true;
+      if (!zoneAnchors[zoneDrag.z]) zoneAnchors[zoneDrag.z] = { x: zoneDrag.ax, y: zoneDrag.ay, o: 'h' };
+      zoneAnchors[zoneDrag.z].x = zoneDrag.ax + zdx;
+      zoneAnchors[zoneDrag.z].y = zoneDrag.ay + zdy;
+      arrangeZone(zoneDrag.z);
+      refreshTransforms();
+      drawEdges();
+      drawZones();
     }
   });
   window.addEventListener('pointerup', function () {
@@ -558,12 +615,38 @@
       var p = panDrag;
       panDrag = null;
       if (!p.moved) clearSelection();
+    } else if (zoneDrag) {
+      var z = zoneDrag;
+      zoneDrag = null;
+      if (z.moved) {
+        // re-evaluate orientation from the new position: left/right of the
+        // console stacks the zone vertically, above/below lays it out in
+        // horizontal rows of four
+        var a = zoneAnchors[z.z];
+        var zcx = a.x + ZONE_PAD + 60, zcy = a.y + 40;
+        var ccx2 = core.x + core.w / 2, ccy2 = core.y + core.h / 2;
+        a.o = Math.abs(zcx - ccx2) >= Math.abs(zcy - ccy2) ? 'v' : 'h';
+        arrangeZone(z.z);
+        refreshTransforms();
+        saveLayout();
+        resolveZoneOverlaps();
+        fitViewBox();
+      }
     }
   });
+  function refreshTransforms() {
+    NODES.forEach(function (n) {
+      if (cardRefs[n.id]) cardRefs[n.id].g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    });
+  }
 
   function saveLayout() {
     var payload = { core: [Math.round(core.x - CORE0.x), Math.round(core.y - CORE0.y)] };
-    NODES.forEach(function (n) { if (!n.is_builtin) payload[String(n.id)] = [Math.round(n.x), Math.round(n.y)]; });
+    NODES.forEach(function (n) { if (!n.is_builtin && !n.zone) payload[String(n.id)] = [Math.round(n.x), Math.round(n.y)]; });
+    Object.keys(zoneAnchors).forEach(function (z) {
+      var a = zoneAnchors[z];
+      payload['zone:' + z] = { x: Math.round(a.x), y: Math.round(a.y), o: a.o };
+    });
     fetch('/admin/nodes/topology/layout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -627,7 +710,9 @@
     document.getElementById('nt-insp-seen').textContent = fmtSeen(n);
     document.getElementById('nt-insp-services').textContent = n.services;
     document.getElementById('nt-insp-pending').textContent = n.pending;
-    document.getElementById('nt-insp-zone').value = n.zone || '';
+    const zoneSel = document.getElementById('nt-insp-zone');
+    zoneSel.value = n.is_builtin ? {{ _('平台控制区') | tojson }} : (n.zone || '');
+    zoneSel.disabled = !!n.is_builtin;  // the builtin node belongs to the console zone
     document.getElementById('nt-insp-link').setAttribute('href', '/admin/nodes/' + n.id);
     setCollapsed(false, false);  // selecting a node always opens the menu bar
   }
@@ -645,7 +730,14 @@
       Object.keys(cardRefs).forEach(function (k) {
         if (String(k) === String(currentId)) cardRefs[k].node.zone = zone;
       });
-      drawZones();
+      // re-arrange both the source and the target zone grids
+      NODES.forEach(function (n) {
+        if (!n.is_builtin && n.zone && arrangeZone(n.zone)) { /* positions updated */ }
+      });
+      refreshTransforms();
+      drawEdges();
+      resolveZoneOverlaps();
+      fitViewBox();
       if (window.showToast) showToast({{ _('网络区域已更新') | tojson }}, 'success');
     }).catch(function () {
       if (window.showToast) showToast({{ _('区域更新失败') | tojson }}, 'error');
@@ -677,7 +769,13 @@
   document.getElementById('nt-zoom-fit').addEventListener('click', fitViewBox);
 
   drawCore();
-  NODES.forEach(drawNode);
+  // zoned nodes take their grid positions before anything draws
+  var zoneNames = [];
+  NODES.forEach(function (n) {
+    if (!n.is_builtin && n.zone && zoneNames.indexOf(n.zone) < 0) zoneNames.push(n.zone);
+  });
+  zoneNames.forEach(function (z) { arrangeZone(z); });
+  NODES.forEach(function (n) { if (!n.is_builtin) drawNode(n); });
   drawEdges();
   drawZones();
   resolveZoneOverlaps();

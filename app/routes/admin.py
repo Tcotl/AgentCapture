@@ -4282,6 +4282,15 @@ async def nodes_topology_save_layout(request: Request):
     clean: dict = {}
     for key, xy in layout.items():
         try:
+            if isinstance(key, str) and key.startswith("zone:"):
+                zname = key[5:]
+                if 1 <= len(zname) <= 40 and isinstance(xy, dict):
+                    clean[key] = {
+                        "x": round(float(xy.get("x")), 1),
+                        "y": round(float(xy.get("y")), 1),
+                        "o": "v" if str(xy.get("o")) == "v" else "h",
+                    }
+                continue
             if key == "core":
                 clean[key] = [round(float(xy[0]), 1), round(float(xy[1]), 1)]
             else:
