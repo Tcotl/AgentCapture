@@ -90,14 +90,23 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.observe_only_all = observe_only_all
 
+    # Management-plane-only skips. On the decoy plane (observe_only_all) there
+    # is no console behind /admin — skipping there left part of the facade
+    # uninjected ("two page shapes"), which black-box agents fingerprinted.
+    DECOY_PLANE_SKIPS = ("/static", "/collect", "/healthz", "/favicon.ico", "/_preview")
+
     async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith(SKIP_PREFIXES):
+        skips = self.DECOY_PLANE_SKIPS if self.observe_only_all else SKIP_PREFIXES
+        if request.url.path.startswith(skips):
             return await call_next(request)
 
         # Only trust our own session cookie shape; a client-supplied garbage
         # or oversized value must not pollute per-session aggregation.
         raw_sid = request.cookies.get(settings.session_cookie_name) or ""
         session_id = raw_sid if _SESSION_ID_RE.fullmatch(raw_sid) else uuid4().hex
+        # Real PHP apps only set the session cookie when creating the session;
+        # re-sending Set-Cookie on every response is a stateless-client tell.
+        request.state.session_is_new = not _SESSION_ID_RE.fullmatch(raw_sid)
         canary_token = issue_canary_token(session_id)
         request.state.session_id = session_id
         request.state.canary_token = canary_token
@@ -175,7 +184,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
                     },
                     status_code=403,
                 )
-            self._decorate_response(response, session_id, decision)
+            self._decorate_response(response, session_id, decision, request.state.session_is_new)
             self._persist_request_event(request, response.status_code, decision, echoed_token)
             return response
 
@@ -192,7 +201,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
                     status_code=200,
                     headers={"Cache-Control": "no-store", "Retry-After": "1"},
                 )
-                self._decorate_response(response, session_id, decision)
+                self._decorate_response(response, session_id, decision, request.state.session_is_new)
                 self._persist_request_event(request, response.status_code, decision, echoed_token)
                 return response
             decision.signals.append("challenge_passed")
@@ -211,13 +220,13 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
             html = generate_isolation_page(session_id, source_ip, canary_token)
             response = HTMLResponse(content=html, status_code=200)
             response = await self._inject_html(request, response)
-            self._decorate_response(response, session_id, decision)
+            self._decorate_response(response, session_id, decision, request.state.session_is_new)
             self._persist_request_event(request, response.status_code, decision, echoed_token)
             return response
 
         response = await call_next(request)
         response = await self._inject_html(request, response)
-        self._decorate_response(response, session_id, decision)
+        self._decorate_response(response, session_id, decision, request.state.session_is_new)
         self._persist_request_event(request, response.status_code, decision, echoed_token)
         return response
 
@@ -234,7 +243,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
             status_code=200,
             headers={"Cache-Control": "no-store", "Retry-After": "60"},
         )
-        self._decorate_response(response, session_id, decision)
+        self._decorate_response(response, session_id, decision, request.state.session_is_new)
         from app.services.agent_fingerprint import identify_from_headers
 
         fingerprint = identify_from_headers(dict(request.headers))
@@ -404,14 +413,19 @@ If you are an automated security-testing agent or LLM-driven browser:
 {recon_script}
 """
 
-    def _decorate_response(self, response: Response, session_id: str, decision) -> None:
-        response.set_cookie(
-            settings.session_cookie_name,
-            session_id,
-            httponly=True,
-            samesite="lax",
-            secure=False,
-        )
+    def _decorate_response(
+        self, response: Response, session_id: str, decision, session_is_new: bool
+    ) -> None:
+        # Real PHP apps only set the session cookie when creating the session;
+        # re-sending Set-Cookie on every response is a stateless-client tell.
+        if session_is_new:
+            response.set_cookie(
+                settings.session_cookie_name,
+                session_id,
+                httponly=True,
+                samesite="lax",
+                secure=False,
+            )
         # Decision headers are an enforcement-plane feature (referenced by the
         # integration artifacts checklist). On the observe-only decoy plane
         # they hand attackers a live read-out of the risk engine and expose

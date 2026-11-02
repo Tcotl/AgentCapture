@@ -153,6 +153,72 @@ def internal_openapi(request: Request) -> Response:
     }
 
 
+@router.get("/sitemap.xml")
+def sitemap() -> Response:
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"  <url><loc>http://127.0.0.1:48777/</loc><changefreq>daily</changefreq></url>\n"
+        "  <url><loc>http://127.0.0.1:48777/login</loc><changefreq>monthly</changefreq></url>\n"
+        "</urlset>"
+    )
+    return Response(content=body, media_type="application/xml")
+
+
+@router.post("/admin/reindex")
+def admin_reindex(request: Request):
+    """The internal OpenAPI spec advertises this maintenance action; it answers
+    a documented-style response for credentialed clients (401 otherwise)."""
+    from app.routes.counter_recon import _client_token_ok, _gate_401
+
+    if not _client_token_ok(request):
+        return _gate_401(request, "the staging reindex action")
+    import uuid as _uuid
+
+    return JSONResponse({
+        "status": "scheduled",
+        "job_id": _uuid.uuid4().hex[:12],
+        "detail": "reindex queued; progress is reported to operators by email",
+    })
+
+
+@router.get("/d/admin/config-backup.sql")
+def config_backup_sql(request: Request) -> Response:
+    """Dead-link fix: the injected hidden link advertises this exact path, so
+    it must resolve to a plausible (watermarked) dump instead of a 404 that
+    gives the deception away."""
+    from app.core.db import SessionLocal
+
+    from app.services.events import extract_client_ip
+
+    canary = getattr(request.state, "canary_token", "") or ""
+    ip = extract_client_ip(request)
+    marker = (canary or ip).replace(".", "")[:12].upper()
+    body = (
+        "-- phpMyAdmin SQL Dump\n-- version 5.2.1\n"
+        "-- https://www.phpmyadmin.net/\n--\n"
+        "-- 主机： localhost:3306\n-- 生成日期： 2025-05-20\n"
+        "--\n\nSET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n"
+        "CREATE DATABASE IF NOT EXISTS `staging` DEFAULT CHARACTER SET utf8mb4;\n"
+        "USE `staging`;\n\n"
+        "DROP TABLE IF EXISTS `config`;\n"
+        "CREATE TABLE `config` (\n"
+        "  `k` varchar(64) NOT NULL,\n  `v` text NOT NULL,\n"
+        "  PRIMARY KEY (`k`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n\n"
+        "INSERT INTO `config` (`k`, `v`) VALUES\n"
+        "  ('db.host', '10.20.30.15:5432'),\n"
+        "  ('db.user', 'staging_ro'),\n"
+        f"  ('db.pass', 'Stg#2025!readonly'),\n"
+        f"  ('audit.marker', '{marker}'),\n"
+        "  ('app.env', 'staging');\n"
+    )
+    return Response(
+        content=body,
+        media_type="application/sql",
+        headers={"Content-Disposition": 'attachment; filename="config-backup.sql"'},
+    )
+
+
 @router.get("/docs/runbook-internal.md")
 def internal_runbook() -> PlainTextResponse:
     body = """# Internal staging runbook

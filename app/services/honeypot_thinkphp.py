@@ -30,15 +30,30 @@ settings = get_settings()
 _TP_EXCEPTION_PAGE = """<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>系统发生错误</title>
-<style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#333;margin:0;padding:24px}
+<style>
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#333;margin:0;padding:24px}
 .exception{background:#f8f8f8;border-left:4px solid #e1755c;padding:12px 16px;margin-bottom:16px}
-.exception pre{margin:0;white-space:pre-wrap;word-break:break-all;font:12px/1.6 Consolas,monospace}
-.copyright{color:#aaa;font-size:12px;margin-top:24px}</style></head>
+.exception h1{font-size:20px;margin:0 0 8px;color:#e1755c}
+.exception .msg{font-size:14px;margin:6px 0}
+.exception pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-all;font:12px/1.6 Consolas,monospace;background:#fff;border:1px solid #e0e0e0;padding:10px}
+.trace{margin:10px 0 0;font:12px/1.7 Consolas,monospace;color:#555}
+.trace td{padding:2px 8px;border-bottom:1px solid #f0f0f0;font-family:Consolas,monospace;font-size:12px}
+.copyright{color:#aaa;font-size:12px;margin-top:24px}
+</style></head>
 <body>
 <div class="exception">
-<div class="message">ThinkPHP V5.0.24 — [ LogicException ]</div>
+<h1>{exception_class}</h1>
+<div class="msg">{exception_message}</div>
 <pre>{output}</pre>
 </div>
+<table class="trace">
+<tr><th>#</th><th>Function</th><th>Location</th></tr>
+<tr><td>0</td><td>think\\App::invokeFunction</td><td>/var/www/html/thinkphp/library/think/App.php(412)</td></tr>
+<tr><td>1</td><td>ReflectionMethod::invokeArgs</td><td>/var/www/html/thinkphp/library/think/App.php(343)</td></tr>
+<tr><td>2</td><td>think\\App::exec</td><td>/var/www/html/thinkphp/library/think/App.php(205)</td></tr>
+<tr><td>3</td><td>think\\Dispatcher::run</td><td>/var/www/html/thinkphp/library/think/Dispatcher.php(38)</td></tr>
+<tr><td>4</td><td>think\\Error::appShutdown</td><td>/var/www/html/thinkphp/library/think/Error.php(52)</td></tr>
+</table>
 <div class="copyright">ThinkPHP V5.0.24 {seed}</div>
 </body></html>"""
 
@@ -163,30 +178,27 @@ def _client_ip(request: Request) -> str:
 
 
 _NOT_FOUND_PAGE = """<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>404 Not Found</title></head>
-<body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>"""
-
-# Paths that a real deployment would 404: secret/config probes and obvious
-# non-application resources. Everything else keeps the facade home page.
-_MISSING_RESOURCE_RE = re.compile(
-    r"\.(env|ini|sql|zip|tar|gz|bak|yml|yaml|log|swp|save|git|ds_store)$"
-    r"|(?:^|/)(composer\.json|composer\.lock|package\.json|web\.config|\.htaccess|\.svn|\.git)"
-    r"|/(?:\.well-known/)?(?:security|acme|\.random)$",
-    re.IGNORECASE,
-)
-
-
-def _looks_like_missing_resource(path: str) -> bool:
-    if not path or path == "/":
-        return False
-    tail = path.rstrip("/")
-    if _MISSING_RESOURCE_RE.search(tail):
-        return True
-    # Random-looking single-segment probes (hex ids, generated noise) —
-    # real apps 404 these instead of serving the homepage.
-    seg = tail.rsplit("/", 1)[-1]
-    return len(seg) >= 16 and bool(re.search(r"\d", seg))
-
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>页面错误！</title>
+<style>
+body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: #f1f5f9; color: #555; margin: 0; padding: 60px 20px; }
+.wrap { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid #e3e8ee; border-radius: 4px; padding: 32px 40px; }
+h1 { font-size: 20px; color: #333; margin: 0 0 12px; }
+p { font-size: 13px; line-height: 1.8; margin: 6px 0; }
+.small { color: #999; font-size: 12px; margin-top: 18px; }
+code { background: #f6f8fa; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>页面错误！您可能跳转到错误页面</h1>
+<p>抱歉，您访问的页面不存在或已被移除。</p>
+<p class="small">ThinkPHP V5.0.24 | 十年磨一剑 - 为API开发设计的高性能框架</p>
+</div>
+</body>
+</html>"""
 
 def _surface_state() -> tuple[bool, dict]:
     """Console-managed face state: (enabled, config). Disabled => bare 404."""
@@ -313,16 +325,29 @@ async def tp_exploit(request: Request) -> Response:
         body = raw.decode("utf-8", errors="replace")[:8192]
 
     if not looks_like_tp_rce(method, request.url.path, query, body):
-        # Real sites answer 404 for missing assets and probe paths (.env,
-        # composer.json, random strings); serving the homepage for everything
-        # makes 404-based enumeration fail — a classic honeypot tell.
-        if _looks_like_missing_resource(request.url.path):
-            return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
-        return HTMLResponse(_render_home(cfg))
+        # Real ThinkPHP answers unknown routes with its production error page,
+        # not the welcome page — a uniform error shape here removes the
+        # "every path serves the facade" enumeration tell. Only the real
+        # entrypoints keep serving the welcome facade.
+        if request.url.path in _WELCOME_PATHS:
+            return HTMLResponse(_render_home(cfg))
+        return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
 
     command = extract_tp_command(query, body)
     command = strip_echo_wrapper(command) if command else ""
     ip = _client_ip(request)
+
+    # Class-name sensitivity: real TP5 only resolves container-registered
+    # classes. Probing with a random \think\zqxnotreal must yield the
+    # framework's ReflectionException page, not a scripted echo.
+    cls = _probe_class(request.url.path, query, body)
+    if cls and cls not in _KNOWN_TP_CLASSES:
+        page = (_TP_EXCEPTION_PAGE
+                .replace("{exception_class}", "ReflectionException")
+                .replace("{exception_message}", f"class not exists: {cls}")
+                .replace("{output}", "")
+                .replace("{seed}", ip.replace(".", "")))
+        return HTMLResponse(page, status_code=500)
 
     _log(request, "thinkphp_rce", {
         "command": command[:2000], "source_ip": ip,
@@ -347,11 +372,39 @@ async def tp_exploit(request: Request) -> Response:
     seed = ip.replace(".", "")
     app_name = str(cfg.get("app_name") or "ThinkPHP V5.0.24")
     page = (_TP_EXCEPTION_PAGE
-            .replace("ThinkPHP V5.0.24", app_name)
+            .replace("{exception_class}", "LogicException")
+            .replace("{exception_message}", "系统发生错误，请稍后重试")
             .replace("{output}", output.replace("<", "&lt;"))
             .replace("{seed}", seed))
+    page = page.replace("ThinkPHP V5.0.24", app_name)
     return HTMLResponse(page, status_code=200)
 
+
+_KNOWN_TP_CLASSES = {
+    "think\\app",
+    "think\\container",
+    "think\\invokevalue",
+    "app\\common\\controllers\\base",
+    "think\\cache\\driver\\file",
+}
+
+
+def _probe_class(path: str, query: str, body: str) -> str:
+    """Best-effort extraction of the container class from the invokefunction
+    GET shape (s=/index/<class>/invokefunction). vars[0] is the function, not
+    the class; the _method=__construct shape carries no class at all."""
+    from urllib.parse import unquote
+
+    for source in (query, path, body):
+        if "invokefunction" not in source:
+            continue
+        m = re.search(r"s=[^&]*?/([\\\w.\-]+)/invokefunction", source)
+        if m:
+            return unquote(m.group(1)).strip("\\").lower()
+    return ""
+
+
+_WELCOME_PATHS = {"/", "/index.php", "/public/index.php"}
 
 tp_router = APIRouter()
 tp_router.add_api_route("/", tp_exploit, methods=["GET", "POST"], include_in_schema=False)

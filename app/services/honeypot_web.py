@@ -42,19 +42,62 @@ def create_web_honeypot_app() -> FastAPI:
         openapi_url=None,
     )
 
-    @app.middleware("http")
-    async def _facade_headers(request, call_next):
-        """Make the decoy plane look like a conventional nginx site: uvicorn's
-        default Server header contradicts the ThinkPHP facade, and missing
-        security headers are another fingerprint tell."""
-        response = await call_next(request)
-        response.headers["Server"] = "nginx"
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        return response
-
     app.add_middleware(CaptureAndInjectMiddleware, observe_only_all=True)
+
+    class FacadeHeadersMiddleware:
+        """Pure-ASGI facade polish: hardened headers (no Server — uvicorn lowercases names, contradicting any claimed origin; security
+        headers, Title-Case names — Starlette lowercases everything), and
+        proper HEAD semantics (a 405 + `allow:` header is a framework tell)."""
+
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+            is_head = scope["method"] == "HEAD"
+            if is_head:
+                scope["method"] = "GET"
+
+            async def send_wrapper(message):
+                if message["type"] == "http.response.start":
+                    hdrs = message["headers"]
+
+                    def _set(name: bytes, value: bytes) -> None:
+                        for i, (k, _) in enumerate(hdrs):
+                            if k.lower() == name.lower():
+                                hdrs[i] = (name, value)
+                                return
+                        hdrs.append((name, value))
+
+                    def _has(name: bytes) -> bool:
+                        return any(k.lower() == name.lower() for k, _ in hdrs)
+
+                    if not _has(b"X-Content-Type-Options"):
+                        hdrs.append((b"x-content-type-options", b"nosniff"))
+                    if not _has(b"X-Frame-Options"):
+                        hdrs.append((b"x-frame-options", b"SAMEORIGIN"))
+                    if not _has(b"Referrer-Policy"):
+                        hdrs.append((b"referrer-policy", b"strict-origin-when-cross-origin"))
+                    if not _has(b"Content-Security-Policy"):
+                        hdrs.append(
+                            (b"content-security-policy",
+                             b"default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                             b"style-src 'self' 'unsafe-inline'; img-src 'self' data:")
+                        )
+                    # nginx emits Title-Case names; Starlette lowercases — recase
+                    hdrs[:] = [
+                        (b"-".join(w.capitalize() for w in k.split(b"-")), v)
+                        for (k, v) in hdrs
+                    ]
+                if is_head and message["type"] == "http.response.body":
+                    message["body"] = b""
+                await send(message)
+
+            await self.app(scope, receive, send_wrapper)
+
+    app.add_middleware(FacadeHeadersMiddleware)
 
     @app.exception_handler(RequestValidationError)
     async def _neutral_validation_error(request, exc):

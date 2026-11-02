@@ -81,15 +81,41 @@ def dataset_page(canary: str, page: int) -> dict[str, Any]:
 # Cloud metadata honeypot (SSRF bait) — canary cloud credentials
 # ---------------------------------------------------------------------------
 
+def _spread_b62(code: str, length: int, salt: str) -> str:
+    """Deterministically embed the watermark inside a realistic base62 string.
+    Attribution keeps working (the code is recoverable by position), but the
+    secret no longer resembles a hex/docs-sample pattern at a glance."""
+    import hashlib
+
+    base62 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    seed = int(hashlib.sha256(f"{salt}:{code}".encode()).hexdigest()[:16], 16)
+    out: list[str] = list(base62[:0] or "")
+    out = []
+    n = seed
+    for _ in range(length):
+        n = (n * 6364136223846793005 + 1442695040888963407) % (1 << 64)
+        out.append(base62[n % 62])
+    # overlay the watermark (first 8 chars of the code) at fixed spread points
+    positions = [p for p in (3, 9, 16, 24, 31, 40, 55, 80) if p < length]
+    for i, ch in enumerate(code[:8].lower()):
+        out[positions[i % len(positions)]] = ch.upper()
+    return "".join(out)
+
+
 def cloud_credentials(canary: str, role: str = "prod-app-role") -> dict[str, Any]:
     code = _wm_code(canary, f"cloud:{role}")
+    from datetime import datetime, timedelta, timezone
+
+    expiry = (datetime.now(timezone.utc) + timedelta(hours=6)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     return {
         "Code": "Success",
         "Type": "AWS-HMAC",
-        "AccessKeyId": f"AKIA{code}Z7Q2",
-        "SecretAccessKey": f"wJalrXUtnFEMI/{code.lower()}/bPXCYI9s",
-        "Token": f"AQoDY3JlZi1jYW5hcnkt{code}=",
-        "Expiration": "2100-01-01T00:00:00Z",
+        "AccessKeyId": "AKIA" + _spread_b62(code, 16, "akid"),
+        "SecretAccessKey": _spread_b62(code, 40, "secret"),
+        "Token": _spread_b62(code, 194, "token"),
+        "Expiration": expiry,
         "RoleArn": f"arn:aws:iam::100000000001:role/{role}",
     }
 
