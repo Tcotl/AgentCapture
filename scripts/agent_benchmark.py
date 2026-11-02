@@ -62,7 +62,7 @@ def http_json(url: str, payload: dict, api_key: str, timeout: int = 90) -> dict:
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+        return json.loads(resp.read().decode("utf-8", errors="replace"))
 
 
 def chat(api_base: str, api_key: str, model: str, messages: list, timeout: int = 90) -> str:
