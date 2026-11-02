@@ -7,8 +7,7 @@
 <section class="panel node-topo-panel">
   {{ section_header(_('节点拓扑'), _('中心为主控制台，节点环绕排布。拖拽调整位置（自动保存）；连线流光 = 心跳活跃，琥珀实线 = 心跳超时，红虚线 = 离线。点击节点查看详情。')) }}
   <div class="node-topo-wrap" id="node-topo-wrap">
-    <svg id="node-topo-svg" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMid meet">
-      <defs>
+    <svg id="node-topo-svg" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMid meet">      <defs>
         <linearGradient id="nt-card-grad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="var(--nt-card-hi, var(--card))"/>
           <stop offset="1" stop-color="var(--nt-card, var(--card))"/>
@@ -19,6 +18,11 @@
       <g id="nt-nodes"></g>
       <g id="nt-core"></g>
     </svg>
+    <div class="nt-zoom">
+      <button type="button" id="nt-zoom-in" title="{{ _( '放大' ) }}">+</button>
+      <button type="button" id="nt-zoom-out" title="{{ _( '缩小' ) }}">−</button>
+      <button type="button" id="nt-zoom-fit" title="{{ _( '重置视图' ) }}">⤢</button>
+    </div>
     <aside class="node-topo-insp collapsed" id="nt-insp">
       <div class="nt-insp-body" id="nt-insp-body">
       <div class="nt-insp-head">
@@ -65,11 +69,20 @@
 <script id="node-topo-layout" type="application/json">{{ node_topology_layout | tojson }}</script>
 <style>
   .node-topo-wrap { display: flex; align-items: stretch; position: relative; }
+  .nt-zoom { position: absolute; top: 10px; left: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 6; }
+  .nt-zoom button {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid var(--border-strong); background: var(--card);
+    color: var(--foreground); font-size: 15px; line-height: 1; cursor: pointer;
+    transition: border-color 150ms var(--ease-out, ease), color 150ms var(--ease-out, ease);
+  }
+  .nt-zoom button:hover { border-color: var(--ring); color: var(--ring); }
   #node-topo-svg { flex: 1; min-width: 0; height: auto; display: block; touch-action: none;
     --nt-card: var(--card); --nt-core: var(--card);
     --nt-card-hi: color-mix(in srgb, var(--foreground) 5%, var(--card));
     --nt-core-hi: color-mix(in srgb, var(--primary, #2563eb) 20%, var(--card)); }
   #node-topo-svg .nt-edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .34; stroke-width: 1.5; stroke-dasharray: 7 6; }
+  #node-topo-svg #nt-edges, #node-topo-svg #nt-zones { pointer-events: none; }
   #node-topo-svg .nt-edge.stale { stroke: #f59e0b; stroke-opacity: .6; }
   #node-topo-svg .nt-edge.off { stroke: #f43f5e; stroke-opacity: .6; }
   #node-topo-svg .nt-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
@@ -214,36 +227,113 @@
   }
 
   var CORE_ZONE_LABEL = {{ _('平台控制区') | tojson }};
-  function drawZones() {
-    zoneLayer.innerHTML = '';
-    // the console always carries its own zone tint (pedestal + labels +
-    // the builtin node that lives on the same host)
-    var czx0 = core.x - 18, czy0 = core.y - 6, czx1 = core.x + core.w + 18, czy1 = core.y + core.h + 4;
+  function zoneBoxes() {
+    var boxes = [];
+    var cz = { label: CORE_ZONE_LABEL, fixed: true, nodes: [],
+      x0: core.x - 18, y0: core.y - 6, x1: core.x + core.w + 18, y1: core.y + core.h + 4 };
     NODES.forEach(function (n) {
       if (!n.is_builtin) return;
       var b = contentBBox(n);
       if (b) {
-        czx0 = Math.min(czx0, b.x - 14); czy0 = Math.min(czy0, b.y - 14);
-        czx1 = Math.max(czx1, b.x + b.w + 14); czy1 = Math.max(czy1, b.y + b.h + 14);
+        cz.x0 = Math.min(cz.x0, b.x - 14); cz.y0 = Math.min(cz.y0, b.y - 14);
+        cz.x1 = Math.max(cz.x1, b.x + b.w + 14); cz.y1 = Math.max(cz.y1, b.y + b.h + 14);
       }
     });
-    drawZoneBox(czx0, czy0, czx1, czy1, CORE_ZONE_LABEL, '#4493f8');
+    boxes.push(cz);
     var groups = {};
     NODES.forEach(function (n) { if (!n.is_builtin && n.zone) (groups[n.zone] = groups[n.zone] || []).push(n); });
     Object.keys(groups).forEach(function (z) {
-      var list = groups[z];
+      var nodes = groups[z];
       var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-      list.forEach(function (n) {
+      nodes.forEach(function (n) {
         var b = contentBBox(n);
-        if (!b) return;
         x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
         x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
       });
-      var pad = 18;
-      drawZoneBox(x0 - pad, y0 - pad, x1 + pad, y1 + pad, z, zoneColor(z));
+      boxes.push({ label: z, fixed: false, nodes: nodes,
+        x0: x0 - 18, y0: y0 - 18, x1: x1 + 18, y1: y1 + 18 });
+    });
+    return boxes;
+  }
+  function shiftBox(box, dx, dy) {
+    if (!dx && !dy) return;
+    box.x0 += dx; box.x1 += dx; box.y0 += dy; box.y1 += dy;
+    box.nodes.forEach(function (n) {
+      n.x += dx; n.y += dy;
+      cardRefs[n.id].g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    });
+  }
+  function resolveZoneOverlaps() {
+    // zones are derived from node clusters, so resolving an overlap moves
+    // the cluster (never the boxes alone) — the console zone is the fixed
+    // anchor and its counterpart takes the full push
+    var boxes = zoneBoxes();
+    for (var iter = 0; iter < 80; iter++) {
+      var any = false;
+      for (var i = 0; i < boxes.length; i++) {
+        for (var j = i + 1; j < boxes.length; j++) {
+          var a = boxes[i], b = boxes[j];
+          var ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+          var oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+          if (ox <= 0 || oy <= 0) continue;
+          any = true;
+          if (ox <= oy) {
+            var dir = ((a.x0 + a.x1) <= (b.x0 + b.x1)) ? -1 : 1;
+            var push = ox + 6;
+            shiftBox(a, dir * push * (a.fixed ? 0 : (b.fixed ? 1 : 0.5)), 0);
+            shiftBox(b, -dir * push * (b.fixed ? 0 : (a.fixed ? 1 : 0.5)), 0);
+          } else {
+            var dir = ((a.y0 + a.y1) <= (b.y0 + b.y1)) ? -1 : 1;
+            var push = oy + 6;
+            shiftBox(a, 0, dir * push * (a.fixed ? 0 : (b.fixed ? 1 : 0.5)));
+            shiftBox(b, 0, -dir * push * (b.fixed ? 0 : (a.fixed ? 1 : 0.5)));
+          }
+        }
+      }
+      if (!any) break;
+    }
+    drawEdges();
+    drawZones();
+  }
+  function drawZones() {
+    zoneLayer.innerHTML = '';
+    zoneBoxes().forEach(function (zb) {
+      var color = zb.label === CORE_ZONE_LABEL ? '#4493f8' : zoneColor(zb.label);
+      drawZoneBox(zb.x0, zb.y0, zb.x1, zb.y1, zb.label, color);
     });
   }
 
+  var FIT = { x: 0, y: 0, w: 1440, h: 560 };
+  var view = { x: 0, y: 0, w: 1440, h: 560 };
+  function applyView() {
+    svg.setAttribute('viewBox', view.x + ' ' + view.y + ' ' + view.w + ' ' + view.h);
+    VW = view.w;
+    VH = view.h;
+  }
+  function clampView() {
+    var minW = FIT.w * 0.35, maxW = FIT.w * 2.6;
+    view.w = Math.max(minW, Math.min(maxW, view.w));
+    view.h = view.w * (FIT.h / FIT.w);
+    var ccx = FIT.x + FIT.w / 2, ccy = FIT.y + FIT.h / 2;
+    var cx = view.x + view.w / 2, cy = view.y + view.h / 2;
+    cx = Math.min(Math.max(cx, ccx - FIT.w * 0.55), ccx + FIT.w * 0.55);
+    cy = Math.min(Math.max(cy, ccy - FIT.h * 0.55), ccy + FIT.h * 0.55);
+    view.x = cx - view.w / 2;
+    view.y = cy - view.h / 2;
+  }
+  function zoomAt(factor, clientX, clientY) {
+    var rect = svg.getBoundingClientRect();
+    var vx = view.x + (clientX - rect.left) / rect.width * view.w;
+    var vy = view.y + (clientY - rect.top) / rect.height * view.h;
+    var nw = Math.max(FIT.w * 0.35, Math.min(FIT.w * 2.6, view.w / factor));
+    var nh = nw * (FIT.h / FIT.w);
+    view.x = vx - (clientX - rect.left) / rect.width * nw;
+    view.y = vy - (clientY - rect.top) / rect.height * nh;
+    view.w = nw;
+    view.h = nh;
+    clampView();
+    applyView();
+  }
   function fitViewBox() {
     // keep every node, label and zone on-canvas no matter how many nodes
     var x0 = core.x - 70, y0 = core.y - 60, x1 = core.x + core.w + 70, y1 = core.y + core.h + 40;
@@ -255,9 +345,9 @@
     });
     var pad = 46;
     x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
-    svg.setAttribute('viewBox', x0 + ' ' + y0 + ' ' + (x1 - x0) + ' ' + (y1 - y0));
-    VW = x1 - x0;
-    VH = y1 - y0;
+    FIT = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    view = { x: x0, y: y0, w: FIT.w, h: FIT.h };
+    applyView();
   }
 
   var edgePool = [];
@@ -443,18 +533,31 @@
       core.y = coreDrag.oy + cdy;
       coreGroup.setAttribute('transform', 'translate(' + core.x + ',' + core.y + ')');
       drawEdges();
+    } else if (panDrag) {
+      var rect = svg.getBoundingClientRect();
+      var pdx = (ev.clientX - panDrag.cx) / rect.width * view.w;
+      var pdy = (ev.clientY - panDrag.cy) / rect.height * view.h;
+      if (Math.abs(ev.clientX - panDrag.cx) + Math.abs(ev.clientY - panDrag.cy) > 4) panDrag.moved = true;
+      view.x = panDrag.x - pdx;
+      view.y = panDrag.y - pdy;
+      clampView();
+      applyView();
     }
   });
   window.addEventListener('pointerup', function () {
     if (drag) {
       var d = drag;
       drag = null;
-      if (d.moved) { saveLayout(); fitViewBox(); }
+      if (d.moved) { saveLayout(); resolveZoneOverlaps(); fitViewBox(); }
       else select(d.n.id);
     } else if (coreDrag) {
       var c = coreDrag;
       coreDrag = null;
-      if (c.moved) { saveLayout(); fitViewBox(); }
+      if (c.moved) { saveLayout(); resolveZoneOverlaps(); fitViewBox(); }
+    } else if (panDrag) {
+      var p = panDrag;
+      panDrag = null;
+      if (!p.moved) clearSelection();
     }
   });
 
@@ -552,14 +655,32 @@
     clearSelection();
     setCollapsed(true, true);   // 收回菜单栏
   });
+  var panDrag = null;
   svg.addEventListener('pointerdown', function (ev) {
-    if (ev.target === svg) clearSelection();
+    if (ev.target !== svg) return;
+    // empty-canvas drag pans the view; a plain click clears the selection
+    panDrag = { cx: ev.clientX, cy: ev.clientY, x: view.x, y: view.y, moved: false };
+    ev.preventDefault();
   });
+  svg.addEventListener('wheel', function (ev) {
+    ev.preventDefault();
+    zoomAt(ev.deltaY < 0 ? 1.18 : 1 / 1.18, ev.clientX, ev.clientY);
+  }, { passive: false });
+  document.getElementById('nt-zoom-in').addEventListener('click', function () {
+    var r = svg.getBoundingClientRect();
+    zoomAt(1.3, r.left + r.width / 2, r.top + r.height / 2);
+  });
+  document.getElementById('nt-zoom-out').addEventListener('click', function () {
+    var r = svg.getBoundingClientRect();
+    zoomAt(1 / 1.3, r.left + r.width / 2, r.top + r.height / 2);
+  });
+  document.getElementById('nt-zoom-fit').addEventListener('click', fitViewBox);
 
   drawCore();
   NODES.forEach(drawNode);
   drawEdges();
   drawZones();
+  resolveZoneOverlaps();
   fitViewBox();
 })();
 </script>
