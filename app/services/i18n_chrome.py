@@ -106,6 +106,7 @@ EN = {
     "收回菜单栏": "Collapse menu bar",
     "展开节点管理菜单": "Expand node management menu",
     "网络区域": "Network Zone",
+    "平台控制区": "Platform Zone",
     "未分区": "Unzoned",
     "业务内网": "Business Intranet",
     "核心内网": "Core Intranet",

@@ -133,9 +133,9 @@
   var svg = document.getElementById('node-topo-svg');
   if (!svg || !NODES.length) return;
   var SVGNS = 'http://www.w3.org/2000/svg';
-  var W = 1440, H = 560;
+  var VW = 1440, VH = 560;  // live viewBox extents (auto-fits content)
   var CW = 210, CH = 72;
-  var CORE0 = { x: W / 2 - 90, y: H / 2 - 60 };
+  var CORE0 = { x: VW / 2 - 90, y: VH / 2 - 60 };
   var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 150 };
   if (LAYOUT.core && LAYOUT.core.length === 2) { core.x += LAYOUT.core[0]; core.y += LAYOUT.core[1]; }
   var edgeLayer = document.getElementById('nt-edges');
@@ -156,6 +156,7 @@
   }
 
   var ring = 0;
+  var others = NODES.filter(function (n) { return !n.is_builtin; });
   NODES.forEach(function (n) {
     // the builtin node lives on the AC host itself — always pinned right
     // below the console pedestal (its saved layout is ignored)
@@ -166,12 +167,19 @@
     }
     var saved = LAYOUT[String(n.id)];
     if (saved && saved.length === 2) { n.x = saved[0]; n.y = saved[1]; return; }
-    var angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(NODES.length - 1, 1);
+    // adaptive ring placement: one ring up to 6 nodes, two rings beyond
+    var total = others.length, angle, radius;
+    if (total <= 6) {
+      angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(total, 1);
+      radius = 430;
+    } else {
+      var inner = Math.ceil(total / 2);
+      if (ring < inner) { angle = -Math.PI / 2 + (ring * 2 * Math.PI) / inner; radius = 300; }
+      else { angle = -Math.PI / 2 + ((ring - inner) * 2 * Math.PI) / (total - inner); radius = 520; }
+    }
     ring += 1;
-    n.x = core.x + core.w / 2 + Math.cos(angle) * 430 - CW / 2;
-    n.y = core.y + core.h / 2 + Math.sin(angle) * 175 - CH / 2;
-    n.x = Math.max(12, Math.min(W - CW - 12, n.x));
-    n.y = Math.max(12, Math.min(H - CH - 12, n.y));
+    n.x = core.x + core.w / 2 + Math.cos(angle) * radius - CW / 2;
+    n.y = core.y + core.h / 2 + Math.sin(angle) * radius * 0.42 - CH / 2;
   });
 
   var ZONE_RULES = [[/DMZ/i, '#f59e0b'], [/业务/, '#3b82f6'], [/核心/, '#a855f7'], [/管理/, '#10b981']];
@@ -183,30 +191,73 @@
     return ZONE_PALETTE[h % ZONE_PALETTE.length];
   }
   var zoneLayer = document.getElementById('nt-zones');
+  function contentBBox(n) {
+    // real rendered extents of the node group (tower + every text line),
+    // so zone boxes always enclose all displayed values
+    var ref = cardRefs[n.id];
+    if (!ref) return null;
+    var b = ref.g.getBBox();
+    return { x: b.x + n.x, y: b.y + n.y, w: b.width, h: b.height };
+  }
+
+  function drawZoneBox(x0, y0, x1, y1, label, color) {
+    var g = el('g', {}, zoneLayer);
+    el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 16,
+      fill: color, 'fill-opacity': .07, stroke: color, 'stroke-opacity': .45,
+      'stroke-width': 1.2, 'stroke-dasharray': '6 5' }, g);
+    var labelW = label.length * 13 + 26;
+    el('rect', { x: x0 + 12, y: y0 + 8, width: labelW, height: 20, rx: 10,
+      fill: color, 'fill-opacity': .18, stroke: color, 'stroke-opacity': .5 }, g);
+    var labelEl = el('text', { x: x0 + 12 + labelW / 2, y: y0 + 22, 'text-anchor': 'middle',
+      style: 'fill:' + color + ';font-size:11px;font-weight:700' }, g);
+    labelEl.textContent = label;
+  }
+
+  var CORE_ZONE_LABEL = {{ _('平台控制区') | tojson }};
   function drawZones() {
     zoneLayer.innerHTML = '';
+    // the console always carries its own zone tint (pedestal + labels +
+    // the builtin node that lives on the same host)
+    var czx0 = core.x - 18, czy0 = core.y - 6, czx1 = core.x + core.w + 18, czy1 = core.y + core.h + 4;
+    NODES.forEach(function (n) {
+      if (!n.is_builtin) return;
+      var b = contentBBox(n);
+      if (b) {
+        czx0 = Math.min(czx0, b.x - 14); czy0 = Math.min(czy0, b.y - 14);
+        czx1 = Math.max(czx1, b.x + b.w + 14); czy1 = Math.max(czy1, b.y + b.h + 14);
+      }
+    });
+    drawZoneBox(czx0, czy0, czx1, czy1, CORE_ZONE_LABEL, '#4493f8');
     var groups = {};
-    NODES.forEach(function (n) { if (n.zone) (groups[n.zone] = groups[n.zone] || []).push(n); });
+    NODES.forEach(function (n) { if (!n.is_builtin && n.zone) (groups[n.zone] = groups[n.zone] || []).push(n); });
     Object.keys(groups).forEach(function (z) {
       var list = groups[z];
       var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
       list.forEach(function (n) {
-        x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
-        x1 = Math.max(x1, n.x + CW); y1 = Math.max(y1, n.y + CH);
+        var b = contentBBox(n);
+        if (!b) return;
+        x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+        x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
       });
-      var pad = 18, color = zoneColor(z);
-      x0 -= pad; y0 -= pad + 10; x1 += pad; y1 += pad;
-      var g = el('g', {}, zoneLayer);
-      el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 16,
-        fill: color, 'fill-opacity': .07, stroke: color, 'stroke-opacity': .45,
-        'stroke-width': 1.2, 'stroke-dasharray': '6 5' }, g);
-      var labelW = z.length * 13 + 26;
-      el('rect', { x: x0 + 12, y: y0 + 8, width: labelW, height: 20, rx: 10,
-        fill: color, 'fill-opacity': .18, stroke: color, 'stroke-opacity': .5 }, g);
-      var label = el('text', { x: x0 + 12 + labelW / 2, y: y0 + 22, 'text-anchor': 'middle',
-        style: 'fill:' + color + ';font-size:11px;font-weight:700' }, g);
-      label.textContent = z;
+      var pad = 18;
+      drawZoneBox(x0 - pad, y0 - pad, x1 + pad, y1 + pad, z, zoneColor(z));
     });
+  }
+
+  function fitViewBox() {
+    // keep every node, label and zone on-canvas no matter how many nodes
+    var x0 = core.x - 70, y0 = core.y - 60, x1 = core.x + core.w + 70, y1 = core.y + core.h + 40;
+    NODES.forEach(function (n) {
+      var b = contentBBox(n);
+      if (!b) return;
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+      x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
+    });
+    var pad = 46;
+    x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+    svg.setAttribute('viewBox', x0 + ' ' + y0 + ' ' + (x1 - x0) + ' ' + (y1 - y0));
+    VW = x1 - x0;
+    VH = y1 - y0;
   }
 
   var edgePool = [];
@@ -376,7 +427,7 @@
   }
   window.addEventListener('pointermove', function (ev) {
     var rect = svg.getBoundingClientRect();
-    var kx = W / rect.width, ky = H / rect.height;
+    var kx = VW / rect.width, ky = VH / rect.height;
     if (drag) {
       var dx = (ev.clientX - drag.cx) * kx, dy = (ev.clientY - drag.cy) * ky;
       if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
@@ -398,12 +449,12 @@
     if (drag) {
       var d = drag;
       drag = null;
-      if (d.moved) saveLayout();
+      if (d.moved) { saveLayout(); fitViewBox(); }
       else select(d.n.id);
     } else if (coreDrag) {
       var c = coreDrag;
       coreDrag = null;
-      if (c.moved) saveLayout();
+      if (c.moved) { saveLayout(); fitViewBox(); }
     }
   });
 
@@ -509,6 +560,7 @@
   NODES.forEach(drawNode);
   drawEdges();
   drawZones();
+  fitViewBox();
 })();
 </script>
 <style>
