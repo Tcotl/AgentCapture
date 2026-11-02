@@ -26,7 +26,7 @@ docker compose --env-file .env.docker up -d</pre>
     </div>
     <div>
       <strong style="display:block;margin-bottom:6px">{{ _('创建节点台账') }}</strong>
-      <p class="muted" style="margin:0 0 8px;font-size:12px">{{ _('每个远程网段一个节点记录；心跳 node_name 必须与之一致，否则心跳 404。') }}</p>
+      <p class="muted" style="margin:0 0 8px;font-size:12px">{{ _('手动登记为可选：子节点也可以带 --enroll 启动执行器自助注册（见 ② 主动接入）。心跳 node_name 必须与之一致，否则心跳 404。') }}</p>
       <form method="post" action="/admin/nodes?next=/admin/nodes/onboarding" class="stack">
         <input name="name" placeholder="{{ _('节点名，如 dc1-edge' ) }}" required>
         <div class="grid-2">
@@ -48,7 +48,7 @@ docker compose --env-file .env.docker up -d</pre>
 </section>
 
 <section class="panel" style="margin-bottom:16px">
-  {{ section_header(_('② 节点侧接入命令'), _('在子节点（网关/跳板机，Linux + Python 3.9+ + iptables，需 root）上执行。选择节点自动生成。')) }}
+  {{ section_header(_('② 节点侧接入命令'), _('在子节点（网关/跳板机，Linux + Python 3.9+ + iptables，需 root）上执行。选择节点自动生成；带 --enroll 可自助注册，无需提前建台账。')) }}
   {% if not remote_names %}
   {{ empty_state(_('还没有可接入的节点'), _('先在上方创建节点台账。'), 1, 'ON') }}
   {% else %}
@@ -66,23 +66,31 @@ docker compose --env-file .env.docker up -d</pre>
     <span class="muted" style="font-size:12px">{{ _('最后上报：') }}{{ selected_row.last_seen or _('从未上报') }}</span>
     <span class="pill">{{ selected_row.zone or _('未分区') }}</span>
   </div>
-  <pre style="background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11.5px;line-height:1.9;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># 1) {{ _('获取执行器（二选一）') }}
+  <pre style="background:color-mix(in srgb, currentColor 5%, transparent);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11.5px;line-height:1.9;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># 0) {{ _('主动接入（自助注册，幂等——已存在则原样返回，无需提前建台账）') }}
+#    {{ _('令牌已配置时需携带 X-Node-Token') }}
+curl -s -X POST http://{{ ac_host }}:{{ ac_port }}/api/node/enroll \
+  -H 'Content-Type: application/json' ${NODE_AUTH_TOKEN:+-H "X-Node-Token: $NODE_AUTH_TOKEN"} \
+  -d '{"node_name":"{{ selected }}","listen_address":"<{{ _('本机地址' ) }}>"}'
+
+# 1) {{ _('获取执行器（二选一）') }}
 curl -fL -o node_agent.py https://raw.githubusercontent.com/Tcotl/AgentCapture/main/scripts/node_agent.py
 # {{ _('或从 AC 主机拷贝：') }}
 # scp <{{ _('用户') }}>@<AC内网IP>:<{{ _('部署目录') }}>/scripts/node_agent.py .
 
-# 2) {{ _('调试运行（dry-run：只打印 iptables，不实际执行）') }}
+# 2) {{ _('调试运行（dry-run：只打印 iptables，不实际执行；--enroll 自助注册）') }}
 sudo python3 node_agent.py --server http://{{ ac_host }}:{{ ac_port }} \
   --name {{ selected }} \
   --token '${NODE_AUTH_TOKEN:-x}' \
+  --enroll \
   --target-host {{ ac_host }} \
   --allow-ports 22,3306,6379,21,9200
 
 # 3) {{ _('正式运行（--apply 真正落 DNAT 导流规则）') }}
-sudo NODE_AUTH_TOKEN='<{{ _('令牌') }}>' python3 node_agent.py \
+sudo NODE_AUTH_TOKEN='<{{ _('令牌' ) }}>' python3 node_agent.py \
   --server http://{{ ac_host }}:{{ ac_port }} \
   --name {{ selected }} \
   --token "$NODE_AUTH_TOKEN" \
+  --enroll \
   --apply --target-host {{ ac_host }} \
   --allow-ports 22,3306,6379,21,9200</pre>
 
@@ -95,7 +103,7 @@ After=network.target
 [Service]
 WorkingDirectory=/opt/agentcapture-node
 Environment=NODE_AUTH_TOKEN=<{{ _('令牌' ) }}>
-ExecStart=/usr/bin/python3 /opt/agentcapture-node/node_agent.py --server http://{{ ac_host }}:{{ ac_port }} --name {{ selected }} --token ${NODE_AUTH_TOKEN} --apply --target-host {{ ac_host }} --allow-ports 22,3306,6379,21,9200
+ExecStart=/usr/bin/python3 /opt/agentcapture-node/node_agent.py --server http://{{ ac_host }}:{{ ac_port }} --name {{ selected }} --token ${NODE_AUTH_TOKEN} --enroll --apply --target-host {{ ac_host }} --allow-ports 22,3306,6379,21,9200
 Restart=always
 
 [Install]

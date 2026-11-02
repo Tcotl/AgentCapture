@@ -52,11 +52,58 @@ class NodeAckPayload(BaseModel):
     result: dict = Field(default_factory=dict)
 
 
+class NodeEnrollPayload(BaseModel):
+    node_name: str = Field(min_length=1, max_length=120)
+    zone: str = Field(default="", max_length=64)
+    listen_address: str = Field(default="0.0.0.0", max_length=255)
+
+
 def _resolve_node(db: Session, node_name: str) -> Node:
     node = db.scalar(select(Node).where(Node.name == node_name))
     if not node:
         raise HTTPException(status_code=404, detail="node not found")
     return node
+
+
+@router.post("/enroll")
+def node_enroll(payload: NodeEnrollPayload, request: Request, db: Session = Depends(get_db)):
+    """子节点主动接入：自助注册到主控制台（幂等，已存在则原样返回）。"""
+    _require_node_token(request)
+    node = db.scalar(select(Node).where(Node.name == payload.node_name))
+    created = False
+    if not node:
+        node = Node(
+            name=payload.node_name.strip(),
+            node_type="remote",
+            listen_address=payload.listen_address or "0.0.0.0",
+            callback_address=payload.listen_address or "0.0.0.0",
+            status="online",
+            network_zone=payload.zone.strip()[:64],
+        )
+        db.add(node)
+        db.commit()
+        created = True
+    if created:
+        from app.services.execution import log_execution
+
+        log_execution(
+            db,
+            actor_username=f"node:{node.name}",
+            action="enroll",
+            module="nodes",
+            target_type="node",
+            target_ref=node.name,
+            detail_json={"zone": node.network_zone, "listen": node.listen_address},
+        )
+    return {
+        "status": "ok",
+        "created": created,
+        "node_name": node.name,
+        "node_id": node.id,
+        "network_zone": getattr(node, "network_zone", "") or "",
+        "heartbeat": {"method": "POST", "path": "/api/node/heartbeat",
+                      "body": {"node_name": node.name, "status": "online"}},
+    }
 
 
 @router.post("/heartbeat")
