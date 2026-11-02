@@ -4243,6 +4243,7 @@ def admin_nodes_onboarding(
             "selected_row": next((r for r in node_rows if r["name"] == selected), None),
             "token_configured": bool(token),
             "token_masked": token_masked,
+            "token_value": token,
             "ac_host": ac_host,
             "ac_port": settings_.port,
             "created": quote(created) if created else "",
