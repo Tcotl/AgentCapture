@@ -13,6 +13,7 @@ shares the console port. Authorized deception use only.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from typing import Any
 from urllib.parse import parse_qs
@@ -165,6 +166,27 @@ _NOT_FOUND_PAGE = """<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>404 Not Found</title></head>
 <body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>"""
 
+# Paths that a real deployment would 404: secret/config probes and obvious
+# non-application resources. Everything else keeps the facade home page.
+_MISSING_RESOURCE_RE = re.compile(
+    r"\.(env|ini|sql|zip|tar|gz|bak|yml|yaml|log|swp|save|git|ds_store)$"
+    r"|(?:^|/)(composer\.json|composer\.lock|package\.json|web\.config|\.htaccess|\.svn|\.git)"
+    r"|/(?:\.well-known/)?(?:security|acme|\.random)$",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_missing_resource(path: str) -> bool:
+    if not path or path == "/":
+        return False
+    tail = path.rstrip("/")
+    if _MISSING_RESOURCE_RE.search(tail):
+        return True
+    # Random-looking single-segment probes (hex ids, generated noise) —
+    # real apps 404 these instead of serving the homepage.
+    seg = tail.rsplit("/", 1)[-1]
+    return len(seg) >= 16 and bool(re.search(r"\d", seg))
+
 
 def _surface_state() -> tuple[bool, dict]:
     """Console-managed face state: (enabled, config). Disabled => bare 404."""
@@ -291,6 +313,11 @@ async def tp_exploit(request: Request) -> Response:
         body = raw.decode("utf-8", errors="replace")[:8192]
 
     if not looks_like_tp_rce(method, request.url.path, query, body):
+        # Real sites answer 404 for missing assets and probe paths (.env,
+        # composer.json, random strings); serving the homepage for everything
+        # makes 404-based enumeration fail — a classic honeypot tell.
+        if _looks_like_missing_resource(request.url.path):
+            return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
         return HTMLResponse(_render_home(cfg))
 
     command = extract_tp_command(query, body)
@@ -334,6 +361,23 @@ tp_router.add_api_route("/admin.php", tp_login_page, methods=["GET"], include_in
 tp_router.add_api_route("/admin.php", tp_login_submit, methods=["POST"], include_in_schema=False)
 tp_router.add_api_route("/login", tp_login_page, methods=["GET"], include_in_schema=False)
 tp_router.add_api_route("/login", tp_login_submit, methods=["POST"], include_in_schema=False)
+
+
+async def tp_robots(request: Request) -> Response:
+    """A plain robots.txt — serving the facade page here was a fingerprint
+    tell (real sites always answer /robots.txt)."""
+    base = str(request.base_url).rstrip("/")
+    body = (
+        "User-agent: *\n"
+        "Disallow: /admin\n"
+        "Disallow: /runtime/\n"
+        "Crawl-delay: 1\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
+    return Response(content=body, media_type="text/plain")
+
+
+tp_router.add_api_route("/robots.txt", tp_robots, methods=["GET"], include_in_schema=False)
 tp_router.add_api_route("/{path:path}", tp_exploit, methods=["GET", "POST"], include_in_schema=False)
 
 
@@ -349,7 +393,8 @@ class ThinkPHPHoneypotServer:
 
         app = create_web_honeypot_app()
         config = uvicorn.Config(app, host=bind, port=port,
-                                log_level="warning", access_log=False)
+                                log_level="warning", access_log=False,
+                                server_header=False)
         self.server = uvicorn.Server(config)
         self._thread: threading.Thread | None = None
         self._stopping = threading.Event()

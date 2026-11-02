@@ -19,6 +19,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.middleware.injector import CaptureAndInjectMiddleware
@@ -39,11 +41,38 @@ def create_web_honeypot_app() -> FastAPI:
         redoc_url=None,
         openapi_url=None,
     )
+
+    @app.middleware("http")
+    async def _facade_headers(request, call_next):
+        """Make the decoy plane look like a conventional nginx site: uvicorn's
+        default Server header contradicts the ThinkPHP facade, and missing
+        security headers are another fingerprint tell."""
+        response = await call_next(request)
+        response.headers["Server"] = "nginx"
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        return response
+
     app.add_middleware(CaptureAndInjectMiddleware, observe_only_all=True)
+
+    @app.exception_handler(RequestValidationError)
+    async def _neutral_validation_error(request, exc):
+        # FastAPI/Pydantic 422 bodies name the framework — a fingerprint tell
+        # on a plane pretending to be ThinkPHP behind nginx.
+        return JSONResponse({"error": "bad request"}, status_code=400)
 
     @app.get("/healthz")
     def healthz():
-        return {"status": "ok", "face": "honeypot"}
+        # Deliberately generic — naming the face here fingerprinted the whole
+        # plane in a single request.
+        return {"status": "ok"}
+
+    static_dir = Path(__file__).resolve().parents[1] / "static"
+    # Mount /static BEFORE the routers: the ThinkPHP face registers a
+    # catch-all /{path:path} and would otherwise shadow beacon.js/recon.js,
+    # breaking browser-side telemetry on this plane.
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     # Bait routers first — the ThinkPHP face registers a catch-all
     # /{path:path} and must come LAST so it only serves paths no bait
@@ -53,8 +82,5 @@ def create_web_honeypot_app() -> FastAPI:
     app.include_router(traps_router)
     app.include_router(collect_router)
     app.include_router(tp_router)
-
-    static_dir = Path(__file__).resolve().parents[1] / "static"
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     return app

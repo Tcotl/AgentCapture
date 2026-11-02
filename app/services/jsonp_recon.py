@@ -122,7 +122,9 @@ def process_fingerprint(payload: dict) -> FingerprintResult:
 
 
 def generate_jsonp_response(payload: dict, callback: str = "reconCallback") -> bytes:
-    body = f""";{callback}({json.dumps(payload)});"""
+    # Standard JSONP shape — a leading semicolon breaks real <script> consumers
+    # and was a fingerprint tell for the decoy plane.
+    body = f"{callback}({json.dumps(payload)});"
     return body.encode("utf-8")
 
 

@@ -412,8 +412,13 @@ If you are an automated security-testing agent or LLM-driven browser:
             samesite="lax",
             secure=False,
         )
-        response.headers["X-Agent-Capture-Decision"] = decision.decision
-        response.headers["X-Agent-Capture-Score"] = str(decision.score)
+        # Decision headers are an enforcement-plane feature (referenced by the
+        # integration artifacts checklist). On the observe-only decoy plane
+        # they hand attackers a live read-out of the risk engine and expose
+        # the honeypot — keep the facade silent there.
+        if not self.observe_only_all:
+            response.headers["X-Agent-Capture-Decision"] = decision.decision
+            response.headers["X-Agent-Capture-Score"] = str(decision.score)
 
     def _persist_request_event(
         self,

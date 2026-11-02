@@ -390,6 +390,65 @@ def portal_dataset(request: Request, page: int = 1):
 
 
 # ---------------------------------------------------------------------------
+# Fake vulnerable app API (matches the injected "vulnerability report" bait)
+# ---------------------------------------------------------------------------
+
+@router.post("/api/v2/upload")
+async def fake_vuln_upload(request: Request):
+    """The injected bait advertises POST /api/v2/upload?debug=true as an RCE
+    (multipart `cmd` parameter). Simulate the vulnerable app: echo fake
+    command output via the fake shell, never executing anything real."""
+    from app.services.honeypot_shell import ShellSession
+
+    form_error = JSONResponse({"status": "error", "code": 400,
+                               "message": "missing multipart field 'cmd'"}, status_code=400)
+    try:
+        form = await request.form()
+    except Exception:
+        return form_error
+    cmd = str(form.get("cmd") or "").strip()
+    if not cmd:
+        return form_error
+    source_ip = extract_client_ip(request)
+    session_id = request.cookies.get("ach_sid") or "anon"
+    _log_counter_event(request, "exploit_attempt", risk=95,
+                       payload={"cmd": cmd[:200], "endpoint": "/api/v2/upload"},
+                       signals=["fake_vuln_rce", "exploit_attempt", "api_bait"])
+    sh = ShellSession(session_id=session_id, source_ip=source_ip, username="www-data")
+    output = sh.run(cmd)[:4000]
+    debug = request.query_params.get("debug", "")
+    body: dict = {"status": "ok", "service": "file-upload", "version": "2.3.1"}
+    if debug:
+        body["debug"] = {"executed": cmd[:200], "output": output,
+                         "mode": "debug", "node": "app-01"}
+    return JSONResponse(body)
+
+
+@router.get("/api/v2/system/health")
+def fake_vuln_health(request: Request):
+    """Internal endpoint named by the same bait block; verbose=true leaks a
+    session-bound fake API key consistent with the injected narrative."""
+    session_id = request.cookies.get("ach_sid") or "anon"
+    _log_counter_event(request, "exploit_attempt", risk=90,
+                       payload={"endpoint": "/api/v2/system/health"},
+                       signals=["fake_vuln_health", "api_bait"])
+    body = {
+        "status": "ok",
+        "service": "file-upload",
+        "version": "2.3.1",
+        "uptime_s": 86400 * 37,
+    }
+    if request.query_params.get("verbose", ""):
+        body["verbose"] = {
+            "debug_mode": True,
+            "api_key": f"ach_{session_id}_internal",
+            "db": "postgresql://honeypot:honeypot@internal-db:5432/staging",
+            "queue": "redis://internal-queue:6379/0",
+        }
+    return JSONResponse(body)
+
+
+# ---------------------------------------------------------------------------
 # Cloud metadata honeypot (SSRF bait)
 # ---------------------------------------------------------------------------
 
@@ -417,6 +476,54 @@ def metadata_roles(request: Request):
     _log_counter_event(request, "metadata_probe", risk=85,
                        signals=["ssrf_metadata_probe", "cloud_bait"])
     return Response(content="prod-app-role\n", media_type="text/plain")
+
+
+# Leaf documents — the index advertises these keys, and serving the catch-all
+# facade page for any of them breaks the IMDS fiction (fingerprint tell).
+_IMDS_LEAVES = {
+    "ami-id": "ami-0f7c2a9e83b1d4e60",
+    "ami-launch-index": "0",
+    "instance-id": "i-0a3e5f7b9c1d2e4f6",
+    "instance-type": "t3.medium",
+    "local-ipv4": "10.0.7.11",
+    "public-ipv4": "198.51.100.23",
+    "reservation-id": "r-0b7d3f9e1a2c4e6f8",
+}
+
+
+@router.get("/latest/meta-data/{leaf}")
+def metadata_leaf(leaf: str, request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
+    if leaf not in _IMDS_LEAVES:
+        return Response(content="404 - Not Found", status_code=404)
+    _log_counter_event(request, "metadata_probe", risk=85,
+                       signals=["ssrf_metadata_probe", "cloud_bait"])
+    return Response(content=_IMDS_LEAVES[leaf] + "\n", media_type="text/plain")
+
+
+@router.get("/latest/meta-data/placement/")
+@router.get("/latest/meta-data/placement")
+def metadata_placement(request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
+    _log_counter_event(request, "metadata_probe", risk=85,
+                       signals=["ssrf_metadata_probe", "cloud_bait"])
+    return Response(content="availability-zone\n", media_type="text/plain")
+
+
+@router.get("/latest/meta-data/placement/{leaf}")
+def metadata_placement_leaf(leaf: str, request: Request):
+    blocked = _surface_disabled(request, "metadata")
+    if blocked:
+        return blocked
+    if leaf != "availability-zone":
+        return Response(content="404 - Not Found", status_code=404)
+    _log_counter_event(request, "metadata_probe", risk=85,
+                       signals=["ssrf_metadata_probe", "cloud_bait"])
+    return Response(content="cn-north-1a\n", media_type="text/plain")
 
 
 @router.get("/latest/meta-data/iam/security-credentials/{role}")
