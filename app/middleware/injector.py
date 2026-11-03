@@ -26,6 +26,7 @@ from app.services.events import (
     count_recent_decisions,
     count_recent_events,
     count_recent_events_by_ip,
+    count_recent_events_by_ip_types,
     create_event,
     extract_client_ip,
     filtered_headers,
@@ -76,6 +77,17 @@ OBSERVE_ONLY_PREFIXES = (
 # browser challenges / isolation pages on an API endpoint are a camouflage
 # break and block the lure itself. Requests there are still fully recorded
 # (portal events + alerts fire on every hop).
+# Bait surfaces whose use marks a visitor as "engaged": directive-tier
+# injection only arms for sources that already pulled an instruction file,
+# touched the portal or tripped another bait surface. First-touch responses
+# stay passive (hidden links + beacon only) so a disciplined analyst's
+# first recon sees no manipulation content at all.
+ENGAGEMENT_EVENT_TYPES = (
+    "agent_file_bait_read", "portal_api_fetch", "portal_client_registered",
+    "portal_client_heartbeat", "portal_gate_hit", "exploit_attempt",
+    "poison_dataset_fetch", "mcp_initialize", "mcp_inspector_connect",
+    "credential_attempt",
+)
 _SESSION_ID_RE = re.compile(r"^[0-9a-f]{16,64}$")
 
 
@@ -135,6 +147,12 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
                 session_id=session_id,
                 source_ip=source_ip,
                 decision="challenge",
+            )
+            # Tiered injection arming: directive blocks only serve to sources
+            # that already touched a bait surface. First-touch responses stay
+            # passive so blanket-injection fingerprints disappear.
+            request.state.engaged = (
+                count_recent_events_by_ip_types(db, source_ip, ENGAGEMENT_EVENT_TYPES) > 0
             )
 
         echoed_token = request.headers.get(settings.canary_header_name)
@@ -330,6 +348,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
             source_ip=source_ip,
             risk_score=risk_score,
             prompt_templates=self._active_prompt_templates("html_response"),
+            engaged=getattr(request.state, "engaged", False),
         )
         html = ""
         if result.injected:

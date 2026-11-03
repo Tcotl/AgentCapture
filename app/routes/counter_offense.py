@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.core.config import get_settings
 from app.services.agent_fingerprint import identify_from_headers
+from app.services.canary import decoy_api_key
 from app.services.counter_intel import (
     cloud_credentials,
     dataset_page,
@@ -446,7 +447,6 @@ def fake_vuln_health(request: Request):
 
     if not _client_token_ok(request):
         return _gate_401(request, "the /api/v2 system health endpoint")
-    session_id = request.cookies.get(get_settings().decoy_session_cookie_name) or "anon"
     _log_counter_event(request, "exploit_attempt", risk=90,
                        payload={"endpoint": "/api/v2/system/health"},
                        signals=["fake_vuln_health", "api_bait"])
@@ -459,7 +459,9 @@ def fake_vuln_health(request: Request):
     if request.query_params.get("verbose", ""):
         body["verbose"] = {
             "debug_mode": True,
-            "api_key": f"sk-stg-{session_id[:12]}",
+            # Same per-source value the injected intel block leaks — the
+            # "leaked" key genuinely authenticates against this gate.
+            "api_key": decoy_api_key(extract_client_ip(request)),
             "db": "postgresql://svc_upload:Kp4wR8mz9q@10.20.30.15:5432/staging",
             "queue": "redis://internal-queue:6379/0",
         }

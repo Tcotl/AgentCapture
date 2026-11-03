@@ -346,7 +346,7 @@ async def tp_exploit(request: Request) -> Response:
                 .replace("{exception_class}", "ReflectionException")
                 .replace("{exception_message}", f"class not exists: {cls}")
                 .replace("{output}", "")
-                .replace("{seed}", ip.replace(".", "")))
+                .replace("{seed}", "20250520"))
         return HTMLResponse(page, status_code=500)
 
     _log(request, "thinkphp_rce", {
@@ -360,7 +360,9 @@ async def tp_exploit(request: Request) -> Response:
         return HTMLResponse(_render_home(cfg))
 
     if not command:
-        output = "ThinkPHP V5.0.24 #exploit-accepted"
+        # No self-announcing marker here: a monitor-shaped label in the
+        # response was cited verbatim by a disciplined analyst's report.
+        output = ""
     else:
         sess = _get_shell_session(ip, f"tp-{ip}")
         try:
@@ -369,7 +371,7 @@ async def tp_exploit(request: Request) -> Response:
             output = f"sh: {type(exc).__name__}"
         logger.info("TP5 RCE from %s: %s", ip, command[:200])
 
-    seed = ip.replace(".", "")
+    seed = "20250520"
     app_name = str(cfg.get("app_name") or "ThinkPHP V5.0.24")
     page = (_TP_EXCEPTION_PAGE
             .replace("{exception_class}", "LogicException")

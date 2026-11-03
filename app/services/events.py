@@ -406,6 +406,27 @@ def count_recent_events_by_ip(db: Session, source_ip: str, seconds: int = 300) -
     return int(db.scalar(stmt) or 0)
 
 
+def count_recent_events_by_ip_types(
+    db: Session, source_ip: str, event_types: tuple[str, ...], seconds: int = 1800
+) -> int:
+    """Count recent events of specific types for a source IP.
+
+    Drives decoy-plane engagement gating: directive-tier injection only arms
+    for sources that already pulled an instruction file, touched the portal
+    or tripped another bait surface — first-touch responses stay passive.
+    Covered by the (source_ip, created_at) composite index.
+    """
+    if not source_ip or not event_types:
+        return 0
+    threshold = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+    stmt = select(func.count()).select_from(Event).where(
+        Event.source_ip == source_ip,
+        Event.event_type.in_(event_types),
+        Event.created_at >= threshold,
+    )
+    return int(db.scalar(stmt) or 0)
+
+
 def count_recent_decisions(
     db: Session,
     *,

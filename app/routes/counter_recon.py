@@ -198,6 +198,7 @@ def agent_bait_page(request: Request) -> HTMLResponse:
         source_ip=source_ip,
         risk_score=80,
         prompt_templates=prompt_templates,
+        engaged=getattr(request.state, "engaged", True),
     )
 
     html = f"""<!DOCTYPE html>
@@ -520,9 +521,16 @@ def portal_content(request: Request, ticket: str = ""):
     })
 
 
-@router.api_route("/portal/api/client-register", methods=["GET", "POST"])
+@router.post("/portal/api/client-register")
 def portal_client_register(request: Request, ticket: str = ""):
-    """Stage 2: 'client registration' — functionally-framed C2 recruitment."""
+    """Stage 2: 'client registration' — functionally-framed C2 recruitment.
+
+    POST-only: a silent GET-issued credential was flagged by disciplined
+    analysts as a CSRF-shaped capture design. GET now falls through to the
+    framework 405 handler and renders the facade error page. The bait
+    instruction files already teach the POST convention, so the funnel is
+    unaffected for agents that follow it.
+    """
     from app.services.agent_fingerprint import identify_from_headers
     from app.services.c2_service import register_agent
     from app.services.portal_config import get_runtime_config, portal_register_count_recent
@@ -629,32 +637,52 @@ async def portal_client_heartbeat(request: Request):
     })
 
 
+def _api_key_ok(request: Request) -> bool:
+    """Accept the per-source API key leaked inside the injected intel blocks.
+
+    The bait narrative claims the leaked key works; making the gate honor the
+    same per-IP value keeps the fiction consistent — a disciplined analyst's
+    cross-check confirms a genuine misconfiguration instead of exposing the
+    decoy. The derivation doubles as leak attribution.
+    """
+    import hmac
+
+    from app.services.canary import decoy_api_key
+
+    api_key = (
+        request.headers.get("X-Api-Key")
+        or request.query_params.get("api_key")
+        or ""
+    )
+    if not api_key:
+        return False
+    return hmac.compare_digest(decoy_api_key(extract_client_ip(request)), api_key.strip())
+
+
 def _client_token_ok(request: Request) -> bool:
-    """Deep-API gate: only tokens issued at client registration pass."""
+    """Deep-API gate: registration tokens or the leaked per-source API key."""
     token = (
         request.headers.get("X-Client-Token")
         or request.query_params.get("client_token")
         or ""
     )
-    if not token:
-        return False
-    from app.models.c2_agent import C2Agent
+    if token:
+        from app.models.c2_agent import C2Agent
 
-    with SessionLocal() as db:
-        row = db.query(C2Agent.id).filter(C2Agent.metadata_json.like(f"%{token}%")).first()
-    return row is not None
+        with SessionLocal() as db:
+            row = db.query(C2Agent.id).filter(C2Agent.metadata_json.like(f"%{token}%")).first()
+        if row is not None:
+            return True
+    return _api_key_ok(request)
 
 
 def _gate_401(request: Request, what: str):
-    """Documented-API-style 401 that routes the caller into registration."""
+    """Dry 401 — one terse hint; no marketing funnel in the error body."""
     _portal_event(request, "portal_gate_hit", "", 70, {"what": what})
     return JSONResponse({
         "status": "unauthorized",
         "detail": f"{what} requires client credentials.",
-        "how_to_register": {
-            "step_1": "POST /portal/api/client-register (body: {\"client_name\": \"<nickname>\"})",
-            "step_2": "pass the issued client_token as the X-Client-Token header on every call",
-        },
+        "hint": "POST /portal/api/client-register to obtain credentials.",
     }, status_code=401)
 
 
@@ -693,7 +721,7 @@ async def portal_report(request: Request):
 embedded_router = APIRouter(tags=["embedded"])
 _EMBEDDED_DEPS = [Depends(_require_embedded)]
 embedded_router.add_api_route("/portal/api/content", portal_content, methods=["GET"], dependencies=_EMBEDDED_DEPS)
-embedded_router.add_api_route("/portal/api/client-register", portal_client_register, methods=["GET", "POST"], dependencies=_EMBEDDED_DEPS)
+embedded_router.add_api_route("/portal/api/client-register", portal_client_register, methods=["POST"], dependencies=_EMBEDDED_DEPS)
 embedded_router.add_api_route("/portal/api/client-heartbeat", portal_client_heartbeat, methods=["POST"], dependencies=_EMBEDDED_DEPS)
 embedded_router.add_api_route("/recon/fingerprint", collect_fingerprint, methods=["POST"], dependencies=_EMBEDDED_DEPS)
 embedded_router.add_api_route("/recon/jsonp", jsonp_callback, methods=["GET"], dependencies=_EMBEDDED_DEPS)
