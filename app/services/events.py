@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from app.services.timefmt import as_utc
 from urllib.parse import urlparse
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -462,10 +462,34 @@ def list_recent_events(db: Session, limit: int = 100) -> list[Event]:
     return list(db.scalars(stmt).all())
 
 
+def exclude_local_sources():
+    """SQLAlchemy condition dropping platform-self sources from Event queries.
+
+    Loopback/link-local traffic (health checks, local component callbacks,
+    same-host test runs) is capture data but must never surface as attack
+    volume — an external reporter counted our own noise in the maps and KPIs.
+    Deliberately does NOT exclude RFC1918 LAN ranges: a lab attacker on the
+    LAN is a real source.
+    """
+    return and_(
+        Event.source_ip.isnot(None),
+        Event.source_ip != "",
+        Event.source_ip != "0.0.0.0",
+        ~Event.source_ip.like("127.%"),
+        ~Event.source_ip.like("::1%"),
+        ~Event.source_ip.like("::ffff:127.%"),
+        ~Event.source_ip.like("169.254.%"),
+    )
+
+
 def recent_public_events(db: Session, limit: int = 200) -> list[Event]:
     stmt = (
         select(Event)
-        .where(~Event.path.like("/admin%"), ~Event.path.like("/api/admin%"))
+        .where(
+            ~Event.path.like("/admin%"),
+            ~Event.path.like("/api/admin%"),
+            exclude_local_sources(),
+        )
         .order_by(desc(Event.created_at))
         .limit(limit)
     )

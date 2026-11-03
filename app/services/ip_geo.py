@@ -109,3 +109,73 @@ def _store(ip_text: str, result: dict[str, Any]) -> None:
 def ip_info_map(ips: list[str]) -> dict[str, dict[str, Any]]:
     """Batch helper for templates: {ip: classify result} (cached lookups)."""
     return {ip: classify_ip(ip) for ip in {i for i in ips if i}}
+
+
+def is_local_source_ip(ip_text: str) -> bool:
+    """Platform-self traffic: loopback / unspecified / link-local only.
+
+    Health checks, local component callbacks and same-host test runs come
+    from these ranges; they are capture data but must not surface as attack
+    volume. Deliberately NOT matching RFC1918 LAN ranges — a lab attacker on
+    the LAN is a real source.
+    """
+    ip_text = (ip_text or "").strip()
+    if not ip_text or ip_text in ("unknown", "0.0.0.0"):
+        return True
+    try:
+        ip = ipaddress.ip_address(ip_text)
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_unspecified or ip.is_link_local
+
+
+_GEOIP_READER: Any = None
+_GEOIP_TRIED = False
+_GEOIP_DB_NAMES = ("geoip-city.mmdb", "GeoLite2-City.mmdb", "dbip-city-lite.mmdb")
+
+
+def geoip_lookup(ip_text: str) -> dict[str, Any] | None:
+    """Real lat/lng for the big-screen globe from an offline MMDB database.
+
+    Optional dependency: ``pip install -e ".[geoip]"`` provides maxminddb;
+    drop a GeoLite2-City / DB-IP City LITE database at ``data/geoip-city.mmdb``
+    (or one of the other recognised names). Returns ``None`` when no database,
+    dependency or record is available — callers keep their deterministic
+    placeholder coordinates and the 示意 legend stays on.
+    """
+    global _GEOIP_READER, _GEOIP_TRIED
+    ip_text = (ip_text or "").strip()
+    if not ip_text or ip_text == "unknown":
+        return None
+    if not _GEOIP_TRIED:
+        _GEOIP_TRIED = True
+        try:
+            import maxminddb  # type: ignore[import-not-found]
+
+            from pathlib import Path
+
+            for name in _GEOIP_DB_NAMES:
+                path = Path("data") / name
+                if path.exists():
+                    _GEOIP_READER = maxminddb.open_database(str(path))
+                    break
+        except Exception:  # noqa: BLE001 — optional dependency, degrade quietly
+            _GEOIP_READER = None
+    if _GEOIP_READER is None:
+        return None
+    try:
+        record = _GEOIP_READER.get(ip_text)
+    except Exception:  # noqa: BLE001 — private/invalid IP shapes
+        return None
+    location = (record or {}).get("location") or {}
+    lat, lng = location.get("latitude"), location.get("longitude")
+    if lat is None or lng is None:
+        return None
+    names = lambda part: ((record.get(part) or {}).get("names") or {})  # noqa: E731
+    return {
+        "lat": float(lat),
+        "lng": float(lng),
+        "city": names("city").get("zh-CN") or names("city").get("en") or "",
+        "country": names("country").get("zh-CN") or names("country").get("en") or "",
+        "source": "mmdb",
+    }

@@ -37,6 +37,9 @@ pg = [
 msf = [
   "msgpack>=1.0"
 ]
+geoip = [
+  "maxminddb>=2.0"
+]
 
 [tool.ruff]
 line-length = 100

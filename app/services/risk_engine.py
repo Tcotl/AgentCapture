@@ -50,7 +50,10 @@ AGENT_UA_MARKERS = [
     "google-genai",
     "kimi",
     "moonshot",
-    "copilot",
+    # "copilot" deliberately absent: editor-autocomplete UAs are not attack
+    # agents (an external reporter flagged the false positive). Coding-agent
+    # CLIs with autonomous execution stay in the list above; Copilot traffic
+    # is still labelled by agent_fingerprint without scoring as an attack.
     "cursor",
     "aider",
     "cline",

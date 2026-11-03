@@ -585,7 +585,7 @@
             <div class="bs-map-badge">{{ _('高频来源') }}<strong>{{ top_sources[0].source_ip if top_sources else '无' }}</strong></div>
             <div class="bs-map-badge">{{ _('高频路径') }}<strong>{{ top_paths[0][0] if top_paths else '/' }}</strong></div>
           </div>
-          <div class="bs-map-legend"><span style="color:var(--bs-headline)">{{ _('活跃区') }}</span><span style="color:var(--bs-amber)">{{ _('高压区') }}</span><span style="color:var(--bs-red)">{{ _('高危区') }}</span><span>{{ _('· 示意分布') }}</span></div>
+          <div class="bs-map-legend"><span style="color:var(--bs-headline)">{{ _('活跃区') }}</span><span style="color:var(--bs-amber)">{{ _('高压区') }}</span><span style="color:var(--bs-red)">{{ _('高危区') }}</span><span id="bs-map-legend-note">{{ _('· 示意分布') }}</span></div>
         </div>
       </section>
 
@@ -925,19 +925,27 @@
   }
 
   function sourcePoints() {
-    // 无 GeoIP 库时的确定性示意坐标：同一来源 IP 永远落在同一位置。
+    // 后端附带真实 GeoIP 坐标（离线 MMDB）时用真实位置；无坐标的来源回退到
+    // 确定性示意位（同一来源 IP 永远落在同一位置）。
     const items = (SMART_DATA.topSources || []).slice(0, 8);
     const max = Math.max(...items.map((item) => Number(item.count || 0)), 1);
-    return items.map((item) => {
+    let realCount = 0;
+    const points = items.map((item) => {
       const intensity = clampPercent((Number(item.count || 0) / max) * 100);
+      const lat = Number(item.lat), lng = Number(item.lng);
+      const hasReal = Number.isFinite(lat) && Number.isFinite(lng);
+      if (hasReal) realCount += 1;
       return {
-        lat: -52 + (hashGeo(item.source_ip, 'lat') % 104),
-        lng: -175 + (hashGeo(item.source_ip, 'lng') % 350),
+        lat: hasReal ? lat : -52 + (hashGeo(item.source_ip, 'lat') % 104),
+        lng: hasReal ? lng : -175 + (hashGeo(item.source_ip, 'lng') % 350),
         intensity,
-        label: `${item.source_ip} · ${formatNumber(item.count)} 次`,
+        label: `${item.source_ip}${item.city ? ' · ' + item.city : ''} · ${formatNumber(item.count)} 次`,
         color: intensity > 78 ? '#fb7185' : intensity > 44 ? '#f59e0b' : '#e8eef7',
       };
     });
+    const note = document.getElementById('bs-map-legend-note');
+    if (note) note.style.display = realCount > 0 ? 'none' : '';
+    return points;
   }
 
   function initGlobe() {

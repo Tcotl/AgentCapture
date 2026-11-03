@@ -5,6 +5,8 @@ import socket
 
 import psutil
 from sqlalchemy import desc, func, select
+
+from app.services.events import exclude_local_sources
 from sqlalchemy.orm import Session
 
 from app.core.db import APP_STARTED_AT
@@ -38,11 +40,22 @@ def _system_status() -> dict:
 
 
 def dashboard_stats(db: Session) -> dict:
+    # total_events stays raw (capture volume); attack-flavored counters
+    # exclude platform-self sources so our own probes never count as attacks.
     total_events = int(db.scalar(select(func.count()).select_from(Event)) or 0)
+    _no_local = exclude_local_sources()
     high_risk_events = int(
-        db.scalar(select(func.count()).select_from(Event).where(Event.risk_score >= 70)) or 0
+        db.scalar(
+            select(func.count()).select_from(Event).where(Event.risk_score >= 70, _no_local)
+        )
+        or 0
     )
-    unique_ips = int(db.scalar(select(func.count(func.distinct(Event.source_ip))).select_from(Event)) or 0)
+    unique_ips = int(
+        db.scalar(
+            select(func.count(func.distinct(Event.source_ip))).select_from(Event).where(_no_local)
+        )
+        or 0
+    )
     online_nodes = int(
         db.scalar(select(func.count()).select_from(Node).where(Node.status == "online")) or 0
     )
@@ -63,12 +76,18 @@ def dashboard_stats(db: Session) -> dict:
     credential_attempts = int(db.scalar(select(func.count()).select_from(CredentialObservation)) or 0)
     execution_count = int(db.scalar(select(func.count()).select_from(ExecutionHistory)) or 0)
     recon_events = int(
-        db.scalar(select(func.count()).select_from(Event).where(Event.event_type == "recon_fingerprint")) or 0
+        db.scalar(
+            select(func.count())
+            .select_from(Event)
+            .where(Event.event_type == "recon_fingerprint", _no_local)
+        )
+        or 0
     )
     agent_interactions = int(
         db.scalar(
             select(func.count()).select_from(Event).where(
-                Event.event_type.in_(["agent_interaction", "agent_verification"])
+                Event.event_type.in_(["agent_interaction", "agent_verification"]),
+                _no_local,
             )
         )
         or 0
@@ -78,19 +97,24 @@ def dashboard_stats(db: Session) -> dict:
             select(func.count()).select_from(Event).where(
                 Event.decision == "block",
                 Event.signals_json.contains("ai_agent_"),
+                _no_local,
             )
         )
         or 0
     )
     payload_downloads = int(
         db.scalar(
-            select(func.count()).select_from(Event).where(Event.event_type == "payload_download")
+            select(func.count())
+            .select_from(Event)
+            .where(Event.event_type == "payload_download", _no_local)
         )
         or 0
     )
     payload_callbacks = int(
         db.scalar(
-            select(func.count()).select_from(Event).where(Event.event_type == "payload_callback")
+            select(func.count())
+            .select_from(Event)
+            .where(Event.event_type == "payload_callback", _no_local)
         )
         or 0
     )
@@ -124,7 +148,11 @@ def dashboard_stats(db: Session) -> dict:
 
 def attack_trends(db: Session, days: int = 7) -> list[dict]:
     threshold = datetime.now(timezone.utc) - timedelta(days=days - 1)
-    events = db.scalars(select(Event).where(Event.created_at >= threshold).order_by(Event.created_at)).all()
+    events = db.scalars(
+        select(Event)
+        .where(Event.created_at >= threshold, exclude_local_sources())
+        .order_by(Event.created_at)
+    ).all()
     buckets: dict[str, int] = defaultdict(int)
     for event in events:
         day = event.created_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
@@ -144,7 +172,9 @@ def attack_trends_previous(db: Session, days: int = 7) -> list[int]:
     end = datetime.now(timezone.utc) - timedelta(days=days - 1)
     start = end - timedelta(days=days)
     events = db.scalars(
-        select(Event).where(Event.created_at >= start, Event.created_at < end)
+        select(Event).where(
+            Event.created_at >= start, Event.created_at < end, exclude_local_sources()
+        )
     ).all()
     buckets: dict[str, int] = defaultdict(int)
     for event in events:
@@ -154,7 +184,13 @@ def attack_trends_previous(db: Session, days: int = 7) -> list[int]:
 
 
 def attack_chain(db: Session) -> dict:
-    events = db.scalars(select(Event).order_by(desc(Event.created_at)).limit(1000)).all()
+    from app.services.ip_geo import is_local_source_ip
+
+    events = [
+        event
+        for event in db.scalars(select(Event).order_by(desc(Event.created_at)).limit(1000)).all()
+        if not is_local_source_ip(event.source_ip)
+    ]
     credentials = db.scalars(select(CredentialObservation)).all()
     return {
         "scan": sum(1 for item in events if item.event_type == "scan" or "high_request_velocity" in (item.signals_json or [])),

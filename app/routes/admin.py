@@ -8496,6 +8496,8 @@ def admin_big_screen(
     db: Session = Depends(get_db),
 ):
     user = _require_user(request, db)
+    from app.services.ip_geo import geoip_lookup
+
     stats = dashboard_stats(db)
     chain = attack_chain(db)
     node_ctx = node_attack_context(db, limit=8)
@@ -8521,7 +8523,12 @@ def admin_big_screen(
             "stats": stats,
             "chain": chain,
             "trends": attack_trends(db),
-            "top_sources": aggregated_attack_sources(db, limit=8),
+            # Attach real GeoIP coordinates when an offline MMDB is present —
+            # the globe uses them instead of the deterministic placeholders.
+            "top_sources": [
+                {**item, **({"lat": g["lat"], "lng": g["lng"], "city": g.get("city", "")} if (g := geoip_lookup(item.get("source_ip") or "")) else {})}
+                for item in aggregated_attack_sources(db, limit=8)
+            ],
             "top_attacks": aggregated_attacks(db, limit=8),
             "node_summary": node_ctx["summary"],
             "node_items": node_ctx["items"],
