@@ -16,6 +16,7 @@
 .chat-presence { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
 .presence-dot { width:8px; height:8px; border-radius:50%; background:var(--muted-foreground); flex-shrink:0; transition:background 200ms ease, box-shadow 200ms ease; }
 .presence-dot.online { background:var(--success); box-shadow:0 0 8px rgba(52,211,153,.5); }
+.presence-dot.stale { background:var(--warning, #f59e0b); box-shadow:0 0 8px rgba(245,158,11,.45); }
 .presence-dot.offline { background:var(--danger); }
 .presence-meta { font-size:11.5px; color:var(--muted-foreground); }
 
@@ -99,7 +100,7 @@
 <div class="chat-layout">
   <section class="panel chat-panel">
     <div class="chat-presence">
-      <span class="presence-dot {{ 'online' if agent.status == 'active' else 'offline' }}" id="presence-dot"></span>
+      <span class="presence-dot {{ 'online' if agent.status == 'active' else 'stale' if agent.status == 'stale' else 'offline' }}" id="presence-dot"></span>
       <code class="c2-mono" style="font-size:12px">{{ agent.agent_id[:20] }}…</code>
       {% if is_recruited %}{{ badge(_('Portal 招募'), 'success') }}{% else %}{{ badge(_('植入 Beacon'), 'info') }}{% endif %}
       <span class="presence-meta" id="presence-meta">
@@ -338,9 +339,11 @@
       outHtml = '<div class="pending"><span class="pending-dots"></span><span>等待 Agent 回传</span></div>';
     }
 
+    var expired = t.status === 'dispatched' && t.lease_expired;
+    var stLabel = expired ? '等待回联' : (STATUS_LABEL[t.status] || t.status);
     wrap.innerHTML =
       '<div class="chat-row op"><div class="bubble op">' +
-        '<div class="bubble-head"><span>#' + t.id + '</span><span class="st-badge st-' + t.status + '">' + (STATUS_LABEL[t.status] || t.status) + '</span><span>' + esc(TYPE_LABEL[t.task_type] || t.task_type) + '</span><span>' + fmtTime(t.created_at) + '</span></div>' +
+        '<div class="bubble-head"><span>#' + t.id + '</span><span class="st-badge st-' + t.status + (expired ? ' st-waiting' : '') + '">' + stLabel + '</span><span>' + esc(TYPE_LABEL[t.task_type] || t.task_type) + '</span><span>' + fmtTime(t.created_at) + '</span></div>' +
         '<div class="bubble-body">' + esc(t.command) + '</div>' +
       '</div></div>' +
       '<div class="chat-row agent"><div class="bubble">' +
@@ -355,14 +358,15 @@
     tasks.forEach(function (t) {
       var prev = seen[t.id];
       var outLen = (t.output || '').length;
+      var exp = !!(t.status === 'dispatched' && t.lease_expired);
       if (!prev) {
         log.appendChild(renderExchange(t));
-        seen[t.id] = { status: t.status, outLen: outLen };
+        seen[t.id] = { status: t.status, outLen: outLen, expired: exp };
         scroll = true;
-      } else if (prev.status !== t.status || prev.outLen !== outLen) {
+      } else if (prev.status !== t.status || prev.outLen !== outLen || prev.expired !== exp) {
         var el = log.querySelector('.chat-exchange[data-task-id="' + t.id + '"]');
         if (el) log.replaceChild(renderExchange(t), el);
-        seen[t.id] = { status: t.status, outLen: outLen };
+        seen[t.id] = { status: t.status, outLen: outLen, expired: exp };
         scroll = true;
       }
     });

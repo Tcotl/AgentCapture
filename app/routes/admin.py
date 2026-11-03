@@ -81,11 +81,13 @@ from app.services.c2_service import (
     bulk_enqueue_task,
     delete_agent,
     enqueue_task,
+    expire_stale_c2_tasks,
     get_agent,
     get_nl_task_templates,
     get_task_templates,
     list_agents,
     list_tasks,
+    refresh_c2_presence,
     serialize_task_full,
     task_type_stats,
 )
@@ -9765,7 +9767,8 @@ def delete_jsonp_template(template_id: int, request: Request, db: Session = Depe
 @router.get("/admin/c2/agents", response_class=HTMLResponse)
 def admin_c2_agents(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
-    auto_mark_offline(db, offline_seconds=300)
+    expire_stale_c2_tasks(db)
+    refresh_c2_presence(db)
     agents = list_agents(db, limit=200)
     stats = agent_stats(db)
     return _render(
@@ -10151,6 +10154,8 @@ def api_admin_c2_agent_chat(agent_id: str, request: Request, db: Session = Depen
     completed with output) flowing without extra bookkeeping.
     """
     _require_user(request, db)
+    expire_stale_c2_tasks(db)
+    refresh_c2_presence(db)
     agent = get_agent(db, agent_id)
     if not agent:
         return JSONResponse({"error": "agent_not_found"}, status_code=404)
@@ -10206,7 +10211,8 @@ async def api_admin_c2_agent_chat_send(agent_id: str, request: Request, db: Sess
 @router.get("/api/admin/c2/beacons")
 def api_admin_c2_beacons(request: Request, db: Session = Depends(get_db)):
     _require_user(request, db)
-    auto_mark_offline(db, offline_seconds=300)
+    expire_stale_c2_tasks(db)
+    refresh_c2_presence(db)
     agents = list_agents(db, limit=200)
     return {
         "beacons": [

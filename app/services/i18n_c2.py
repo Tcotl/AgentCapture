@@ -61,6 +61,7 @@ EN = {
     "节点": "Node",
     "节点名称": "Node Name",
     "在线": "Online",
+    "失联中": "Lost Contact",
     "离线": "Offline",
     "最近心跳": "Last Heartbeat",
     "最后心跳": "Last Heartbeat",

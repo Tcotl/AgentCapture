@@ -167,6 +167,19 @@ def _ensure_legacy_columns() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE c2_agents ADD COLUMN listener_id INTEGER"))
 
+    # c2_tasks lease columns (stable-C2-channel upgrade: leased dispatch with
+    # lazy reclaim + bounded redelivery, mirroring the managed-stack leases)
+    if "c2_tasks" in table_names:
+        ct_cols = {col["name"] for col in inspector.get_columns("c2_tasks")}
+        ct_migrations = {
+            "lease_expires_at": "ALTER TABLE c2_tasks ADD COLUMN lease_expires_at DATETIME",
+            "retry_count": "ALTER TABLE c2_tasks ADD COLUMN retry_count INTEGER DEFAULT 0",
+        }
+        with engine.begin() as conn:
+            for column, ddl in ct_migrations.items():
+                if column not in ct_cols:
+                    conn.execute(text(ddl))
+
     # nodes.network_zone (intranet segmentation for the topology canvas)
     if "nodes" in table_names:
         nd_cols = {col["name"] for col in inspector.get_columns("nodes")}

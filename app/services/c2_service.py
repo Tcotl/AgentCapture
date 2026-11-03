@@ -9,7 +9,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -17,6 +17,16 @@ from app.models.c2_agent import C2Agent
 from app.models.c2_task import C2Task
 
 settings = get_settings()
+
+# ---------------------------------------------------------------------------
+# Stable-C2-channel lifecycle constants (mirrors managed_runtime.py:
+# 90s stale, 300s offline, 90s lease, ≤3 reclaim retries). Advanced lazily
+# on console reads — no background thread.
+# ---------------------------------------------------------------------------
+C2_STALE_AFTER_SECONDS = 90
+C2_OFFLINE_AFTER_SECONDS = 300
+C2_LEASE_TTL_SECONDS = 90
+C2_LEASE_MAX_RETRIES = 3
 
 
 # ---------------------------------------------------------------------------
@@ -264,9 +274,23 @@ def enqueue_task(
 
 
 def pull_next_task(db: Session, *, agent_id: str) -> C2Task | None:
+    """Leased dispatch: a dispatched task holds a 90s lease and is only
+    re-sent after it expires — an agent that goes quiet can never wedge the
+    queue (expire_stale_c2_tasks requeues it for bounded redelivery)."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=C2_LEASE_TTL_SECONDS)
     stmt = (
         select(C2Task)
-        .where(C2Task.agent_id == agent_id, C2Task.status.in_(["queued", "dispatched"]))
+        .where(
+            C2Task.agent_id == agent_id,
+            or_(
+                C2Task.status == "queued",
+                and_(
+                    C2Task.status == "dispatched",
+                    or_(C2Task.lease_expires_at.is_(None), C2Task.lease_expires_at < cutoff),
+                ),
+            ),
+        )
         .order_by(C2Task.priority.asc(), C2Task.created_at.asc())
         .limit(1)
     )
@@ -275,7 +299,8 @@ def pull_next_task(db: Session, *, agent_id: str) -> C2Task | None:
         return None
     task.status = "dispatched"
     task.dispatch_count += 1
-    task.dispatched_at = datetime.now(timezone.utc)
+    task.dispatched_at = now
+    task.lease_expires_at = now + timedelta(seconds=C2_LEASE_TTL_SECONDS)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -299,13 +324,22 @@ def find_agent_by_recruit_src(db: Session, recruit_src: str) -> C2Agent | None:
 
 
 def pull_pending_nl_tasks(db: Session, *, agent_id: str, limit: int = 3) -> list[C2Task]:
-    """Fetch pending natural-language tasks for a recruited agent and mark them dispatched."""
+    """Fetch pending natural-language tasks for a recruited agent (leased
+    dispatch — see pull_next_task) and mark them dispatched."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=C2_LEASE_TTL_SECONDS)
     stmt = (
         select(C2Task)
         .where(
             C2Task.agent_id == agent_id,
             C2Task.task_type == "nl_instruct",
-            C2Task.status.in_(["queued", "dispatched"]),
+            or_(
+                C2Task.status == "queued",
+                and_(
+                    C2Task.status == "dispatched",
+                    or_(C2Task.lease_expires_at.is_(None), C2Task.lease_expires_at < cutoff),
+                ),
+            ),
         )
         .order_by(C2Task.priority.asc(), C2Task.created_at.asc())
         .limit(limit)
@@ -314,7 +348,8 @@ def pull_pending_nl_tasks(db: Session, *, agent_id: str, limit: int = 3) -> list
     for task in tasks:
         task.status = "dispatched"
         task.dispatch_count += 1
-        task.dispatched_at = datetime.now(timezone.utc)
+        task.dispatched_at = now
+        task.lease_expires_at = now + timedelta(seconds=C2_LEASE_TTL_SECONDS)
         db.add(task)
     if tasks:
         db.commit()
@@ -422,11 +457,17 @@ def serialize_task_full(task: C2Task) -> dict:
     status/output/dispatch metadata so the console can render an operator
     message plus the agent's eventual reply as one exchange.
     """
+    lease_expired = bool(
+        task.status == "dispatched"
+        and task.lease_expires_at is not None
+        and task.lease_expires_at < datetime.now(timezone.utc)
+    )
     return {
         "id": task.id,
         "task_id": task.id,
         "task_type": task.task_type,
         "status": task.status,
+        "lease_expired": lease_expired,
         "command": task.command or "",
         "arguments_json": task.arguments_json or {},
         "output": (task.output or "")[:20000],
@@ -480,18 +521,73 @@ def delete_agent(db: Session, agent_id: str) -> bool:
     return True
 
 
-def auto_mark_offline(db: Session, offline_seconds: int = 300) -> int:
-    threshold = datetime.now(timezone.utc) - timedelta(seconds=offline_seconds)
-    stmt = select(C2Agent).where(
-        C2Agent.status == "active",
-        C2Agent.last_seen_at < threshold,
-    )
-    agents = db.scalars(stmt).all()
-    for agent in agents:
-        agent.status = "offline"
-        db.add(agent)
+def refresh_c2_presence(
+    db: Session,
+    *,
+    stale_seconds: int = C2_STALE_AFTER_SECONDS,
+    offline_seconds: int = C2_OFFLINE_AFTER_SECONDS,
+) -> dict:
+    """Three-state presence for C2 agents (active → stale → offline),
+    advanced lazily on console reads — same contract as the managed stack."""
+    from app.services.timefmt import as_utc
+
+    now = datetime.now(timezone.utc)
+    stale_cut = now - timedelta(seconds=stale_seconds)
+    offline_cut = now - timedelta(seconds=offline_seconds)
+    counts = {"active": 0, "stale": 0, "offline": 0}
+    for agent in db.scalars(select(C2Agent)).all():
+        last = as_utc(agent.last_seen_at) or as_utc(agent.first_seen_at)
+        if last is None or last < offline_cut:
+            new = "offline"
+        elif last < stale_cut:
+            new = "stale"
+        else:
+            new = "active"
+        if agent.status != new:
+            agent.status = new
+            db.add(agent)
+        counts[new] = counts.get(new, 0) + 1
     db.commit()
-    return len(agents)
+    return counts
+
+
+def expire_stale_c2_tasks(db: Session) -> dict:
+    """Reclaim dispatched C2 tasks whose lease expired: requeue up to
+    C2_LEASE_MAX_RETRIES redeliveries, then fail with an operator-visible
+    reason. Lazy — invoked from console reads, no background thread."""
+    now = datetime.now(timezone.utc)
+    tasks = db.scalars(
+        select(C2Task).where(
+            C2Task.status == "dispatched",
+            or_(C2Task.lease_expires_at.is_(None), C2Task.lease_expires_at < now),
+        )
+    ).all()
+    requeued = failed = 0
+    for task in tasks:
+        if (task.retry_count or 0) + 1 > C2_LEASE_MAX_RETRIES:
+            task.status = "failed"
+            task.result_json = {
+                **(task.result_json or {}),
+                "reason": "agent never returned; lease expired repeatedly",
+            }
+            task.completed_at = now
+            failed += 1
+        else:
+            task.retry_count = (task.retry_count or 0) + 1
+            task.status = "queued"
+            task.dispatched_at = None
+            task.lease_expires_at = None
+            requeued += 1
+        db.add(task)
+    if tasks:
+        db.commit()
+    return {"reclaimed": len(tasks), "requeued": requeued, "failed": failed}
+
+
+def auto_mark_offline(db: Session, offline_seconds: int = 300) -> int:
+    """Back-compat wrapper — full three-state presence refresh."""
+    counts = refresh_c2_presence(db, offline_seconds=offline_seconds)
+    return counts["offline"]
 
 
 def bulk_enqueue_task(

