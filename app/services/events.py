@@ -458,8 +458,102 @@ def count_recent_decisions(
 
 
 def list_recent_events(db: Session, limit: int = 100) -> list[Event]:
-    stmt = select(Event).order_by(desc(Event.created_at)).limit(limit)
+    stmt = (
+        select(Event)
+        .where(exclude_local_sources())
+        .order_by(desc(Event.created_at))
+        .limit(limit)
+    )
     return list(db.scalars(stmt).all())
+
+
+FEED_SCAN_CAP = 2000
+
+
+def list_events_since(
+    db: Session,
+    since_id: int = 0,
+    *,
+    decision: str = "",
+    event_type: str = "",
+    source_ip: str = "",
+    min_risk: int = 0,
+) -> tuple[list[Event], int, int]:
+    """All feed-eligible rows newer than ``since_id`` (ascending, scan-capped).
+
+    Filters are pushed into SQL (primary-key range + the composite
+    (event_type|source_ip, created_at) indexes serve the scan); loopback /
+    platform-self sources never surface. Returns ``(rows, total_new,
+    horizon_id)`` — ``total_new`` counts every matching new event and
+    ``horizon_id`` is MAX(id) across them, so clients that sample still
+    advance past the rows they dropped and never re-deliver or lag behind.
+    The caller applies page-size cuts and risk-priority sampling on top.
+    """
+    conds: list = [Event.id > (since_id or 0), exclude_local_sources()]
+    if decision:
+        conds.append(Event.decision == decision)
+    if event_type:
+        conds.append(Event.event_type == event_type)
+    if source_ip:
+        conds.append(Event.source_ip == source_ip)
+    if min_risk > 0:
+        conds.append(Event.risk_score >= min_risk)
+    rows = list(
+        db.scalars(select(Event).where(*conds).order_by(Event.id).limit(FEED_SCAN_CAP)).all()
+    )
+    total_new = int(db.scalar(select(func.count()).select_from(Event).where(*conds)) or 0)
+    horizon = int(db.scalar(select(func.max(Event.id)).where(*conds)) or since_id or 0)
+    return rows, total_new, horizon
+
+
+def aggregate_window(
+    db: Session, window_seconds: int = 60, since_id: int = 0
+) -> dict:
+    """SQL-side rollup of the recent event window for the aggregate feed view.
+
+    Groups by (source_ip, event_type) over the last ``window_seconds`` —
+    the created_at index bounds the scan — plus a top-paths breakdown.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        seconds=max(5, min(int(window_seconds or 60), 3600))
+    )
+    conds: list = [Event.created_at >= cutoff, exclude_local_sources()]
+    if since_id and since_id > 0:
+        conds.append(Event.id > since_id)
+    grouped = db.execute(
+        select(
+            Event.source_ip,
+            Event.event_type,
+            func.count(),
+            func.max(Event.risk_score),
+        )
+        .where(*conds)
+        .group_by(Event.source_ip, Event.event_type)
+        .order_by(desc(func.count()))
+        .limit(50)
+    ).all()
+    total = int(db.scalar(select(func.count()).select_from(Event).where(*conds)) or 0)
+    top_paths = db.execute(
+        select(Event.path, func.count())
+        .where(*conds)
+        .group_by(Event.path)
+        .order_by(desc(func.count()))
+        .limit(5)
+    ).all()
+    return {
+        "window_seconds": max(5, min(int(window_seconds or 60), 3600)),
+        "total": total,
+        "sources": [
+            {
+                "source_ip": ip,
+                "event_type": etype,
+                "count": int(count),
+                "max_risk": int(max_risk or 0),
+            }
+            for ip, etype, count, max_risk in grouped
+        ],
+        "top_paths": [{"path": path, "count": int(count)} for path, count in top_paths],
+    }
 
 
 def exclude_local_sources():

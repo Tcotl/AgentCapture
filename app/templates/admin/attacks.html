@@ -131,12 +131,13 @@
 {% endfor %}
 
 <div class="at-deck">
-  <section class="panel at-status">
+  <section class="panel at-status" id="at-status-wrap">
     <div class="at-status-id">
       <span class="at-live-dot"></span>
       <div>
         <div class="at-status-title">{{ _('攻击流量监控') }}</div>
         <div class="at-status-sub">{{ _('来源 IP × 站点 × 会话聚合矩阵') }}</div>
+        <div class="at-status-sub" id="at-updated-at" style="opacity:.75">自动刷新 · 10s</div>
       </div>
     </div>
     <div class="at-readouts">
@@ -225,7 +226,7 @@
       </script>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="at-table-wrap">
       {{ section_header(_('攻击聚合视图'), _('聚合维度：来源 IP + 站点 + 会话'), '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
       <div class="table-wrap compact at-table">
         <table>
@@ -307,5 +308,27 @@
     });
   });
 })();
+
+  // 实时化：10s 批量整段替换（不逐条 append，DOM 不增长）。筛选表单在
+  // 刷新容器之外，用户未提交的输入不受影响。
+  (function () {
+    function refresh() {
+      fetch(location.href, { headers: { 'Accept': 'text/html' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          ['at-status-wrap', 'at-table-wrap'].forEach(function (id) {
+            var fresh = doc.getElementById(id);
+            var cur = document.getElementById(id);
+            if (fresh && cur) cur.innerHTML = fresh.innerHTML;
+          });
+          var stamp = document.getElementById('at-updated-at');
+          if (stamp) stamp.textContent = '自动刷新 · 上次更新 ' + new Date().toLocaleTimeString();
+        })
+        .catch(function () {});
+    }
+    if (typeof acPoll === 'function') acPoll(refresh, 10000);
+    else setInterval(refresh, 10000);
+  })();
 </script>
 {% endblock %}
