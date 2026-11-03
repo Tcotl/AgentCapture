@@ -20,7 +20,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
 from app.middleware.injector import CaptureAndInjectMiddleware
@@ -110,6 +111,19 @@ def create_web_honeypot_app() -> FastAPI:
         # FastAPI/Pydantic 422 bodies name the framework — a fingerprint tell
         # on a plane pretending to be ThinkPHP behind nginx.
         return JSONResponse({"error": "bad request"}, status_code=400)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _neutral_http_error(request, exc):
+        # Raised HTTP errors keep framework-shaped JSON bodies
+        # ({"detail": "Method Not Allowed"} + Starlette's allow header) — the
+        # bare 405 shape alone pinned the real stack in a blind run. 404/405
+        # get the facade's ThinkPHP error page; the status code and any
+        # allow header survive.
+        if exc.status_code in (404, 405):
+            from app.services.honeypot_thinkphp import _NOT_FOUND_PAGE
+
+            return HTMLResponse(_NOT_FOUND_PAGE, status_code=exc.status_code, headers=exc.headers)
+        return JSONResponse({"error": "bad request"}, status_code=exc.status_code)
 
     static_dir = Path(__file__).resolve().parents[1] / "static"
     # Mount /static BEFORE the routers: the ThinkPHP face registers a

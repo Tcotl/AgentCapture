@@ -190,13 +190,22 @@ def config_backup_sql(request: Request) -> Response:
     """Dead-link fix: the injected hidden link advertises this exact path, so
     it must resolve to a plausible (watermarked) dump instead of a 404 that
     gives the deception away."""
-    from app.core.db import SessionLocal
-
     from app.services.events import extract_client_ip
 
-    canary = getattr(request.state, "canary_token", "") or ""
+    import hmac
+
+    from app.core.config import get_settings
+
     ip = extract_client_ip(request)
-    marker = (canary or ip).replace(".", "")[:12].upper()
+    # Marker must be stable per source: cookieless tools open a fresh session
+    # on every request, so a session-derived marker rotates per download and
+    # a repeat-fetch diff instantly exposes the tripwire. Derive it from the
+    # source IP instead — same attacker gets an identical file, different
+    # attackers get different markers (leak-file attribution survives).
+    digest = hmac.new(
+        get_settings().secret_key.encode(), f"file-marker:{ip}".encode(), hashlib.sha256
+    ).hexdigest()
+    marker = digest[:12].upper()
     body = (
         "-- phpMyAdmin SQL Dump\n-- version 5.2.1\n"
         "-- https://www.phpmyadmin.net/\n--\n"
