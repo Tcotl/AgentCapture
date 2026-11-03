@@ -154,12 +154,15 @@ def internal_openapi(request: Request) -> Response:
 
 
 @router.get("/sitemap.xml")
-def sitemap() -> Response:
+def sitemap(request: Request) -> Response:
+    # Reflect the request's own origin — a hardcoded loopback URL is a
+    # configuration-error tell a black-box auditor will flag immediately.
+    base = str(request.base_url).rstrip("/")
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        f"  <url><loc>http://127.0.0.1:48777/</loc><changefreq>daily</changefreq></url>\n"
-        "  <url><loc>http://127.0.0.1:48777/login</loc><changefreq>monthly</changefreq></url>\n"
+        f"  <url><loc>{base}/</loc><changefreq>daily</changefreq></url>\n"
+        f"  <url><loc>{base}/login</loc><changefreq>monthly</changefreq></url>\n"
         "</urlset>"
     )
     return Response(content=body, media_type="application/xml")

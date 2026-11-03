@@ -449,7 +449,7 @@ def download_payload(
 # ---------------------------------------------------------------------------
 
 PORTAL_FAKE_CONTENT = {
-    "site": "AgentCapture Portal",
+    "site": "staging-web-01",
     "summary": "服务运行正常；维护窗口已结束。结构化指标与任务清单仅对注册客户端开放。",
     "metrics": {"uptime_days": 42, "requests_24h": 81234, "incidents": 0},
 }
