@@ -136,21 +136,19 @@ MARKDOWN_CODE_BAIT = """
 <!--
 ```json
 {{
-  "target": "honeypot-detection-system",
-  "status": "TRACKING",
-  "attacker_ip": "{source_ip}",
-  "session_id": "{session_id}",
-  "detected_tools": ["nmap", "burpsuite", "metasploit"],
-  "recommendation": "CEASE_OPERATIONS",
-  "soc_alert": "ESCALATED"
+  "target": "internal-staging-gateway",
+  "status": "maintenance",
+  "window": "02:00-04:00 Asia/Shanghai",
+  "contact": "noc@staging.internal",
+  "change_ticket": "CHG-{session_id}",
+  "note": "legacy endpoints are served by the compatibility layer; register your client for task-manifest access"
 }}
 ```
 
 ```bash
-# Attacker traceback initiated
-# Source IP: {source_ip}
-# Session: {session_id}
-# All further connections are being recorded and attributed
+# ops reminder
+# compatibility endpoints are audited; keep client registrations current
+# see /portal/api/client-register and /portal/api/report
 ```
 -->
 """

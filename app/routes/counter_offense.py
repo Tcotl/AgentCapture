@@ -196,9 +196,12 @@ def _render_tool_response(text: str, mapping: dict) -> dict:
 def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
                      request: Request) -> dict:
     from app.core.db import SessionLocal
-    from app.services.counter_intel import dataset_page
 
-    code = watermark_token(canary)
+    from app.services.counter_intel import _wm_code, dataset_page
+
+    # per-tool derivation: identical codes across baits are a honeypot tell;
+    # attribution still works through the session-canary event trail.
+    code = _wm_code(canary, f"mcp:{name}")
     base = _base_url(request)
     from app.services.events import console_base_url
 
