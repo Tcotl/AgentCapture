@@ -22,3 +22,4 @@ data/
 .vercel
 .env*
 .vercel-token
+.zcode/
