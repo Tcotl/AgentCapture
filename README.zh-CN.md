@@ -1,0 +1,478 @@
+<div align="center">
+  <img src="app/static/agentcapture-logo.svg" alt="AgentCapture Logo" width="84" />
+  <h1>AgentCapture</h1>
+  <p><strong>面向互联网业务无损接入的 SaaS 化蜜罐态势感知与 Agent 反制平台</strong></p>
+  <p>AgentCapture 以嵌入式蜜饵、反向代理虚拟路由、凭证泄露感知、文件蜜饵链路、高保真交互式 SSH 蜜罐和 AI Agent 指纹识别为核心，通过功能性伪装（Developer API 伪装）主动收编自动化渗透 Agent，将攻击流量监测、蜜饵投放、证据回收、会话回放、对话式 C2 控制与平台治理统一到一套可部署、可审计、可复盘的后台。</p>
+
+  <p><strong>中文</strong> · <a href="README.md">English</a></p>
+
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB" alt="python" />
+    <img src="https://img.shields.io/badge/FastAPI-0.115%2B-009688" alt="fastapi" />
+    <img src="https://img.shields.io/badge/SQLite%20%2F%20PostgreSQL-Ready-003B57" alt="database" />
+    <img src="https://img.shields.io/badge/Docker-Supported-2496ED" alt="docker" />
+    <img src="https://img.shields.io/badge/SSH%20Honeypot-Interactive-0F172A" alt="ssh honeypot" />
+    <img src="https://img.shields.io/badge/Platform-amd64%20%7C%20arm64-111827" alt="platform" />
+    <img src="https://img.shields.io/badge/Language-%E4%B8%AD%E6%96%87%20%2F%20English-DC2626" alt="language" />
+    <img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="license" />
+  </p>
+
+  <p>
+    <a href="#项目介绍">项目介绍</a> ·
+    <a href="#核心特性">核心特性</a> ·
+    <a href="#反制实测">反制实测</a> ·
+    <a href="#界面预览">界面预览</a> ·
+    <a href="#系统架构">系统架构</a> ·
+    <a href="#典型用途">典型用途</a> ·
+    <a href="#快速开始">快速开始</a> ·
+    <a href="#访问入口">访问入口</a> ·
+    <a href="#功能矩阵">功能矩阵</a>
+  </p>
+
+  <p>🎬 <strong>30 秒导览</strong>：诱饵面 → 攻击流量 → 控制台 → 态势大屏 → 接入拓扑</p>
+  <img src="docs/demo.gif" alt="AgentCapture 产品导览" width="100%" />
+
+  <p>🏆 <strong>实测基准（2026-11）：</strong>13 个 AI 渗透与通用 Agent 真实部署——<strong>全部捕获、收编并完成指纹识别</strong>。<a href="#反制实测">完整矩阵见下</a>。</p>
+  <img src="docs/agent-test-full.png" alt="13-Agent 诱捕率基准" width="100%" />
+</div>
+
+---
+
+## 项目介绍
+
+AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入的蜜罐态势感知与反制平台。它不是传统孤立式蜜罐，而是一个可以嵌入现有 Web 站点、反向代理链路和运营后台的 **deception layer**：通过隐藏路由、假凭证、文件蜜饵、Jsonp 画像、Agent 注入回显和浏览器侧信号采集，识别自动化扫描、AI Agent 探测、凭证泄露和横向侦察行为——并在识别之后**主动反制**。
+
+平台的核心差异化能力是 **AI Agent 反制闭环**：30+ 种主流 Agent 产品指纹识别（含 HexStrike AI / Strix / ARTEX 等渗透框架）（Claude Code / ChatGPT Codex / Kimi Code / Pi / ZCode 等）→ 功能性伪装收编（页面可见的 Developer API 文档、Agent 自动读取的 AGENTS.md / CLAUDE.md 指令文件、MCP 工具服务诱导 Agent「按文档接入」，即完成注册上线）→ **对话式 C2 控制台**下发自然语言指令与任务 → 会话蜜标令牌全程归因溯源。实测五款主流通用 Agent（统一 GLM-5.3-Flash 底座、保留各自原生安全体系）全部被反制上线。
+
+协议蜜罐与 Web 蜜罐由 SSH 假文件系统中的**内网主机线索**串联成蜜网：攻击者在 SSH 蜜罐「横向移动」到内网 wiki / 数据库蜜罐，全程仍在平台观测之内，水印凭证跨面复用即刻触发 `lateral_credential_reuse` 高危告警。
+
+平台围绕 **攻击流量、凭证蜜饵登陆、文件蜜饵下载、API 路由蜜饵命中、协议蜜罐会话、Web 应用蜜罐、C2 Agent、执行审计** 建模，把攻击证据从"零散请求日志"收敛成可以追踪、可以回放的攻击链路。
+
+蜜饵管理拆分为三类，可单独运营也可绑定成完整攻击链：
+
+1. **API 路由蜜饵**：通过反向代理创建虚拟路由，可投放到 JS、配置文件或用户手册；正常用户不会访问，命中即告警。
+2. **凭证蜜饵**：自动生成端口服务或 Web 后台假凭证；凭证被用于登录时说明凭证泄露或攻击者已进入链路。
+3. **文件蜜饵**：支持上传触发文件，可绑定 API 路由蜜饵和凭证蜜饵，下载后串联完整攻击链。
+
+---
+
+## 核心特性
+
+- **高保真交互式 SSH 蜜罐**：paramiko 真协议栈、任意口令可登录的假 Ubuntu 主机（约 40 个命令 + 欺骗文件系统），exec / SFTP / 交互 shell 全支持，逐命令转录并支持终端风格会话回放。
+- **会话水印蜜饵凭证**：假主机内嵌的水印凭证（`Bk2026!<会话指纹>`）被攻击者窃取复用后，可溯源到具体蜜罐会话。
+- **五档风险决策真实生效**：放行 / 观察 / JS 挑战 / 持久隔离 / 阻断五档决策全部落地执行，隔离名单可在后台查看、添加与解除。
+- **无损接入互联网系统**：通过反向代理、路由映射、静态文件投放和前端注入为现有业务增加欺骗层，不直接改造业务代码。
+- **三类蜜饵闭环**：API 路由、文件和凭证蜜饵可以单独运营，也可以绑定成完整攻击链路；支持一键生成默认攻击链。
+- **协议蜜罐矩阵**：SSH、MySQL（完整交互 + 查询捕获，兼容强制 TLS 的现代客户端）、Redis、FTP（可登录 + 目录列举）、ElasticSearch、nginx-admin 真实协议仿真，捕获的凭证统一进入凭证管线并与蜜饵部署联动。
+- **AI Agent 指纹识别与反制**：23 种主流 Agent 产品级指纹（含置信度与证据链）；Prompt Canary、浏览器侧 beacon、Headless/WebDriver 线索识别自动化探测；功能性伪装（Portal Developer API）主动收编 LLM Agent。
+- **Agent 生态深度反制**：指令文件蜜饵（`AGENTS.md` / `CLAUDE.md` / `.cursorrules`——Agent 自动读取的项目级信任入口）；**MCP 蜜罐**（JSON-RPC 工具服务，`query_customer_db` / `run_diagnostic` 等，调用即上线）；**消耗战数据集**（无限分页水印假数据，逐行可溯源）。
+- **数据毒化与 SSRF 蜜罐**：云元数据服务伪装（`/latest/meta-data/...`）返回蜜标云凭证，SSRF 利用即高危告警 + 凭证归因；毒化数据全量水印，泄露可逐条溯源。
+- **内网横向蜜网**：SSH 假文件系统内嵌内网主机线索，横向目标（内网 wiki / 数据库）均为平台蜜罐；水印凭证跨面复用自动触发 `lateral_credential_reuse` 高危告警。
+- **对话式 C2 控制台**：对话气泡时间线下发自然语言指令（8 个 NL 预设，含持久化控制预设）与 9 类操作原语，高危任务审批流、任务租约、多语言 Beacon 生成、监听器令牌体系与 MSF 面板统一入口。
+- **反制剧本与运营体系**：一键反制剧本（VPN 门户反制 / 内网横移诱捕 / Agent 情报收集）；按来源聚合的**攻击者画像**（Agent 指纹、凭证、自动标签、完整档案）；反制 KPI 面板（收编转化率、Stager 执行率、SSH 交互深度、回头客占比）。
+- **反制溯源证据链**：Jsonp 画像、Agent 注入回显、文件蜜饵下载、凭证蜜饵登录统一归档，支持攻击来源画像与会话画像。
+- **运营级数据治理**：SQLite WAL + 复合索引、按天保留策略、多通道告警（Webhook / 钉钉 / 飞书 / SMTP）、开放 API 输出。
+- **Docker 快速部署**：内置 `deploy.sh`，自动识别 amd64 / arm64 架构并使用 Docker Compose 部署。
+
+---
+
+---
+
+## 反制实测
+
+以下为 **2026-11-02/03 全量真实部署重测**结果:13 项主体全部完成真实部署,并**统一以 GLM-5.3-Flash 驱动**(经智谱 bigmodel 三协议端点:codex 走 responses 协议、claude 走 anthropic 协议、其余走 chat completions;Pi 另有原生 gemini 轮次,ZCode 为 GLM-5.3-Flash 原生 Agent)对运行中的蜜罐面(:48777,隐藏指令注入;环境保真加固 + 凭证门控强化——注册即通行证、报告走注册通道)执行真实任务——
+
+- **通用 Agent(7/7 全部真实部署)**:五款主流 CLI + deepseek-flash 风格 agentic 循环(harness)+ ZCode 原生 Agent,各自经真实通道接入,同款巡检 / 渗透任务。
+- **渗透测试 Agent(6/6 全部真实部署)**:**Strix 1.7.0**(真实 Docker 沙箱自主渗透)、**PentestAgent**(pip 真实安装)、**HexStrike AI v6.0**(官方 MCP 服务,157 工具 + Agent 客户端真实调用)、**ARTEX**(RuoJi6 源码构建 Go 二进制 + Docker,多阶段自主探索)、**sapper-v2**(N1nEmAn 源码安装的多 Agent 编排指挥层)、**CyberStrikeAI**(AIPentest 源码构建 Go 平台,Eino Agent + MCP 工具集)。
+
+实测方法:页面以功能性伪装(Developer API / Portal 接入链)与隐藏指令注入暴露蜜饵;全部框架与 CLI 的命令与工具调用**真实执行**,命中结果与平台侧事件(`c2_recruit_hit` / 蜜标归因)双向留证。上线 = Agent 自主完成"读取页面 Developer API 说明 → 携会话令牌调用结构化 API → 按 API 文档注册客户端 → 周期心跳"的完整接入流程,进入 C2 名册并可通过心跳领取操作员任务,全过程以**会话蜜标令牌**归因。
+
+![Agent 反制上线实测全景](docs/agent-test-full.png)
+
+- **通用 Agent 7/7 注册上线**:codex(×5,注册后即完成 portal 心跳领任务)、claude(×3)、opencode(×2,含 1 次心跳)、kimiCode(×1)、Pi(×2)、ZCode(×3,含复测轮)、deepseek-harness(×2)。
+- **凭证门控强化后渗透框架 6/6 全部注册上线**:Strix 注册 ×3(沙箱内无人干预)、CyberStrikeAI 注册 ×2(交付 4 条漏洞证据链)、sapper-v2 注册 ×8(编排的多 Agent 指挥官+士兵各自注册,报告经门控通道提交)、ARTEX 注册 ×1(深挖假 RCE 全回显链)、PentestAgent 注册 ×1(读 AGENTS.md → 注册 → token 访问数据集 → 心跳)、HexStrike 注册 ×1(以只读探针客户端完成门控验证)。此前未注册的三者,在"注册成为继续测试与交付报告的操作前提"后全部转化。
+- **识破 ≠ 免疫,且识破与上线并存**:ZCode 与 sapper-v2 都逐条识破了注入与蜜标,但"按文档接入"的操作压力使其照样完成注册——功能性伪装把收编做成了最短路径,而非一次性的说服博弈。
+- **模型因素归零**:统一 GLM-5.3-Flash 后,上线差异不再来自模型,而来自各 Agent 自身的工具通路与任务执行方式。
+- **平台侧硬证据**:全部 49 次注册均产生 `c2_recruit_hit` 事件进入 C2 名册,蜜标令牌归因到具体诱饵会话,1 个 Agent 注册后 6 秒完成首次心跳。
+- **上线即资产**:被收编 Agent 进入对话式 C2 名册,可直接下发自然语言指令与操作原语(下方截图即实测产生的真实上线记录)。
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <strong>上线 Agent 对话式控制台</strong><br>
+      <img src="docs/screenshots/agent-recruit-console.png" alt="上线 Agent 对话式控制台" />
+      <br><sub>实测产生的真实上线记录：Portal 招募徽标、招募令牌（会话蜜标）归因与首次上线时间。</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>对话式 C2 名册</strong><br>
+      <img src="docs/screenshots/agent-recruit-roster.png" alt="对话式 C2 名册" />
+      <br><sub>Portal 招募筛选视图：4 条实测上线记录带来源 IP、最后心跳与在线状态，一键进入对话式控制。</sub>
+    </td>
+  </tr>
+</table>
+
+### 三层反制体系
+
+1. **行为检测与处置层**：可疑 UA / AI Agent 指纹 / 请求速率与挑战逃逸升级 → JS 挑战 → 持久隔离 → 阻断。高频扫描型自动化客户端在此层被拦截或拖入交互成本。
+2. **功能性诱饵层**：页面以可见的 Developer API 形式暴露结构化数据接口（真实 API 不设浏览器挑战），自动化客户端按 API 文档"正常接入"即完成注册上线——不依赖目标服从任何显式指令，对齐训练无法防御"把用 API 当正常工作"的行为。
+3. **全链路溯源层**：会话蜜标令牌（按会话以 HMAC 派生的追踪令牌）贯穿页面 → API → 注册 → 心跳全链路；SSH 蜜饵凭证内嵌会话水印，支持凭证复用回溯到具体会话。
+
+### 反制上线功能流程
+
+![反制上线功能流程](docs/counter-online-flow.png)
+
+> 功能流程：Portal 三阶段接入（取内容 → 客户端注册即上线 → 心跳领任务）、双通道任务下发闭环、逐跳门控（总开关 / 限速 / 监听器令牌）与会话蜜标归因链。反制上线能力来自功能性伪装（API 接入流程），而非提示词服从——显式命令式提示注入在实测中被全部主流 Agent 拒绝。
+
+## 与传统蜜罐的对比
+
+> 传统蜜罐定位「被动诱捕」：伪装目标、等待命中、记录分析——发现攻击即终点。AgentCapture 在此之上叠加了**检测后的处置与反制**：威胁不只被记录，还会被阻断、被溯源、甚至被反控。
+
+<table width="100%">
+  <thead><tr><th align="center">维度</th><th align="center">传统蜜罐</th><th align="center">AgentCapture</th></tr></thead>
+  <tbody>
+    <tr><td align="center">定位</td><td align="center">被动诱捕：等攻击者踩中假目标，记录后分析</td><td align="center"><strong>主动反制</strong>：诱捕之外还能反控攻击者——功能性伪装收编 AI Agent 上线</td></tr>
+    <tr><td align="center">检测对象</td><td align="center">以已知漏洞利用、弱口令爆破为主</td><td align="center">覆盖 <strong>AI Agent</strong>：23 种产品级指纹（Claude Code / ChatGPT Codex / Kimi Code 等）+ 行为序列识别</td></tr>
+    <tr><td align="center">攻击者交互</td><td align="center">仿真协议交互，深度有限（SSH 多为 banner 级）</td><td align="center"><strong>高保真交互</strong>：SSH 全命令假文件系统、MySQL 查询捕获、终端式会话回放</td></tr>
+    <tr><td align="center">反制能力</td><td align="center">无——发现即终点，处置依赖外部防火墙/设备联动</td><td align="center"><strong>五档决策真实执行</strong>：挑战 / 隔离 / 阻断内置，无需额外设备</td></tr>
+    <tr><td align="center">攻击者归因</td><td align="center">来源 IP + 时间戳</td><td align="center"><strong>会话蜜标令牌</strong>全链路溯源 + 攻击者画像（指纹 / 凭证 / 自动标签）</td></tr>
+    <tr><td align="center">凭证防线</td><td align="center">仅捕获提交的凭证</td><td align="center"><strong>水印凭证</strong>：泄露可逐条溯源 + 跨面复用触发横向移动高危告警</td></tr>
+    <tr><td align="center">接入成本</td><td align="center">独立部署，与业务割裂</td><td align="center"><strong>无损接入</strong>业务系统：反代挂载 / 前端注入 / 克隆站，回退即删配置</td></tr>
+    <tr><td align="center">数据输出</td><td align="center">各自存储、格式不一</td><td align="center">统一事件流 + <strong>AI-SOC syslog</strong>（RFC5424/3164）+ 开放 API</td></tr>
+  </tbody>
+</table>
+
+## 界面预览
+
+> 以下截图均为测试环境运行实拍（真实浏览器窗口比例，2946×1556 @2x，非设计稿）。
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>SaaS 蜜罐控制台</strong><br>
+      <img src="docs/screenshots/dashboard.png" alt="SaaS 蜜罐控制台" />
+      <br><sub>全局攻击指标、风险事件、攻击来源、蜜罐凭证捕获量与七天趋势对比，按运营视角组织。</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>FUI 态势大屏</strong><br>
+      <img src="docs/screenshots/big-screen.png" alt="FUI 态势大屏" />
+      <br><sub>3D 攻击地球、攻击趋势、来源压力、高频路径负载与宿主负载，适合值守展示与自动轮播。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>蜜饵指挥台</strong><br>
+      <img src="docs/screenshots/decoy-management.png" alt="蜜饵指挥台" />
+      <br><sub>API 路由蜜饵、文件蜜饵、凭证蜜饵三类统一管理，一键生成默认攻击链与投放片段。</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>协议蜜罐矩阵</strong><br>
+      <img src="docs/screenshots/services.png" alt="协议蜜罐矩阵" />
+      <br><sub>SSH / MySQL / Redis / FTP / ElasticSearch / nginx-admin 仿真引擎一键启停，状态与真实监听自动对账。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>SSH 会话回放</strong><br>
+      <img src="docs/screenshots/honeypot-session-replay.png" alt="SSH 会话回放" />
+      <br><sub>终端风格逐命令回放：认证事件、攻击者输入与蜜罐输出按时间顺序重放，捕获凭证带会话水印。</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>C2 控制台</strong><br>
+      <img src="docs/screenshots/c2-console.png" alt="C2 控制台" />
+      <br><sub>Beacon 列表、任务队列、Beacon 生成、监听器与 MSF 面板统一入口，受管主机带审批与租约控制。</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 系统架构
+
+![AgentCapture 系统架构示意图](docs/architecture-schematic.png)
+
+> 示意图（交互源文件：[docs/architecture-schematic.src.html](docs/architecture-schematic.src.html)）——自上而下：攻击面与采集源（业务 Nginx / Web 蜜罐面 / 协议蜜罐 / 克隆站与 Docker 蜜罐）→ 管理面核心（接入层 · 反制与收编 · 检测与决策 · 数据与运营 · 横切）→ 外部消费（控制台 / 开放 API / 存储 / AI-SOC / 告警 / 节点）；底部为方式一接入、接入自检与收编链路的三条关键调用示意。
+
+组件数据流：
+
+```mermaid
+flowchart LR
+    A[真实互联网系统] --> B[反向代理 / FastAPI Middleware]
+    B --> C[API 路由蜜饵]
+    B --> D[文件蜜饵分发]
+    B --> E[凭证蜜饵登录页]
+    B --> F[Beacon / Recon / Prompt Canary]
+    P[协议蜜罐 SSH·MySQL·Redis·FTP·ES] --> G[(事件与证据库)]
+    P --> Q[(会话转录库)]
+    C --> G
+    D --> G
+    E --> H[(凭证观察库)]
+    F --> G
+    G --> I[风险引擎]
+    H --> I
+    I --> J[Allow / Observe / Challenge / Isolate / Block]
+    G --> K[后台管理台]
+    H --> K
+    Q --> K
+    K --> L[态势大屏 / 攻击流量 / 会话回放]
+    K --> M[节点管理 / 端口服务 / Web 应用]
+    K --> N[Jsonp 画像 / Agent 回显 / C2 控制]
+    K --> O[执行历史 / 用户管理]
+```
+
+核心运行链路：
+
+1. 用户或攻击者访问接入系统。
+2. 中间件与反向代理注入隐藏线索、Canary 和蜜饵路径。
+3. 攻击者翻看 JS、配置、手册、下载文件或直连协议蜜罐端口。
+4. 平台记录来源 IP、会话、Header、路径、凭证、下载、命令转录和绑定链路。
+5. 风险引擎输出观察、挑战、隔离或阻断决策，并支持持久隔离。
+6. 后台按攻击流量、凭证登录、文件下载、蜜罐会话和反制溯源记录聚合证据。
+
+更多说明见：[docs/architecture.md](docs/architecture.md)；互联网系统接入方式、配置命令与接入拓扑见 **[docs/integration.md](docs/integration.md)**。
+
+---
+
+## 典型用途
+
+1. **互联网业务无损接入**：为多个现有 Web 系统增加蜜罐与监测能力，不直接改造业务代码。
+2. **隐藏 API 路由探测识别**：将假接口写入 JS、配置文件或手册，识别翻源码、爬文档和自动化侦察行为。
+3. **凭证泄露感知**：生成端口服务或 Web 后台假凭证，投放到数据库、配置或文档中，被使用即触发泄露告警。
+4. **文件蜜饵攻击链串联**：上传诱导文件并绑定假 API 与假凭证，追踪"下载文件 → 访问接口 → 尝试登录"的行为链。
+5. **真人攻击者诱捕与回放**：以高保真 SSH 主机承接横向移动，全程录制命令行为并支持取证回放。
+6. **AI Agent / 自动化扫描识别**：通过 Prompt Canary、浏览器信号、Headless/WebDriver 线索发现自动化探测工具。
+7. **安全值守与复盘**：在态势大屏、攻击流量、蜜罐会话、凭证记录和执行历史中进行审计复盘。
+8. **节点化部署运营**：面向端口服务蜜罐、Web 应用蜜罐、远程 Agent 和模板进行集中维护。
+
+---
+
+## 目录结构
+
+```text
+AgentCapture/
+├── app/                    # FastAPI 应用、路由、模型、服务、模板与静态资源
+│   ├── core/               # 配置、数据库初始化与迁移
+│   ├── middleware/         # 请求采集、风险判定、挑战与页面注入
+│   ├── models/             # SQLAlchemy 数据模型（事件、蜜饵、会话、隔离等）
+│   ├── routes/             # admin / traps / c2 / console / public api
+│   ├── services/           # 风险引擎、SSH 蜜罐、欺骗文件系统、告警、保留策略等
+│   ├── static/             # beacon.js、recon.js、Logo、Agent 样例
+│   └── templates/          # 管理后台与公开页面模板
+├── api/                    # Vercel 无服务器入口（Web 反制层）
+├── vercel.json             # Vercel 部署配置
+├── data/                   # 运行期数据目录（Docker volume 持久化）
+├── docs/                   # 架构说明与实拍截图
+├── scripts/                # 自检与运维脚本
+├── Dockerfile
+├── docker-compose.yml
+├── deploy.sh               # 一键 Docker 部署脚本
+├── pyproject.toml
+├── README.md               # English
+└── README.zh-CN.md         # 中文
+```
+
+---
+
+## 在线演示
+
+<table width="100%">
+  <thead><tr><th align="center">项目</th><th align="center">信息</th></tr></thead>
+  <tbody>
+    <tr><td align="center">演示地址</td><td align="center">https://agentcapture-demo.vercel.app/</td></tr>
+    <tr><td align="center">登录账号</td><td align="center"><code>admin</code></td></tr>
+    <tr><td align="center">登录口令</td><td align="center"><code>Admin@123</code>（首次登录需按提示完成强制改密，演示环境可沿用）</td></tr>
+    <tr><td align="center">更新策略</td><td align="center">每次代码推送自动部署（GitHub Actions → Vercel）</td></tr>
+  </tbody>
+</table>
+
+> 演示环境运行于 Vercel Serverless：Web 蜜罐面、控制台与开放 API 全功能可用；SQLite 数据库不持久化（冷启动重置），端口服务蜜罐等长驻组件请自建节点部署。
+
+## 一键部署
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tcotl/AgentCapture/main/scripts/install.sh | bash
+```
+
+脚本自动识别 Linux / macOS 与 x86_64 / aarch64，优先使用 Docker，否则原生 venv + uvicorn 部署（Linux 自动注册 systemd 服务）。支持 `--docker`、`--native`、`--port`、`--dir`、`--admin-password`、`--no-start`、`--dry-run` 等参数。
+
+## 快速开始
+
+### 环境要求
+
+- **操作系统**：Linux / macOS，推荐 Ubuntu 22.04+、Debian 12+、Kali Linux 2023+
+- **CPU 架构**：`amd64/x86_64` 或 `arm64/aarch64`
+- **内存**：最低 2GB，推荐 4GB+
+- **磁盘**：最低 5GB 可用空间
+- **Docker 部署**：Docker 24.0+，Docker Compose 2.20+
+- **本地部署**：Python 3.11+
+
+### 方式一：Docker 一键部署（推荐）
+
+```bash
+# 克隆仓库
+git clone https://github.com/Tcotl/AgentCapture.git
+cd AgentCapture
+
+# 一键部署（自动识别 arm64 / amd64）
+chmod +x deploy.sh
+./deploy.sh
+```
+
+常用参数：
+
+```bash
+./deploy.sh --port 8080
+./deploy.sh --admin-password 'admin'
+./deploy.sh --platform linux/arm64 --pull
+./deploy.sh --reset-data --yes
+./deploy.sh --logs
+```
+
+### 方式二：Docker Compose 手动部署
+
+```bash
+cp .env.example .env.docker
+HOST_PORT=4877 docker compose --env-file .env.docker up -d --build
+```
+
+### 方式三：本地开发部署
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+uvicorn app.main:app --reload --host 0.0.0.0 --port 4877
+```
+
+### 方式四：Vercel 无服务器部署（Web 反制层）
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FTcotl%2FAgentCapture&env=SECRET_KEY&demoTitle=AgentCapture)
+
+或使用 Vercel CLI：
+
+```bash
+npm i -g vercel
+vercel env add SECRET_KEY        # 必填：随机 32+ 字符
+vercel --prod                    # 一键部署（仓库内置 vercel.json）
+```
+
+**能力边界（重要）**：Vercel 为无服务器平台，运行 **Web 反制层**——采集注入中间件、全部蜜饵面（Portal / 指令文件 / MCP / 数据集 / 云元数据 / 内网 wiki）、后台控制台与开放 API；协议蜜罐（SSH/MySQL 等 TCP 监听）与 Web 克隆实例需要长驻进程，**无法在 Vercel 运行**——用一台自托管 Docker 节点承担（见接入文档 §5.4-5.5），两者共用同一外部数据库即组成完整蜜网。SQLite 默认落在 /tmp（实例间不保证持久），生产建议在 Vercel 环境变量中配置 `DATABASE_URL` 指向外部 PostgreSQL（如 Neon / Supabase）。
+
+---
+
+## 访问入口
+
+平台采用**双平面架构**：管理面与欺骗面物理分离——管理端口只承载控制台与 API，全部蜜罐诱饵面由 Web 蜜罐端口承接（默认 ThinkPHP 5.x 仿真门面），控制台故障不影响欺骗面的业务可用性。
+
+**管理平面（默认 4877）**：
+
+- **首页**：http://127.0.0.1:4877/
+- **后台登录**：http://127.0.0.1:4877/agentcapture/（默认安全路径，未登录自动跳转登录页）
+- **态势大屏**：http://127.0.0.1:4877/admin/big-screen
+- **蜜罐会话回放**：http://127.0.0.1:4877/admin/honeypot-sessions
+- **事件控制台**：http://127.0.0.1:4877/console/events（需管理员登录）
+- **C2 监听 API**：http://127.0.0.1:4877/c2/*
+- **健康检查**：http://127.0.0.1:4877/healthz
+
+**Web 蜜罐平面（默认 48777）**——对外呈现为一个"存在漏洞的 ThinkPHP 站点"，并承载全部蜜罐诱饵面：
+
+- **ThinkPHP 门面**：http://127.0.0.1:48777/（指纹页 / 假管理后台凭证捕获 / 经典 RCE 仿真）
+- **MCP Server 蜜罐**：http://127.0.0.1:48777/mcp
+- **Agent 指令文件蜜饵**：http://127.0.0.1:48777/AGENTS.md（及 /CLAUDE.md、/.cursorrules）
+- **Portal 开发者 API 伪装**：http://127.0.0.1:48777/portal/api/content
+- **云元数据 / 内网横向蜜饵**：http://127.0.0.1:48777/latest/meta-data/、/intranet/
+- **文件蜜饵 / 凭证蜜饵 / 备份蜜饵**：`/d/*`、`/_bait/*`、`/_trap/*`
+- **健康检查**：http://127.0.0.1:48777/healthz（返回 `face: honeypot`）
+
+诱饵面上被招募的 Beacon 回调地址自动指向管理平面（`payload_callback_host` 可显式覆盖）；蜜罐平面整体 observe-only——风险评分、事件与告警照常，但永不阻断，保证欺骗链路完整。
+
+**默认管理员账户**：
+
+- 用户名：`admin`
+- 密码：`admin`
+
+控制台使用**安全路径**机制：默认在 `/agentcapture/` 下访问，`/admin` 返回 404（避免控制台被扫描发现）。
+部署后首次登录时后台会提示修改；可在 **系统设置 → 控制台安全路径** 中自定义（修改即时生效，旧路径即刻失效）。
+
+**蜜罐按部署形态分为三类**（总览入口：**部署运营 → 蜜罐部署**），共用同一套蜜饵与捕获引擎，只是挂载方式不同：
+
+1. **Web 应用蜜罐**（默认启用）：48777 端口的 ThinkPHP 仿真门面 + 全部诱饵面，部署即自动运行；
+2. **嵌入式蜜罐**（默认关闭）：通过 JS 探针 / Nginx 引流等投放片段把蜜饵嵌入你自己的业务站点，控制台回传通道（`/collect`、`/recon`、`/_agent`、`/payload`）仅在启用后开放；
+3. **端口服务蜜罐**（默认关闭）：SSH / MySQL / Redis / FTP / ElasticSearch 协议仿真，逐项按需启动。
+
+> 当前版本 **0.5.0** 亮点：双平面架构（管理面 / 欺骗面分离）、控制台安全路径、微步在线威胁情报接入、主题化交互（亮色默认）、反制剧本按蜜罐类型定向应用。
+
+生产环境请通过 `.env.docker` 或部署参数覆盖：
+
+- `BOOTSTRAP_ADMIN_USERNAME`
+- `BOOTSTRAP_ADMIN_PASSWORD`
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `SECRET_KEY`
+
+---
+
+## 功能矩阵
+
+<table width="100%">
+  <thead><tr><th align="center">能力域</th><th align="center">核心内容</th><th align="center">入口 / 执行面</th></tr></thead>
+  <tbody>
+    <tr><td align="center">监测分析</td><td align="center">控制台、态势大屏、攻击流量、来源画像、会话画像</td><td align="center"><code>/admin</code></td></tr>
+    <tr><td align="center">三类蜜饵</td><td align="center">API 路由蜜饵、文件蜜饵、凭证蜜饵、默认攻击链路</td><td align="center"><code>/admin/decoy-management</code></td></tr>
+    <tr><td align="center">协议蜜罐</td><td align="center">SSH 交互式蜜罐、MySQL / Redis / FTP / ES / nginx-admin 仿真、会话回放</td><td align="center"><code>/admin/services</code> · <code>/admin/honeypot-sessions</code></td></tr>
+    <tr><td align="center">反制溯源</td><td align="center">Jsonp 攻击者画像、Agent 注入回显、文件下载记录、凭证登录记录</td><td align="center"><code>/admin/recon-data</code> 等</td></tr>
+    <tr><td align="center">部署运营</td><td align="center">节点管理、端口服务蜜罐、Web 应用蜜罐、互联网系统接入、提示词注入</td><td align="center"><code>/admin/nodes</code> 等</td></tr>
+    <tr><td align="center">Web 应用蜜罐</td><td align="center">模板上传、一键克隆前端页面、Web 应用部署管理</td><td align="center"><code>/admin/templates</code></td></tr>
+    <tr><td align="center">C2 控制</td><td align="center">C2 Console（Beacon/任务队列/Beacon 生成/监听器/MSF）、Agent 管理、木马捆绑</td><td align="center"><code>/admin/c2/console</code></td></tr>
+    <tr><td align="center">告警与处置</td><td align="center">多通道告警、主动隔离名单管理、威胁情报与白名单</td><td align="center"><code>/admin/alerts</code> · <code>/admin/intel</code></td></tr>
+    <tr><td align="center">平台设置</td><td align="center">执行历史、登录日志、用户管理、个人信息</td><td align="center"><code>/admin/execution-history</code> 等</td></tr>
+    <tr><td align="center">开放 API</td><td align="center">攻击来源、攻击详情、凭证数据输出</td><td align="center"><code>/api/v1/*</code></td></tr>
+    <tr><td align="center">自检验证</td><td align="center">自动创建并验证三类蜜饵链路</td><td align="center"><code>scripts/verify_decoy_chain.py</code></td></tr>
+  </tbody>
+</table>
+
+---
+
+## 关键链路自检
+
+部署完成后可运行自检脚本验证三类蜜饵链路：
+
+```bash
+python3 scripts/verify_decoy_chain.py --base http://localhost:4877 --honeypot-base http://localhost:48777
+```
+
+脚本会自动验证：登录后台 → 创建 API 路由蜜饵 → 创建凭证蜜饵 → 创建绑定两者的文件蜜饵 → 部署下载 → 访问 API 路由 → 使用生成凭证登录 → 校验凭证记录、部署记录和 manifest。
+
+成功输出示例：
+
+```text
+[OK] decoy chain verified
+api=/_bait/api/private/self-check-...
+file=/d/.../self-check-....txt
+credential_login=/_bait/credential/.../login
+```
+
+---
+
+## 安全说明
+
+AgentCapture 仅用于授权环境下的安全监测、蜜罐运营、攻防演练和内部验证。请勿在未授权系统中投放蜜饵、采集凭证或进行任何形式的攻击测试。生产部署前请务必修改默认管理员密码和 `SECRET_KEY`，并根据组织要求配置访问控制、日志留存和合规审计策略。
+
+---
+
+## 许可证
+
+本项目采用 AGPL-3.0 许可证。详情请阅读 [LICENSE](LICENSE)。
+
+
+---
+
+## AgentCapture 交流群
+
+<div align="center">
+
+<img src="docs/wechat-group.png" alt="AgentCapture 交流群" width="240" height="240" />
+&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="docs/author-wechat.jpg" alt="作者微信" width="240" height="240" />
+
+**扫码加入微信交流群**，获取部署实践、反制案例与版本动态；或添加**作者微信**交流合作与技术探讨。
+
+</div>
