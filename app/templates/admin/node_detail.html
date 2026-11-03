@@ -33,13 +33,13 @@
         <span></span>
       </div>
       <div class="actions-inline">
-        <button type="submit" class="btn-sm">下发导流（honeypot-publish）</button>
+        <button type="submit" class="btn-sm">{{ _('下发导流') }}（honeypot-publish）</button>
       </div>
     </form>
     <form method="post" action="/admin/nodes/{{ node.id }}/publish-honeypots" class="stack" style="margin-top:10px">
       <input type="hidden" name="action" value="retract">
       <div class="actions-inline">
-        <button type="submit" class="secondary btn-sm">回收全部导流（honeypot-retract）</button>
+        <button type="submit" class="secondary btn-sm">{{ _('回收全部导流') }}（honeypot-retract）</button>
         <span class="muted" style="font-size:11.5px">{{ _( '回收任务会移除该节点上全部 AC 相关 DNAT 规则。' ) }}</span>
       </div>
     </form>

@@ -217,7 +217,7 @@
               {% endif %}
             </div>
           </td>
-          <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
+          <td>{% if item.is_active %}{{ badge(_('启用'), 'success') }}{% else %}{{ badge('停用', 'danger') }}{% endif %}</td>
           <td class="jsonp-description-cell" title="{{ item.description or '' }}">{{ item.description or _('暂无说明') }}</td>
           <td>
             <div class="jsonp-actions-row">
@@ -276,7 +276,7 @@
     <div class="jsonp-modal-header">
       <div>
         <h2 class="jsonp-modal-title" id="jsonp-edit-title-{{ item.id }}">编辑 JSONP 模版：{{ item.name }}</h2>
-        <div class="jsonp-modal-subtitle">{{ item.method_key }} · 在弹窗中维护请求入口、采集字段和响应 JSON 模板。</div>
+        <div class="jsonp-modal-subtitle">{{ item.method_key }} · {{ _('在弹窗中维护请求入口、采集字段和响应 JSON 模板。') }}</div>
       </div>
       <button type="button" class="jsonp-modal-close" onclick="closeJsonpModal('jsonp-edit-{{ item.id }}')">×</button>
     </div>

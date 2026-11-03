@@ -32,7 +32,7 @@
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <span class="badge {{ 'badge-success' if s.enabled else 'badge-warning' }}">{{ _('运行中') if s.enabled else _('已停用') }}</span>
       <span class="muted" style="font-size:12px">{{ _( '24h 命中' ) }} <strong style="color:var(--foreground)">{{ s.hits_24h }}</strong></span>
-      {% if s.last_hit %}<span class="muted" style="font-size:12px">最近 {{ s.last_hit | dt('%m-%d %H:%M') }}</span>{% endif %}
+      {% if s.last_hit %}<span class="muted" style="font-size:12px">{{ _('最近') }} {{ s.last_hit | dt('%m-%d %H:%M') }}</span>{% endif %}
     </div>
     <div style="margin-top:auto">
       <a class="chip primary" href="/admin/counter-offense/{{ s.key }}" style="text-decoration:none">{{ _( '进入配置页面 →' ) }}</a>

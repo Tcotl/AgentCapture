@@ -47,7 +47,7 @@
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
     {% for face in default_honeypot.faces %}
     <a class="chip" href="/admin/counter-offense/{{ face.key }}" style="cursor:pointer;text-decoration:none"
-       title="{{ face.name }}——点击进入配置">
+       title="{{ face.name }} — {{ _('点击进入配置') }}">
       {% if face.enabled %}<span style="color:var(--success,#34d399)">●</span>{% else %}<span style="color:var(--muted-foreground)">○</span>{% endif %}
       {{ face.name.split(' · ')[0] }}
     </a>
@@ -89,13 +89,13 @@
     <form method="post" action="/admin/templates/honeypot/config" class="stack" >
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" name="enabled" {% if default_honeypot.enabled %}checked{% endif %}>
-        启用门面（关闭后 48777 上所有 ThinkPHP 路径返回 404，其余诱饵面不受影响）
+        {{ _('启用门面（关闭后 48777 上所有 ThinkPHP 路径返回 404，其余诱饵面不受影响）') }}
       </label>
       <div class="grid-2">
         <label class="field-label"><span>{{ _('框架显示名称') }}</span>
           <input name="app_name" value="{{ default_honeypot.config.get('app_name', 'ThinkPHP V5.0.24') }}"></label>
         <label class="field-label"><span>{{ _('首页标语') }}</span>
-          <input name="slogan" value="{{ default_honeypot.config.get('slogan', '十年磨一剑 — 为API开发设计的高性能PHP框架') }}"></label>
+          <input name="slogan" value="{{ default_honeypot.config.get('slogan', _('十年磨一剑 — 为API开发设计的高性能PHP框架')) }}"></label>
         <label class="field-label"><span>{{ _('Runtime 路径指纹') }}</span>
           <input name="runtime_path" value="{{ default_honeypot.config.get('runtime_path', '/var/www/html/app/runtime') }}"></label>
         <label class="field-label"><span>{{ _('假后台登录页标题') }}</span>
@@ -104,7 +104,7 @@
       <div style="display:flex;gap:18px;flex-wrap:wrap">
         <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
           <input type="checkbox" name="login_page_enabled" {% if default_honeypot.config.get('login_page_enabled', True) %}checked{% endif %}>
-          假后台登录捕获（/admin.php · /login）
+          {{ _('假后台登录捕获（/admin.php · /login）') }}
         </label>
         <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
           <input type="checkbox" name="rce_simulation_enabled" {% if default_honeypot.config.get('rce_simulation_enabled', True) %}checked{% endif %}>

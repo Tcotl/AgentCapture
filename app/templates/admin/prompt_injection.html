@@ -330,7 +330,7 @@
   var bulkBtn = document.querySelector('.bulk-del-btn');
   if (bulkBtn) bulkBtn.addEventListener('click', function () {
     var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
-    if (!checked.length) { alert('请先勾选要删除的模板'); return; }
+    if (!checked.length) { alert({{ _('请先勾选要删除的模板') | tojson }}); return; }
     var form = bulkBtn.closest('form');
     if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
     form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');

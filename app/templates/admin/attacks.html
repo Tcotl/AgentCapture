@@ -227,7 +227,7 @@
     </section>
 
     <section class="panel" id="at-table-wrap">
-      {{ section_header(_('攻击聚合视图'), _('聚合维度：来源 IP + 站点 + 会话'), '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+      {{ section_header(_('攻击聚合视图'), _('聚合维度：来源 IP + 站点 + 会话'), '<a class="chip" href="' ~ export_href ~ '">' ~ _('导出 CSV') ~ '</a>') }}
       <div class="table-wrap compact at-table">
         <table>
           <colgroup>
@@ -248,7 +248,7 @@
                 <td class="numeric">{{ item.count }}</td>
                 <td class="at-window" title="{{ item.first_seen }} → {{ item.last_seen }}">{{ item.window_display }}</td>
                 <td><code class="at-path" title="{{ item.top_path }}">{{ item.top_path or '-' }}</code></td>
-                <td><span class="badge badge-{{ 'danger' if item.top_decision == '阻断' else ('warning' if item.top_decision in ['隔离', '挑战', '质询'] else 'info') }}">{{ item.top_decision }}</span></td>
+                <td><span class="badge badge-{{ 'danger' if item.top_decision_key == 'block' else ('warning' if item.top_decision_key in ['isolate', 'challenge'] else 'info') }}">{{ _(item.top_decision) }}</span></td>
                 <td class="numeric"><span class="at-risk {% if item.risk_score_max >= 70 %}danger{% elif item.risk_score_max >= 45 %}warn{% endif %}">{{ item.risk_score_max }}</span></td>
                 <td class="cell-prose"><span class="at-signal-wrap" title="{{ item.top_signals|join('，') }}">{{ item.top_signals|join('，') if item.top_signals else '-' }}</span></td>
                 <td><div class="actions-inline"><a class="chip primary" href="/admin/attacks/{{ item.session_id }}">{{ _( '详情' ) }}</a><a class="chip" href="/admin/sessions/{{ item.session_id }}">{{ _( '画像' ) }}</a></div></td>

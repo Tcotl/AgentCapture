@@ -71,7 +71,7 @@
     <form method="post" action="/admin/alerts/syslog" class="stack" style="max-width:760px">
       <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" name="enabled" {% if syslog.enabled %}checked{% endif %}>
-        启用 syslog 外发（低于最小风险阈值的事件不外发）
+        {{ _('启用 syslog 外发（低于最小风险阈值的事件不外发）') }}
       </label>
       <div class="grid-2">
         <label class="field-label"><span>{{ _('Syslog 服务器地址') }}</span>
@@ -95,7 +95,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button type="submit" class="primary btn-sm">{{ _('保存 syslog 配置') }}</button>
-        <span class="muted" style="font-size:12px">已发送 {{ syslog_counters.sent }} · 错误 {{ syslog_counters.errors }} · 丢弃 {{ syslog_counters.dropped }}</span>
+        <span class="muted" style="font-size:12px">{{ _('已发送') }} {{ syslog_counters.sent }} · {{ _('错误') }} {{ syslog_counters.errors }} · {{ _('丢弃') }} {{ syslog_counters.dropped }}</span>
       </div>
     </form>
     <div style="border-top:1px solid rgba(96,165,250,.12);margin-top:12px;padding-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -109,7 +109,7 @@
     <details style="margin-bottom: 12px;">
       <summary class="field-help-toggle">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-        渠道类型说明（点击展开）
+        {{ _('渠道类型说明（点击展开）') }}
       </summary>
       <div class="field-help-body">
         <p><strong>webhook</strong> {{ _('— 任意 HTTP(S) 接收端点。POST JSON 包含') }} <code>event</code>/<code>channel</code>/<code>timestamp</code> {{ _('字段。可用') }} <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a> {{ _('验证。') }}</p>
@@ -152,7 +152,7 @@
                 <pre>{{ item.config_json }}</pre>
               {% endif %}
             </td>
-            <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'warning') }}{% endif %}</td>
+            <td>{% if item.is_active %}{{ badge(_('已启用'), 'success') }}{% else %}{{ badge(_('已停用'), 'warning') }}{% endif %}</td>
             <td>
               <div class="actions-inline">
                 <form method="post" action="/admin/alerts/test" style="margin: 0;">
@@ -172,7 +172,7 @@
           {% if edit_channel_id and edit_channel_id == item.id %}
           <tr><td colspan="5" style="padding: 0;">
             <form method="post" action="/admin/alerts/channels/{{ item.id }}/patch" class="stack edit-form-inline">
-              <h4 class="edit-form-title">编辑 channel：{{ item.name }}</h4>
+              <h4 class="edit-form-title">{{ _('编辑 channel') }}：{{ item.name }}</h4>
               <div class="grid-2">
                 <label class="field-label"><span>{{ _( '名称 *' ) }}</span><input name="name" value="{{ item.name }}" required></label>
                 <label class="field-label"><span>{{ _( '描述' ) }}</span><input name="description" value="{{ item.description or '' }}" placeholder="{{ _('可选') }}"></label>
@@ -232,7 +232,7 @@
             <td>{{ badge(item.event_scope, 'info') }}</td>
             <td><code>{{ item.min_risk_score }}</code></td>
             <td>{% for c in item.delivery_channels_json %}<code>{{ c }}</code>{% if not loop.last %} {% endif %}{% endfor %}</td>
-            <td>{% if item.is_active %}{{ badge('启用', 'success') }}{% else %}{{ badge('停用', 'warning') }}{% endif %}</td>
+            <td>{% if item.is_active %}{{ badge(_('已启用'), 'success') }}{% else %}{{ badge(_('已停用'), 'warning') }}{% endif %}</td>
             <td>
               <div class="actions-inline">
                 <a class="chip" href="?edit_policy={{ item.id }}">{{ _( '编辑' ) }}</a>
@@ -248,7 +248,7 @@
           {% if edit_policy_id and edit_policy_id == item.id %}
           <tr><td colspan="6" style="padding: 0;">
             <form method="post" action="/admin/alerts/policies/{{ item.id }}/patch" class="stack edit-form-inline">
-              <h4 class="edit-form-title">编辑 policy：{{ item.name }}</h4>
+              <h4 class="edit-form-title">{{ _('编辑 policy') }}：{{ item.name }}</h4>
               <div class="grid-2">
                 <label class="field-label"><span>{{ _( '名称 *' ) }}</span><input name="name" value="{{ item.name }}" required></label>
                 <label class="field-label"><span>{{ _('事件范围') }}</span>
@@ -470,13 +470,13 @@ details[open] .field-help-toggle::before { transform: rotate(90deg); }
 <script>
 document.getElementById('syslog-test').addEventListener('click', function () {
   var btn = this, st = document.getElementById('syslog-test-status');
-  btn.disabled = true; st.textContent = '发送中…';
+  btn.disabled = true; st.textContent = {{ _('发送中…') | tojson }};
   fetch('/agentcapture/api/admin/alerts/syslog/test', { method: 'POST' })
     .then(function (r) { return r.json(); })
     .then(function (d) {
       btn.disabled = false;
-      st.textContent = d.ok ? '测试消息已发送（检查 syslog 服务器）' : ('失败：' + (d.error || '未知错误'));
-    }).catch(function () { btn.disabled = false; st.textContent = '请求失败'; });
+      st.textContent = d.ok ? {{ _('测试消息已发送（检查 syslog 服务器）') | tojson }} : ({{ _('失败：') | tojson }} + (d.error || {{ _('未知错误') | tojson }}));
+    }).catch(function () { btn.disabled = false; st.textContent = {{ _('请求失败') | tojson }}; });
 });
 </script>
 {% endblock %}

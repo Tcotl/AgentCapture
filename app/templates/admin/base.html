@@ -306,7 +306,7 @@
             const parts = Object.entries(values || {})
               .filter(([, value]) => String(value || "").trim() !== "")
               .map(([name, value]) => `${name}=${value}`);
-            if (!parts.length) return "空条件";
+            if (!parts.length) return {{ _('空条件') | tojson }};
             return parts.slice(0, 4).join(" · ");
           }
 
@@ -359,9 +359,9 @@
           }
 
           function formatTimestamp(isoString) {
-            if (!isoString) return "未记录时间";
+            if (!isoString) return {{ _('未记录时间') | tojson }};
             const date = new Date(isoString);
-            if (Number.isNaN(date.getTime())) return "未记录时间";
+            if (Number.isNaN(date.getTime())) return {{ _('未记录时间') | tojson }};
             return date.toLocaleString("zh-CN", {
               month: "2-digit",
               day: "2-digit",
@@ -373,16 +373,16 @@
           const manager = document.createElement("div");
           manager.className = "recent-filter-manager";
           manager.innerHTML = `
-            <div class="recent-filter-title">最近使用条件管理</div>
-            <div class="recent-filter-summary" data-recent-history-summary>当前尚未保存历史条件</div>
+            <div class="recent-filter-title">{{ _('最近使用条件管理') }}</div>
+            <div class="recent-filter-summary" data-recent-history-summary>{{ _('当前尚未保存历史条件') }}</div>
             <div class="recent-filter-controls">
               <select data-recent-history-select>
-                <option value="">选择历史条件</option>
+                <option value="">{{ _('选择历史条件') }}</option>
               </select>
-              <button type="button" class="secondary" data-recent-history-apply>应用历史</button>
-              <button type="button" class="secondary" data-recent-default-set>设为默认</button>
-              <button type="button" class="secondary" data-recent-default-apply>使用默认</button>
-              <button type="button" class="secondary" data-recent-history-clear>清空历史</button>
+              <button type="button" class="secondary" data-recent-history-apply>{{ _('应用历史') }}</button>
+              <button type="button" class="secondary" data-recent-default-set>{{ _('设为默认') }}</button>
+              <button type="button" class="secondary" data-recent-default-apply>{{ _('使用默认') }}</button>
+              <button type="button" class="secondary" data-recent-history-clear>{{ _('清空历史') }}</button>
             </div>
           `;
           form.appendChild(manager);
@@ -402,19 +402,19 @@
 
           function renderManager(store) {
             const previousSelection = historySelect.value;
-            historySelect.innerHTML = '<option value="">选择历史条件</option>';
+            historySelect.innerHTML = '<option value="">{{ _('选择历史条件') }}</option>';
             (store.history || []).forEach((entry, index) => {
               const option = document.createElement("option");
               option.value = entry.id;
               const isDefault = hasStoredValues(store.defaultValues) && sameValues(store.defaultValues, entry.values);
-              option.textContent = `${isDefault ? "默认 · " : ""}${index + 1}. ${formatTimestamp(entry.updatedAt)} · ${entry.label || "未命名条件"}`;
+              option.textContent = `${isDefault ? {{ _('默认 · ') | tojson }} : ""}${index + 1}. ${formatTimestamp(entry.updatedAt)} · ${entry.label || {{ _('未命名条件') | tojson }}}`;
               historySelect.appendChild(option);
             });
             if ((store.history || []).some((entry) => entry.id === previousSelection)) {
               historySelect.value = previousSelection;
             }
-            const defaultSummary = hasStoredValues(store.defaultValues) ? summarizeValues(store.defaultValues) : "未设置";
-            historySummary.textContent = `默认条件：${defaultSummary} ｜ 历史条数：${(store.history || []).length}`;
+            const defaultSummary = hasStoredValues(store.defaultValues) ? summarizeValues(store.defaultValues) : {{ _('未设置') | tojson }};
+            historySummary.textContent = `{{ _('默认条件') }}: ${defaultSummary} | {{ _('历史条数') }}: ${(store.history || []).length}`;
             const hasHistory = (store.history || []).length > 0;
             historyApplyButton.disabled = !hasHistory;
             historyClearButton.disabled = !hasHistory;
@@ -423,7 +423,7 @@
 
           function navigateWithValues(values, noticeType) {
             if (!hasStoredValues(values)) {
-              writeStatus("暂无可应用的筛选条件");
+              writeStatus({{ _('暂无可应用的筛选条件') | tojson }});
               return;
             }
             sessionStorage.setItem(noticeKey, noticeType);
@@ -448,13 +448,13 @@
 
           const notice = sessionStorage.getItem(noticeKey);
           if (notice === "recent-auto") {
-            writeStatus("已自动恢复最近使用条件");
+            writeStatus({{ _('已自动恢复最近使用条件') | tojson }});
             sessionStorage.removeItem(noticeKey);
           } else if (notice === "default-auto") {
-            writeStatus("已自动恢复默认条件");
+            writeStatus({{ _('已自动恢复默认条件') | tojson }});
             sessionStorage.removeItem(noticeKey);
           } else if (hasStoredValues(storeBeforeRestore.defaultValues) || hasStoredValues(storeBeforeRestore.lastUsed)) {
-            writeStatus("当前页已启用最近使用条件记忆");
+            writeStatus({{ _('当前页已启用最近使用条件记忆') | tojson }});
           }
 
           const initialStore = persistLastUsed(currentValues(), { toHistory: false });
@@ -470,7 +470,7 @@
               const store = normalizeStore(readStoredValues());
               const fallbackValues = hasStoredValues(store.defaultValues) ? store.defaultValues : store.lastUsed;
               if (!hasStoredValues(fallbackValues)) {
-                writeStatus("暂无默认或最近使用条件");
+                writeStatus({{ _('暂无默认或最近使用条件') | tojson }});
                 return;
               }
               navigateWithValues(
@@ -483,7 +483,7 @@
           clearButtons.forEach((button) => {
             button.addEventListener("click", () => {
               sessionStorage.setItem(skipAutoRestoreKey, "1");
-              writeStatus("本次已跳过自动恢复");
+              writeStatus({{ _('本次已跳过自动恢复') | tojson }});
             });
           });
 
@@ -491,7 +491,7 @@
             const store = normalizeStore(readStoredValues());
             const values = selectedHistoryValues(store);
             if (!values) {
-              writeStatus("请先从下拉框选择一条历史条件");
+              writeStatus({{ _('请先从下拉框选择一条历史条件') | tojson }});
               return;
             }
             navigateWithValues(values, "recent-auto");
@@ -501,19 +501,19 @@
             const store = normalizeStore(readStoredValues());
             const values = selectedHistoryValues(store) || currentValues();
             if (!hasStoredValues(values)) {
-              writeStatus("当前条件为空，无法设为默认");
+              writeStatus({{ _('当前条件为空，无法设为默认') | tojson }});
               return;
             }
             store.defaultValues = cloneValues(values);
             saveStore(store);
             renderManager(store);
-            writeStatus("已设为默认条件");
+            writeStatus({{ _('已设为默认条件') | tojson }});
           });
 
           defaultApplyButton.addEventListener("click", () => {
             const store = normalizeStore(readStoredValues());
             if (!hasStoredValues(store.defaultValues)) {
-              writeStatus("尚未设置默认条件");
+              writeStatus({{ _('尚未设置默认条件') | tojson }});
               return;
             }
             navigateWithValues(store.defaultValues, "default-auto");
@@ -522,7 +522,7 @@
           historyClearButton.addEventListener("click", () => {
             const store = clearStoredHistory();
             renderManager(store);
-            writeStatus("历史条件已清空，默认条件保留");
+            writeStatus({{ _('历史条件已清空，默认条件保留') | tojson }});
           });
         });
       }

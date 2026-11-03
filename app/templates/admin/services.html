@@ -211,7 +211,7 @@
   var btn = document.querySelector('.bulk-del-btn');
   if (btn) btn.addEventListener('click', function () {
     var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
-    if (!checked.length) { alert('请先勾选要删除的条目'); return; }
+    if (!checked.length) { alert({{ _('请先勾选要删除的条目') | tojson }}); return; }
     var form = btn.closest('form');
     if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
     form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');

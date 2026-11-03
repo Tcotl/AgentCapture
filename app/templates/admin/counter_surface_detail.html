@@ -73,7 +73,7 @@
         <td>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <strong style="font-size:13px">{{ tpl.name }}</strong>
-            {% if active_template == tkey %}{{ badge('运行中', 'success') }}{% endif %}
+            {% if active_template == tkey %}{{ badge(_('运行中'), 'success') }}{% endif %}
           </div>
           <code style="font-size:11px;color:var(--muted-foreground)">{{ tpl.server_name }} v{{ tpl.version }}</code>
         </td>
@@ -156,11 +156,11 @@
   </div>
 </section>
 
-{% call modal_dialog('config-modal', _('编辑配置 · ') ~ surface.name, '支持占位符：{{portal_url}} {{ticket}} {{audit_code}} {{page}} {{slug}} {{target}}（请求时注入会话值）。保存即时生效（≤5s 缓存刷新）。', wide=true) %}
+{% call modal_dialog('config-modal', _('编辑配置 · ') ~ surface.name, _('支持占位符：portal_url / ticket / audit_code / page / slug / target（请求时注入会话值）。保存即时生效（≤5s 缓存刷新）。'), wide=true) %}
 <form method="post" action="/admin/counter-offense/{{ surface.key }}/config" class="stack">
   <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
     <input type="checkbox" name="enabled" {% if runtime.get('enabled') %}checked{% endif %}>
-    启用本反制面（关闭后本面端点即刻返回 404，伪装为不存在）
+    {{ _('启用本反制面（关闭后本面端点即刻返回 404，伪装为不存在）') }}
   </label>
 
   {% if fields %}

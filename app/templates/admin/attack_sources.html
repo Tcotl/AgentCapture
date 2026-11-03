@@ -24,7 +24,7 @@
 
 {{ page_header('IP', _('攻击来源'), _('聚合所有来源地址的攻击强度、会话数量、热点站点与热点路径，用于快速定位高频来源。'), [_('来源画像')]) }}
 <section class="panel">
-  {{ section_header(_('来源聚合视图'), _('按来源 IP 汇总事件数、站点分布、决策与高频信号'), '<a class="chip" href="' ~ export_href ~ '">导出 CSV</a>') }}
+  {{ section_header(_('来源聚合视图'), _('按来源 IP 汇总事件数、站点分布、决策与高频信号'), '<a class="chip" href="' ~ export_href ~ '">' ~ _('导出 CSV') ~ '</a>') }}
   <form method="get" action="/admin/attack-sources" class="grid-4" style="margin-bottom:14px" data-recent-filter-key="admin-attack-sources">
     <label class="as-field">
       <span class="as-field-label">{{ _('起始日期 // DATE_FROM') }}</span>

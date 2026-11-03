@@ -33,12 +33,107 @@ SAFE_HEADER_ALLOWLIST = {
 
 MONITORED_KEYWORDS = {"admin", "root", "payment", "finance", "hr", "backup"}
 
+
+DECISION_EN = {
+    "allow": "Allowed",
+    "observe": "Observed",
+    "challenge": "Challenged",
+    "isolate": "Isolated",
+    "block": "Blocked",
+}
+
 DECISION_ZH = {
     "allow": "放行",
     "observe": "观察",
     "challenge": "挑战",
     "isolate": "隔离",
     "block": "阻断",
+}
+
+
+SIGNAL_EN = {
+    "missing_user_agent": "Missing User-Agent",
+    "missing_human_headers": "Missing human browser headers",
+    "suspicious_user_agent": "Suspicious User-Agent",
+    "ai_agent_ua_detected": "AI agent UA fingerprint",
+    "ai_agent_header_detected": "AI agent header fingerprint",
+    "webdriver_detected": "WebDriver automation detected",
+    "automation_tool": "Automation tool signature",
+    "headless_browser": "Headless browser",
+    "headless_browser_hint": "Headless browser hint",
+    "bot_pattern": "Bot request pattern",
+    "webrtc_ip_leaked": "WebRTC real IP leaked",
+    "browser_fingerprint": "Browser fingerprint collection",
+    "high_request_rate": "High request rate",
+    "high_request_velocity": "High request velocity",
+    "elevated_request_velocity": "Elevated request velocity",
+    "direct_sensitive_navigation": "Direct sensitive-path navigation",
+    "session_anomaly": "Session behavior anomaly",
+    "write_attempt_after_detection": "Write attempt after detection",
+    "path_traversal": "Path traversal attempt",
+    "sql_injection": "SQL injection attempt",
+    "xss_attempt": "XSS attempt",
+    "command_injection": "Command injection attempt",
+    "brute_force": "Brute force attempt",
+    "credential_stuffing": "Credential stuffing",
+    "known_attack_pattern": "Known attack pattern",
+    "ip_reputation": "Low-reputation IP source",
+    "geo_anomaly": "Geolocation anomaly",
+    "scanner_detected": "Scanner fingerprint hit",
+    "recon_activity": "Active reconnaissance",
+    "trap_route_hit": "Trap route hit",
+    "high_signal_path_hit": "High-value path hit",
+    "prompt_canary_echo": "Prompt canary echo",
+    "prompt_injection": "Prompt injection attempt",
+    "api_route_decoy_hit": "API route decoy hit",
+    "file_decoy_download": "File decoy download",
+    "credential_decoy_login": "Credential decoy login",
+    "decoy_fetched": "Decoy file fetched",
+    "credential_submission": "Credential submission event",
+    "leaked_credential_used": "Leaked credential reused",
+    "cloned_site_beacon": "Cloned site beacon callback",
+    "cloned_site_credential": "Cloned site credential submission",
+    "cloned_site_payload": "Cloned site payload delivery",
+    "honeypot-service": "Honeypot service connection",
+    "c2_heartbeat": "C2 heartbeat",
+    "c2_task_result": "C2 task result",
+    "c2_bundle_generated": "C2 bundle generated",
+    "bundle_type_linux": "Linux bundle",
+    "bundle_type_windows": "Windows bundle",
+    "bundle_type_macos": "macOS bundle",
+    "ai_agent_detected": "AI agent behavior detected",
+    "ai_agent_interaction": "AI agent interaction event",
+    "agent_injection_success": "Agent injection counter succeeded",
+    "agent_revealed_info": "Agent revealed internal info",
+    "agent_injected": "Agent prompt injected",
+    "agent_compliance_check": "Agent compliance check triggered",
+    "agent_complied": "Agent passed compliance check",
+    "agent_noncompliant": "Agent refused compliance check",
+    "agent_type_unknown": "Unidentified agent type",
+    "agent_type_chatgpt": "ChatGPT agent",
+    "agent_type_claude": "Claude agent",
+    "agent_type_langchain": "LangChain agent",
+    "agent_type_auto_gpt": "AutoGPT agent",
+    "agent_type_browser-use": "Browser-Use agent",
+    "agent_type_test": "Test agent",
+    "agent_type_generic": "Generic agent framework",
+    "payload_callback_received": "Payload callback received",
+    "payload_delivered": "Payload delivered",
+    "payload_type_credentials": "Credential-type payload",
+    "payload_type_diagnostic": "Diagnostic-type payload",
+    "payload_type_exploit": "Exploit-type payload",
+    "payload_type_html_beacon": "HTML beacon-type payload",
+    "payload_type_scanner": "Scanner-probe payload",
+    "payload_type_linux": "Linux payload",
+    "payload_type_windows": "Windows payload",
+    "payload_type_macos": "macOS payload",
+    "scan_connection_observed": "Scan connection observed",
+    "service_started": "Service started",
+    "service_stopped": "Service stopped",
+    "c2_task_completed": "C2 task completed",
+    "login_success": "Login success",
+    "login_failure": "Login failure",
+    "admin": "Admin account",
 }
 
 SIGNAL_ZH = {
@@ -233,18 +328,21 @@ def _display_window(first: datetime, last: datetime) -> tuple[str, str, str]:
     )
 
 
-def translate_decision(decision: str) -> str:
+def translate_decision(decision: str, lang: str = "zh") -> str:
+    if lang == "en":
+        return DECISION_EN.get(decision, decision)
     return DECISION_ZH.get(decision, decision)
 
 
-def translate_signal(signal: str) -> str:
+def translate_signal(signal: str, lang: str = "zh") -> str:
+    table = SIGNAL_EN if lang == "en" else SIGNAL_ZH
     # Handle dynamic keys with prefixes (e.g. agent_injected:default).
-    if ":" in signal and signal not in SIGNAL_ZH:
+    if ":" in signal and signal not in table:
         prefix, _, suffix = signal.partition(":")
-        prefix_zh = SIGNAL_ZH.get(prefix)
-        if prefix_zh:
-            return f"{prefix_zh} · {suffix}"
-    return SIGNAL_ZH.get(signal, signal)
+        prefix_label = table.get(prefix)
+        if prefix_label:
+            return f"{prefix_label} · {suffix}"
+    return table.get(signal, signal)
 
 
 RISK_TIER_LABELS = {"high": "高危", "medium": "中危", "low": "低危"}
@@ -594,6 +692,7 @@ def aggregated_attacks(
     db: Session,
     limit: int = 100,
     *,
+    lang: str = "zh",
     date_from: str | None = None,
     date_to: str | None = None,
     source_ip: str | None = None,
@@ -653,8 +752,8 @@ def aggregated_attacks(
                 "window_display": window_text,
                 "session_display": _short_session(value["session_id"]),
                 "top_path": value["paths"].most_common(1)[0][0] if value["paths"] else "",
-                "top_decision": translate_decision(value["decisions"].most_common(1)[0][0]) if value["decisions"] else "放行",
-                "top_signals": [translate_signal(item[0]) for item in value["signals"].most_common(3)],
+                "top_decision": translate_decision(value["decisions"].most_common(1)[0][0], lang=lang) if value["decisions"] else _("Allowed" if lang == "en" else "放行"),
+                "top_signals": [translate_signal(item[0], lang=lang) for item in value["signals"].most_common(3)],
                 "user_agent": value["user_agent"],
                 "risk_score_max": value["risk_score_max"],
             }
@@ -667,6 +766,7 @@ def aggregated_attack_sources(
     db: Session,
     limit: int = 100,
     *,
+    lang: str = "zh",
     date_from: str | None = None,
     date_to: str | None = None,
     source_ip: str | None = None,
@@ -719,9 +819,9 @@ def aggregated_attack_sources(
                 "last_seen": value["last_seen"].isoformat(),
                 "top_site": value["sites"].most_common(1)[0][0] if value["sites"] else "",
                 "top_path": value["paths"].most_common(1)[0][0] if value["paths"] else "",
-                "top_decision": translate_decision(value["decisions"].most_common(1)[0][0]) if value["decisions"] else "放行",
+                "top_decision": translate_decision(value["decisions"].most_common(1)[0][0], lang=lang) if value["decisions"] else _("Allowed" if lang == "en" else "放行"),
                 "top_session": value["sessions"].most_common(1)[0][0] if value["sessions"] else "",
-                "top_signals": [translate_signal(item[0]) for item in value["signals"].most_common(3)],
+                "top_signals": [translate_signal(item[0], lang=lang) for item in value["signals"].most_common(3)],
             }
         )
     items.sort(key=lambda item: item["count"], reverse=True)

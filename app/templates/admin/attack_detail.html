@@ -114,7 +114,7 @@
 
 <div class="grid-2">
   <section class="panel">
-    {{ section_header(_('会话概览'), _('基础元信息与时间边界'), '<a class="chip primary" href="/admin/sessions/' ~ detail.session_id ~ '">切换到会话画像</a>') }}
+    {{ section_header(_('会话概览'), _('基础元信息与时间边界'), '<a class="chip primary" href="/admin/sessions/' ~ detail.session_id ~ '">' ~ _('切换到会话画像') ~ '</a>') }}
     <div class="ad-kv-grid">
       <div class="ad-kv"><div class="key">{{ _( '站点' ) }}</div><div class="val"><code>{{ detail.site_id }}</code></div></div>
       <div class="ad-kv"><div class="key">{{ _( '画像标签' ) }}</div><div class="val">{% for label in detail.portrait_labels %}<span class="pill">{{ label }}</span>{% else %}<span class="muted">—</span>{% endfor %}</div></div>

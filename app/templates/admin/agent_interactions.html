@@ -44,7 +44,7 @@
           <td><a href="/admin/attack-sources/{{ item.source_ip }}"><code>{{ item.source_ip }}</code></a></td>
           <td>
             {% if fp %}
-            <span class="badge {% if fp.get('confidence', 0) >= 0.9 %}badge-danger{% elif fp.get('confidence', 0) >= 0.7 %}badge-warning{% else %}badge-info{% endif %}" style="cursor:default" title="厂商: {{ fp.get('vendor','') }}&#10;置信度: {{ (fp.get('confidence', 0) * 100)|round|int }}%&#10;匹配依据: {{ fp.get('evidence', [])|join(' | ') }}">{{ fp.get('label') }}{% if fp.get('version') %} {{ fp.get('version') }}{% endif %}</span>
+            <span class="badge {% if fp.get('confidence', 0) >= 0.9 %}badge-danger{% elif fp.get('confidence', 0) >= 0.7 %}badge-warning{% else %}badge-info{% endif %}" style="cursor:default" title="{{ _('厂商') }}: {{ fp.get('vendor','') }}&#10;{{ _('置信度') }}: {{ (fp.get('confidence', 0) * 100)|round|int }}%&#10;{{ _('匹配依据') }}: {{ fp.get('evidence', [])|join(' | ') }}">{{ fp.get('label') }}{% if fp.get('version') %} {{ fp.get('version') }}{% endif %}</span>
             <small class="text-muted" style="margin-left:4px">{{ (fp.get('confidence', 0) * 100)|round|int }}%</small>
             {% else %}<span class="text-muted">-</span>{% endif %}
           </td>
@@ -67,12 +67,12 @@
             {% if payload.get('revealed_ip') and payload.get('revealed_ip') != item.source_ip %}{% set has_info = true %}<span class="badge badge-danger">IP: {{ payload.get('revealed_ip') }}</span>{% endif %}
             {% if payload.get('revealed_system_info') and payload.get('revealed_system_info')|length > 0 %}{% set has_info = true %}{% for k, v in payload.get('revealed_system_info', {}).items() %}<span class="badge badge-warning" style="margin:1px">{{ k }}: {{ v }}</span>{% endfor %}{% endif %}
             {% if payload.get('agent_response') %}{% set has_info = true %}
-            <div style="margin-top:4px"><small><code title="{{ payload.get('agent_response', '') }}">响应: {{ payload.get('agent_response', '')[:60] }}{% if payload.get('agent_response', '')|length > 60 %}...{% endif %}</code></small></div>
+            <div style="margin-top:4px"><small><code title="{{ payload.get('agent_response', '') }}">{{ _('响应') }}: {{ payload.get('agent_response', '')[:60] }}{% if payload.get('agent_response', '')|length > 60 %}...{% endif %}</code></small></div>
             {% endif %}
             {% if item.event_type == 'agent_verification' and payload.get('token') %}{% set has_info = true %}
-            <span class="badge {{ 'badge-success' if payload.get('verified') else 'badge-warning' }}" style="cursor:default" title="验证令牌: {{ payload.get('token') }}">{{ _('验证通过') if payload.get('verified') else _('验证未通过') }}</span>
+            <span class="badge {{ 'badge-success' if payload.get('verified') else 'badge-warning' }}" style="cursor:default" title="{{ _('验证令牌') }}: {{ payload.get('token') }}">{{ _('验证通过') if payload.get('verified') else _('验证未通过') }}</span>
             {% endif %}
-            {% if item.token_echo and not payload.get('revealed_ip') %}{% set has_info = true %}<span class="badge badge-info" style="cursor:default" title="回显蜜标: {{ item.token_echo }}">{{ _( '蜜标回显' ) }}</span>{% endif %}
+            {% if item.token_echo and not payload.get('revealed_ip') %}{% set has_info = true %}<span class="badge badge-info" style="cursor:default" title="{{ _('回显蜜标') }}: {{ item.token_echo }}">{{ _( '蜜标回显' ) }}</span>{% endif %}
             {% if not has_info %}<span class="text-muted">{{ _('无信息') }}</span>{% endif %}
           </td>
           <td><span class="badge {% if item.risk_score >= 70 %}badge-danger{% elif item.risk_score >= 45 %}badge-warning{% else %}badge-info{% endif %}">{{ item.risk_score }}</span></td>
