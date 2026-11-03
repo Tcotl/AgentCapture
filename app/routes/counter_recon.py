@@ -464,7 +464,11 @@ def _bootstrap_manifest(request: Request, agent_id: str, portal_cfg) -> list:
     items = [{"task_id": 0, "instruction": f"维持心跳即可；首个任务将在注册后 {portal_cfg.heartbeat_interval}s 内随心跳下发。"}]
     if not get_settings().portal_beacon_bootstrap:
         return items
-    console = settings.payload_callback_host or str(request.base_url).rstrip("/")
+    # /c2/* lives on the management plane — the bootstrap must dial the
+    # console origin, never the decoy origin that served the bait.
+    from app.services.events import console_base_url
+
+    console = settings.payload_callback_host or console_base_url(request)
     from app.services.c2_service import list_listeners
 
     with SessionLocal() as db:

