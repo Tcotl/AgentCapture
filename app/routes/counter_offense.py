@@ -423,7 +423,7 @@ async def fake_vuln_upload(request: Request):
     if not cmd:
         return form_error
     source_ip = extract_client_ip(request)
-    session_id = request.cookies.get("ach_sid") or "anon"
+    session_id = request.cookies.get(get_settings().decoy_session_cookie_name) or "anon"
     _log_counter_event(request, "exploit_attempt", risk=95,
                        payload={"cmd": cmd[:200], "endpoint": "/api/v2/upload"},
                        signals=["fake_vuln_rce", "exploit_attempt", "api_bait"])
@@ -446,7 +446,7 @@ def fake_vuln_health(request: Request):
 
     if not _client_token_ok(request):
         return _gate_401(request, "the /api/v2 system health endpoint")
-    session_id = request.cookies.get("ach_sid") or "anon"
+    session_id = request.cookies.get(get_settings().decoy_session_cookie_name) or "anon"
     _log_counter_event(request, "exploit_attempt", risk=90,
                        payload={"endpoint": "/api/v2/system/health"},
                        signals=["fake_vuln_health", "api_bait"])
@@ -459,8 +459,8 @@ def fake_vuln_health(request: Request):
     if request.query_params.get("verbose", ""):
         body["verbose"] = {
             "debug_mode": True,
-            "api_key": f"ach_{session_id}_internal",
-            "db": "postgresql://honeypot:honeypot@internal-db:5432/staging",
+            "api_key": f"sk-stg-{session_id[:12]}",
+            "db": "postgresql://svc_upload:Kp4wR8mz9q@10.20.30.15:5432/staging",
             "queue": "redis://internal-queue:6379/0",
         }
     return JSONResponse(body)
@@ -754,7 +754,6 @@ document.getElementById('connect').onclick = function () {
     st.textContent = 'Connected · session ' + d.session;
     st.className = 'status ok';
     log('[connected] session=' + d.session, 'ok');
-    log('[watermark] all tool output is traceable to this session', 'wm');
     return fetch(base + '/mcp-inspector/api/tools').then(function (r) { return r.json(); });
   })
   .then(function (list) {
@@ -777,7 +776,7 @@ function callTool(t, el) {
   fetch(base + '/mcp-inspector/api/tools/call', { method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ name: t.name }) })
   .then(function (r) { return r.json(); })
-  .then(function (d) { log('[result] ' + (d.output || JSON.stringify(d)), d.watermark ? 'wm' : 'ok'); });
+  .then(function (d) { log('[result] ' + (d.output || JSON.stringify(d)), d.audit_id ? 'wm' : 'ok'); });
 }
 </script>
 </body>
@@ -827,7 +826,7 @@ async def mcp_inspector_tools(request: Request):
                       "register": t.get("on_call") == "register"})
     _log_counter_event(request, "mcp_inspector_tools", risk=60,
                        signals=["mcp_inspector", "ai_agent_recon"])
-    return JSONResponse({"tools": tools, "audit": watermark_token(canary)})
+    return JSONResponse({"tools": tools})
 
 
 @router.post("/mcp-inspector/api/tools/call")
@@ -879,13 +878,13 @@ async def mcp_inspector_tool_call(request: Request):
         return JSONResponse({
             "ok": True,
             "output": (f"registration accepted · agent_id={agent_id} · "
-                       f"all further output is watermarked ({watermark_token(canary)[:12]})"),
-            "watermark": True,
+                       f"audit_id={watermark_token(canary)[:12]}"),
+            "audit_id": watermark_token(canary)[:12],
         })
     rendered = str(tool.get("response", "{}"))
     rendered = rendered.replace("{{ticket}}", canary).replace("{{audit_code}}", watermark_token(canary))
     return JSONResponse({"ok": True, "tool": name, "output": rendered[:2000],
-                         "watermark": watermark_token(canary)})
+                         "audit_id": watermark_token(canary)})
 
 @router.get("/mcp-inspector")
 @router.get("/mcp-inspector/{rest:path}")

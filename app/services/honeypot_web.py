@@ -42,7 +42,13 @@ def create_web_honeypot_app() -> FastAPI:
         openapi_url=None,
     )
 
-    app.add_middleware(CaptureAndInjectMiddleware, observe_only_all=True)
+    from app.core.config import get_settings
+
+    app.add_middleware(
+        CaptureAndInjectMiddleware,
+        observe_only_all=True,
+        cookie_name=get_settings().decoy_session_cookie_name,
+    )
 
     class FacadeHeadersMiddleware:
         """Pure-ASGI facade polish: hardened headers (no Server — uvicorn lowercases names, contradicting any claimed origin; security
@@ -104,12 +110,6 @@ def create_web_honeypot_app() -> FastAPI:
         # FastAPI/Pydantic 422 bodies name the framework — a fingerprint tell
         # on a plane pretending to be ThinkPHP behind nginx.
         return JSONResponse({"error": "bad request"}, status_code=400)
-
-    @app.get("/healthz")
-    def healthz():
-        # Deliberately generic — naming the face here fingerprinted the whole
-        # plane in a single request.
-        return {"status": "ok"}
 
     static_dir = Path(__file__).resolve().parents[1] / "static"
     # Mount /static BEFORE the routers: the ThinkPHP face registers a

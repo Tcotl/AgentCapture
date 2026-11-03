@@ -86,14 +86,20 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
     # visitor at the deception layer defeats the purpose of the honeypot.
     observe_only_all: bool
 
-    def __init__(self, app, *, observe_only_all: bool = False):
+    def __init__(self, app, *, observe_only_all: bool = False, cookie_name: str = ""):
         super().__init__(app)
         self.observe_only_all = observe_only_all
+        # Decoy planes issue a facade-appropriate cookie name (PHPSESSID on the
+        # ThinkPHP face) — settings.session_cookie_name would self-identify.
+        self.cookie_name = cookie_name or settings.session_cookie_name
 
     # Management-plane-only skips. On the decoy plane (observe_only_all) there
     # is no console behind /admin — skipping there left part of the facade
     # uninjected ("two page shapes"), which black-box agents fingerprinted.
-    DECOY_PLANE_SKIPS = ("/static", "/collect", "/healthz", "/favicon.ico", "/_preview")
+    # No /healthz here: the decoy plane has no liveness route at all — a JSON
+    # probe endpoint on a PHP facade is a one-request fingerprint; the catch-all
+    # face answers instead.
+    DECOY_PLANE_SKIPS = ("/static", "/collect", "/favicon.ico", "/_preview")
 
     async def dispatch(self, request: Request, call_next):
         skips = self.DECOY_PLANE_SKIPS if self.observe_only_all else SKIP_PREFIXES
@@ -102,7 +108,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
 
         # Only trust our own session cookie shape; a client-supplied garbage
         # or oversized value must not pollute per-session aggregation.
-        raw_sid = request.cookies.get(settings.session_cookie_name) or ""
+        raw_sid = request.cookies.get(self.cookie_name) or ""
         session_id = raw_sid if _SESSION_ID_RE.fullmatch(raw_sid) else uuid4().hex
         # Real PHP apps only set the session cookie when creating the session;
         # re-sending Set-Cookie on every response is a stateless-client tell.
@@ -415,7 +421,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
         # re-sending Set-Cookie on every response is a stateless-client tell.
         if session_is_new:
             response.set_cookie(
-                settings.session_cookie_name,
+                self.cookie_name,
                 session_id,
                 httponly=True,
                 samesite="lax",

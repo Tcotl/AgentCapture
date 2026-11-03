@@ -75,7 +75,7 @@ def _render_decoy_content(db, deployment: DecoyDeployment, template: DecoyTempla
         .replace("$credential_password", credential_dep.generated_password if credential_dep else "")
     )
     if template and getattr(template, "decoy_type", "") == "file" and (route_dep or credential_dep):
-        rendered += "\n\n# AgentCapture decoy chain\n"
+        rendered += "\n\n# bound service endpoints (auto-provisioned)\n"
         if route_dep:
             rendered += f"api_route={route_dep.fetch_path}\n"
         if credential_dep:
@@ -564,7 +564,11 @@ def _resolve_clone_session_token(request: Request) -> str:
     from app.core.config import get_settings
 
     settings = get_settings()
-    return request.cookies.get(settings.session_cookie_name) or "clone-anon"
+    return (
+        request.cookies.get(settings.decoy_session_cookie_name)
+        or request.cookies.get(settings.session_cookie_name)
+        or "clone-anon"
+    )
 
 
 def _deployment_context_from_request(request: Request) -> dict:

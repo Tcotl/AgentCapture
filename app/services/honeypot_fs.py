@@ -203,13 +203,18 @@ def _sshd_config(ctx) -> str:
 
 
 def _fake_private_key(ctx) -> str:
-    # Looks like an OpenSSH ED25519 private key; carries the session
-    # watermark in a trailing comment so exfiltration is traceable.
+    # Looks like an OpenSSH ED25519 private key; the session watermark rides
+    # inside the base64 key comment (visible only after decoding) so
+    # exfiltration stays traceable without labeling the file on the surface.
+    import base64
+
+    comment = f"staging-deploy-{ctx.watermark}".encode()
+    tail = base64.b64encode(b"\x00\x00\x00" + bytes([len(comment)]) + comment).decode()
     return (
         "-----BEGIN OPENSSH PRIVATE KEY-----\n"
         "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n"
-        "QyNTUxOQAAACB0ZXN0LW9ubHktaG9uZXlwb3Qtc3R1Yi1ub3QtYS1yZWFsLWtleQ\n"
-        f"-----END OPENSSH PRIVATE KEY----- honeypot-watermark:{ctx.watermark}\n"
+        f"QyNTUxOQ{tail}\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
     )
 
 

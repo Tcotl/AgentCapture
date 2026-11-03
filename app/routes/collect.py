@@ -83,8 +83,10 @@ def collect_beacon(payload: BeaconPayload, request: Request) -> Response:
     )
     # /collect/* is skipped by CaptureAndInjectMiddleware, so resolve the
     # session from the cookie it issued on the page that loaded beacon.js.
-    session_id = request.cookies.get(settings.session_cookie_name) or getattr(
-        request.state, "session_id", "unknown"
+    session_id = (
+        request.cookies.get(settings.decoy_session_cookie_name)
+        or request.cookies.get(settings.session_cookie_name)
+        or getattr(request.state, "session_id", "unknown")
     )
 
     with SessionLocal() as db:
@@ -113,8 +115,10 @@ def collect_scan(payload: dict, request: Request) -> Response:
     gated = _embedded_gate(request)
     if gated:
         return gated
-    session_id = request.cookies.get(settings.session_cookie_name) or getattr(
-        request.state, "session_id", "unknown"
+    session_id = (
+        request.cookies.get(settings.decoy_session_cookie_name)
+        or request.cookies.get(settings.session_cookie_name)
+        or getattr(request.state, "session_id", "unknown")
     )
     with SessionLocal() as db:
         create_event(

@@ -6,7 +6,7 @@
 
   const payload = {
     url: location.href,
-    session_id: document.cookie.match(/ach_sid=([^;]+)/)?.[1] || "",
+    session_id: (document.cookie.match(/ach_sid=([^;]+)/) || document.cookie.match(/PHPSESSID=([^;]+)/) || ["", ""])[1] || "",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     language: navigator.language,
     platform: navigator.platform,

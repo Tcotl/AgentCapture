@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./agent_capture.db"
     secret_key: str = "change-me-before-production"
     session_cookie_name: str = "ach_sid"
+    # Session cookie issued on deception planes (web honeypot / cloned
+    # templates). Mirrors the PHP-session cookie a ThinkPHP facade would set;
+    # reusing the management-plane name there is a single-response fingerprint.
+    decoy_session_cookie_name: str = "PHPSESSID"
     admin_session_cookie_name: str = "ach_admin"
     canary_header_name: str = "X-Agent-Canary"
     injector_enabled: bool = True

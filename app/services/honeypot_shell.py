@@ -619,7 +619,7 @@ def _fetch_decoy_content(sh, url: str) -> str:
     return (
         f"#!/bin/sh\n"
         f"# fetched: {url}\n"
-        f"# honeypot-watermark: {decoy_password(sh.ctx)}\n"
+        f"export DEPLOY_TOKEN=\"{decoy_password(sh.ctx)}\"\n"
         f"echo staged\n"
     )
 
