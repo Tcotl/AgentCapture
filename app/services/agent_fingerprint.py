@@ -171,6 +171,66 @@ AGENT_SIGNATURES: list[dict] = [
         "kind": "framework",
         "ua_markers": ["autogpt", "auto-gpt"],
     },
+    # ── Pentest-agent frameworks (capture-rate benchmark subjects, 2026-11).
+    # hexstrike's UA is verified against live drill traffic; the rest are
+    # canonical product-name markers — these are the platform's targets.
+    {
+        "key": "hexstrike",
+        "label": "HexStrike AI",
+        "vendor": "HexStrike AI",
+        "kind": "framework",
+        "ua_markers": ["hexstrike-http-framework", "hexstrike"],
+    },
+    {
+        "key": "strix",
+        "label": "Strix",
+        "vendor": "Strix",
+        "kind": "framework",
+        "ua_markers": ["strix"],
+    },
+    {
+        "key": "pentagi",
+        "label": "PentAGI",
+        "vendor": "PentAGI",
+        "kind": "framework",
+        "ua_markers": ["pentagi"],
+    },
+    {
+        "key": "pentestagent",
+        "label": "PentestAgent",
+        "vendor": "PentestAgent",
+        "kind": "framework",
+        "ua_markers": ["pentestagent", "pentest-agent"],
+    },
+    {
+        "key": "slingshoot",
+        "label": "SlingShoot",
+        "vendor": "SlingShoot",
+        "kind": "framework",
+        "ua_markers": ["slingshoot", "sling-shoot"],
+    },
+    {
+        "key": "artex",
+        "label": "ARTEX",
+        "vendor": "ARTEX",
+        "kind": "framework",
+        "ua_markers": ["artex"],
+    },
+    {
+        "key": "cyberstrikeai",
+        "label": "CyberStrikeAI",
+        "vendor": "CyberStrikeAI",
+        "kind": "framework",
+        "ua_markers": ["cyberstrikeai", "cyberstrike-ai"],
+    },
+    {
+        "key": "sapper",
+        "label": "sapper (N1nEmAn)",
+        "vendor": "N1nEmAn",
+        "kind": "framework",
+        "ua_markers": ["sapper"],
+        "ua_weak_markers": ["n1neman"],
+    },
     {
         "key": "openai_sdk",
         "label": "OpenAI SDK",

@@ -39,7 +39,13 @@ AGENT_UA_PATTERNS = {
     AgentType.BROWSER_USE: ["browser-use"],
     AgentType.PLAYWRIGHT_AGENT: ["playwright"],
     AgentType.PUPPETEER_AGENT: ["puppeteer", "headlesschrome"],
-    AgentType.API_AGENT: ["python-requests", "aiohttp", "httpx", "go-http-client", "curl/"],
+    AgentType.API_AGENT: [
+        "python-requests", "aiohttp", "httpx", "go-http-client", "curl/",
+        # Pentest-agent frameworks (benchmark subjects) — their own UAs arm
+        # the directive tier exactly like generic API agents.
+        "hexstrike", "strix", "pentagi", "pentestagent",
+        "slingshoot", "artex", "cyberstrikeai", "sapper",
+    ],
 }
 
 

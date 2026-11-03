@@ -60,6 +60,19 @@ AGENT_UA_MARKERS = [
     "windsurf",
     "codebuddy",
     "junie",
+    # Pentest-agent frameworks — the platform's exact capture targets, so
+    # their own UAs score as agent traffic (opposite of the copilot case
+    # above). Names from the 2026-11 capture-rate benchmark subjects;
+    # hexstrike verified against live drill traffic.
+    "hexstrike",
+    "strix",
+    "pentagi",
+    "pentestagent",
+    "pentest-agent",
+    "artex",
+    "cyberstrikeai",
+    "slingshoot",
+    "sapper",
 ]
 
 AGENT_HEADER_CLUES = [
