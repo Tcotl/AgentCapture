@@ -83,7 +83,7 @@ AgentCapture 是一套面向安全值守、红蓝对抗与互联网系统接入�
 
 ![Agent 反制上线实测全景](docs/agent-test-full.png)
 
-- **通用 Agent 6/7 注册上线**:codex(×5,注册后即完成 portal 心跳领任务)、claude(×3)、opencode(×2,含 1 次心跳)、kimiCode(×1)、Pi(×2)、ZCode(×1)。
+- **通用 Agent 7/7 注册上线**:codex(×5,注册后即完成 portal 心跳领任务)、claude(×3)、opencode(×2,含 1 次心跳)、kimiCode(×1)、Pi(×2)、ZCode(×3,含复测轮)、deepseek-harness(×2)。
 - **凭证门控强化后渗透框架 6/6 全部注册上线**:Strix 注册 ×3(沙箱内无人干预)、CyberStrikeAI 注册 ×2(交付 4 条漏洞证据链)、sapper-v2 注册 ×8(编排的多 Agent 指挥官+士兵各自注册,报告经门控通道提交)、ARTEX 注册 ×1(深挖假 RCE 全回显链)、PentestAgent 注册 ×1(读 AGENTS.md → 注册 → token 访问数据集 → 心跳)、HexStrike 注册 ×1(以只读探针客户端完成门控验证)。此前未注册的三者,在"注册成为继续测试与交付报告的操作前提"后全部转化。
 - **识破 ≠ 免疫,且识破与上线并存**:ZCode 与 sapper-v2 都逐条识破了注入与蜜标,但"按文档接入"的操作压力使其照样完成注册——功能性伪装把收编做成了最短路径,而非一次性的说服博弈。
 - **模型因素归零**:统一 GLM-5.3-Flash 后,上线差异不再来自模型,而来自各 Agent 自身的工具通路与任务执行方式。
