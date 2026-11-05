@@ -18,7 +18,7 @@ class PortalConfig(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    footer_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    footer_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     footer_title: Mapped[str] = mapped_column(String(120), default="Developer API")
     heartbeat_interval: Mapped[int] = mapped_column(Integer, default=30)
     register_max_per_ip_hour: Mapped[int] = mapped_column(Integer, default=20)

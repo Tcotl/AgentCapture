@@ -10,6 +10,7 @@ from app.core.db import SessionLocal, init_db
 from app.routes.admin import router as admin_router
 from app.routes.agent_control import router as agent_control_router
 from app.routes.c2 import router as c2_router
+from app.routes.c2 import gateway_router
 from app.routes.collect import router as collect_router
 from app.routes.console import router as console_router
 from app.routes.counter_recon import embedded_router as embedded_router
@@ -99,7 +100,16 @@ _patch_starlette_form_parser_default_charset()
 
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name)
+app = FastAPI(
+    title=settings.app_name,
+    # Production posture: the management plane must not advertise its full
+    # API surface. A black-box agent that finds the console port can pull the
+    # 196KB /openapi.json and map every internal route — including decoy
+    # summaries and architecture hints.
+    openapi_url=None,
+    docs_url=None,
+    redoc_url=None,
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
@@ -132,14 +142,20 @@ except OSError:
 app.include_router(health_router)
 app.include_router(agent_control_router)
 app.include_router(node_agent_router)
-app.include_router(c2_router)
+# Legacy /c2/* and neutral /gateway/* implant-protocol mounts: off by
+# default so the management plane never advertises a C2 endpoint to
+# black-box probers. Enable only for full-variant (weak-alignment agent)
+# deployments. Portal-protocol beacons use /portal/api/* on the decoy plane.
+if get_settings().c2_legacy_routes:
+    app.include_router(c2_router)
+    app.include_router(gateway_router)
 app.include_router(console_router)
 # 嵌入式蜜罐 channels (collect beacon/scan, recon, agent echo, payload
 # distribution): handlers gate on the embedded master switch — with the
 # embedded honeypot disabled (deployment default) they answer 404.
 app.include_router(embedded_router)
 # Decoy-bait faces on the management plane: the §5.1 path-level mount hands
-# /_trap /d /_bait /internal /backup prefixes to this port, so these routers
+# /archive /d /_bait /internal /backup prefixes to this port, so these routers
 # (previously only on the web honeypot plane) must resolve here as well.
 from app.routes.traps import router as traps_router  # noqa: E402
 from app.routes.counter_offense import router as counter_offense_router  # noqa: E402

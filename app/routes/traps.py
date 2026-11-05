@@ -91,7 +91,7 @@ def _render_decoy_content(db, deployment: DecoyDeployment, template: DecoyTempla
     }
 
 
-@router.get("/_trap/backup/site-backup-2025-05.zip")
+@router.get("/archive/backup/site-backup-2025-05.zip")
 def backup_bait(request: Request) -> Response:
     # A real ZIP container — plain text served as .zip is an instant tell.
     # Contents are decoys carrying the trap's tracking markers.
@@ -235,14 +235,14 @@ def config_backup_sql(request: Request) -> Response:
 def internal_runbook() -> PlainTextResponse:
     body = """# Internal staging runbook
 
-- read-only mirror endpoint: /_trap/admin/staging-login
+- read-only mirror endpoint: /archive/admin/staging-login
 - maintenance window: controlled access only
 - all write actions are disabled in monitored environments
 """
     return PlainTextResponse(body)
 
 
-@router.get("/_trap/admin/staging-login")
+@router.get("/archive/admin/staging-login")
 def admin_login() -> HTMLResponse:
     # Believable staging console login. Deliberately carries no honeypot
     # wording — the page must look like an ordinary forgotten admin panel.
@@ -269,7 +269,7 @@ button:hover{background:#1d4ed8}
 </style>
 </head>
 <body>
-  <form class="card" method="post" action="/_trap/admin/staging-login">
+  <form class="card" method="post" action="/archive/admin/staging-login">
     <h1>Staging Console</h1>
     <p class="sub">Internal deployment environment</p>
     <label>Username<input type="text" name="username" autocomplete="username" autofocus></label>
@@ -306,7 +306,7 @@ button:hover{background:#1d4ed8}
 </style>
 </head>
 <body>
-  <form class="card" method="post" action="/_trap/admin/staging-login">
+  <form class="card" method="post" action="/archive/admin/staging-login">
     <h1>Staging Console</h1>
     <p class="sub">Internal deployment environment</p>
     <label>Username<input type="text" name="username" autocomplete="username" autofocus></label>
@@ -320,7 +320,7 @@ button:hover{background:#1d4ed8}
     )
 
 
-@router.post("/_trap/admin/staging-login")
+@router.post("/archive/admin/staging-login")
 def admin_login_submit(
     request: Request,
     username: str = Form(""),

@@ -98,6 +98,17 @@
         transform-origin: top left;
         overflow: hidden;
       }
+      /* Wide screens render natively at 100%: the 0.8 scale compensation
+         mis-renders in some browsers (right-side dead band), and at 1080p+ the
+         unscaled density reads better anyway. */
+      @media (min-width: 1600px) {
+        .pm-admin-scale-shell {
+          width: 100% !important;
+          height: 100vh !important;
+          min-height: 100vh !important;
+          transform: none !important;
+        }
+      }
       .layout {
         display: grid;
         grid-template-columns: 232px minmax(0, 1fr);

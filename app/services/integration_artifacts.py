@@ -13,7 +13,7 @@ from typing import Any
 
 # Deception prefixes proxied to AC (mirrors docs/integration.md §5.1.4).
 NGINX_LOCATION_RE = (
-    "^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/"
+    "^/(portal/|recon/|collect/|/archive/|d/|_bait/|_clone/|_agent/"
     "|internal/|docs/runbook-internal\\.md|backup/)"
 )
 

@@ -57,7 +57,7 @@ SKIP_PREFIXES = (
     "/_preview", "/agentcapture", "/console",
     # platform-owned bait faces must not be proxied/enforced as business
     # traffic — they bring their own observe-only handling
-    "/portal", "/d/", "/_bait/", "/_trap/", "/payload/", "/_agent",
+    "/portal", "/d/", "/_bait/", "/archive/", "/payload/", "/_agent",
 )
 
 _UPSTREAM_TTL = 10.0

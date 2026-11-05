@@ -88,7 +88,7 @@ MISSING_HUMAN_HEADERS = {"sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest", "
 HIGH_SIGNAL_PATHS = {
     "/internal/openapi.json",
     "/docs/runbook-internal.md",
-    "/_trap/admin/staging-login",
+    "/archive/admin/staging-login",
 }
 
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -191,7 +191,7 @@ def classify_http_request(
         score += 15
         signals.append("missing_human_headers")
 
-    if path.startswith("/_trap/") or path.startswith("/d/"):
+    if path.startswith("/archive/") or path.startswith("/d/"):
         score += 45
         signals.append("trap_route_hit")
 

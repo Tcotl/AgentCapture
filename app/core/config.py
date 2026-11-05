@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     admin_session_cookie_name: str = "ach_admin"
     canary_header_name: str = "X-Agent-Canary"
     injector_enabled: bool = True
-    collect_path: str = "/collect/beacon"
+    collect_path: str = "/api/collect"
+    c2_legacy_routes: bool = False  # mount legacy /c2/* implant protocol (full-variant deployments only)
     knowledge_base_root: str = "./data/knowledge_base"
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: str = "admin"
@@ -35,7 +36,7 @@ class Settings(BaseSettings):
     agent_injection_enabled: bool = True
     agent_injection_aggressiveness: str = "medium"
     recon_jsonp_enabled: bool = True
-    recon_beacon_path: str = "/recon/fingerprint"
+    recon_beacon_path: str = "/api/fingerprint"
     payload_callback_host: str = ""
     c2_enabled: bool = True
     c2_poll_interval: int = 5

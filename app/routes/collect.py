@@ -72,6 +72,7 @@ def internet_system_verify(token: str, request: Request):
         )
 
 
+@router.post("/collect", status_code=204, dependencies=[Depends(_require_embedded)])
 @router.post("/beacon", status_code=204, dependencies=[Depends(_require_embedded)])
 def collect_beacon(payload: BeaconPayload, request: Request) -> Response:
     gated = _embedded_gate(request)
@@ -110,6 +111,7 @@ def collect_beacon(payload: BeaconPayload, request: Request) -> Response:
     return Response(status_code=204)
 
 
+@router.post("/api/scan", status_code=204, dependencies=[Depends(_require_embedded)])
 @router.post("/scan", status_code=204, dependencies=[Depends(_require_embedded)])
 def collect_scan(payload: dict, request: Request) -> Response:
     gated = _embedded_gate(request)

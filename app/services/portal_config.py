@@ -30,7 +30,7 @@ class PortalRuntimeConfig:
 
 _DEFAULTS = PortalRuntimeConfig(
     enabled=True,
-    footer_enabled=True,
+    footer_enabled=False,
     footer_title="Developer API",
     heartbeat_interval=30,
     register_max_per_ip_hour=20,

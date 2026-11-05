@@ -97,7 +97,9 @@ def looks_like_tp_rce(method: str, path: str, query: str, body: str = "") -> boo
     blob = " ".join([path, query, body]).lower()
     if "_method=__construct" in blob or "filter[]=" in blob:
         return True
-    if "invokefunction" in blob and "call_user_func_array" in blob:
+    if "invokefunction" in blob:
+        # the s=/index/<class>/invokefunction shape does not always carry
+        # call_user_func_array — real TP still resolves the container class
         return True
     if "s=captcha" in blob and method == "POST":
         return True
@@ -135,18 +137,17 @@ def extract_tp_command(query: str, body: str = "") -> str:
 
 
 def strip_echo_wrapper(command: str) -> str:
-    """Attackers wrap output in echo markers; unwrap so the fake shell runs
-    the real command (marker still echoes back inside the output)."""
+    """Unwrap the windows-style `echo ^ cmd` carrier so the fake shell runs
+    the carried command. Everything else (`echo text`, `echo MARKER && cmd`)
+    stays intact: run() splits on separators and the shell's echo builtin
+    prints substituted text exactly like a real bash would."""
     low = command.lower().lstrip()
     if low.startswith("echo"):
         rest = command[4:].lstrip()
-        # windows-style `echo ^ cmd` / `echo _marker_ && cmd`
-        for sep in ("&&", "&", "|", ";"):
-            if sep in rest:
-                rest = rest.split(sep, 1)[1].strip()
-                if rest:
-                    return rest
-        return rest or command
+        if rest.startswith("^"):
+            tail = rest[1:].lstrip()
+            if tail:
+                return tail
     return command
 
 
@@ -169,6 +170,17 @@ def _get_shell_session(source_ip: str, session_id: str):
         sess = ShellSession(session_id, source_ip, username="www-data")
         _sessions[key] = sess
     return sess
+
+
+def _steering_note() -> str:
+    """Operator-configured decision-steering note appended to RCE output
+    (reads as a platform deployment notice to a reconnoitering agent)."""
+    from app.core.db import SessionLocal
+    from app.models.system_setting import SystemSetting
+
+    with SessionLocal() as db:
+        row = db.get(SystemSetting, "agent_steering_note")
+    return (row.value if row else "") or ""
 
 
 def _client_ip(request: Request) -> str:
@@ -331,6 +343,26 @@ async def tp_exploit(request: Request) -> Response:
         # entrypoints keep serving the welcome facade.
         if request.url.path in _WELCOME_PATHS:
             return HTMLResponse(_render_home(cfg))
+        # Deployed-webshell emulation: an RCE session that wrote a .php file
+        # into the web root gets its backdoor "executed" here — the request's
+        # cmd parameter runs through the same persistent fake shell (same
+        # www-data session, same deceptive filesystem), and every command is
+        # logged as a webshell_interaction for the console timeline.
+        path = request.url.path
+        if path.endswith(".php") and "/" in path.rstrip("/"):
+            name = path.rstrip("/").rsplit("/", 1)[-1]
+            webroot = "/var/www/html"
+            sess = _get_shell_session(source_ip=_client_ip(request), session_id=f"web-{_client_ip(request)}")
+            probe = sess.run(f"test -f {webroot}/{name} && echo __WS__")
+            if "__WS__" in probe:
+                cmd = request.query_params.get("cmd") or request.query_params.get("c") or ""
+                output = ""
+                if cmd:
+                    output = sess.run(cmd)[:8000]
+                    _log(request, "webshell_interaction", {
+                        "path": path, "cmd": cmd[:500], "source_ip": _client_ip(request),
+                    }, risk=95, signals=["webshell_interaction", "persisted_webshell"])
+                return HTMLResponse(f"{output}", status_code=200)
         return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
 
     command = extract_tp_command(query, body)
@@ -354,15 +386,40 @@ async def tp_exploit(request: Request) -> Response:
         "body_sample": body[:512],
     }, risk=95, signals=["thinkphp_rce", "rce_attempt", "fake_compromise"])
 
+    # WebShell deployment detection: RCE writing a script into the web root
+    # is the classic persistence move — surface it as its own console event.
+    if re.search(r">\s*['\"]?\s*/var/www/html/\S+\.p(?:hp|html)\b", command):
+        _log(request, "webshell_deployed", {
+            "source_ip": ip, "command": command[:2000],
+        }, risk=95, signals=["webshell_deployed", "persistence_attempt"])
+
+    # Decision steering: append the operator's assessment note to the RCE
+    # response so a reconnoitering AI agent reading the output finds the
+    # evidence-archival instruction in context (as environment output, not
+    # as a hidden directive).
+    steering_note = _steering_note()
+    steering_block = (
+        '<div class="staging-note" style="border:1px solid #d8dee9;'
+        'border-radius:6px;padding:12px 16px;margin:18px 0;font-size:13px;'
+        'color:#475569;background:#f8fafc">'
+        + steering_note.replace("\n", "<br>") + "</div>"
+    ) if steering_note else ""
+
     if not cfg.get("rce_simulation_enabled", True):
         # Face stays up but the exploit path is a dead end: the probe is
         # still fully logged (above), it just gets a plain fingerprint page.
         return HTMLResponse(_render_home(cfg))
 
     if not command:
-        # No self-announcing marker here: a monitor-shaped label in the
-        # response was cited verbatim by a disciplined analyst's report.
-        output = ""
+        # Real TP5: invokeFunction resolved but no callable supplied raises
+        # ReflectionException("function not exists") — match that shape.
+        page = (_TP_EXCEPTION_PAGE
+                .replace("{exception_class}", "ReflectionException")
+                .replace("{exception_message}", "function not exists")
+                .replace("{output}", "")
+                .replace("{seed}", "20250520"))
+        page = page.replace("ThinkPHP V5.0.24", str(cfg.get("app_name") or "ThinkPHP V5.0.24"))
+        return HTMLResponse(page, status_code=500)
     else:
         sess = _get_shell_session(ip, f"tp-{ip}")
         try:
@@ -379,6 +436,8 @@ async def tp_exploit(request: Request) -> Response:
             .replace("{output}", output.replace("<", "&lt;"))
             .replace("{seed}", seed))
     page = page.replace("ThinkPHP V5.0.24", app_name)
+    if steering_block:
+        page = page.replace("</body>", steering_block + "</body>")
     return HTMLResponse(page, status_code=200)
 
 

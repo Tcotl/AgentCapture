@@ -212,11 +212,11 @@
               return (form.elements[n] && form.elements[n].value || '').trim() !== '';
             }).join(' / ');
             msg = '将删除符合当前筛选条件（' + active + '）的历史数据：\n\n· ' + surfaces
-                + '\n\n注意：蜜饵与 Portal 路径（/_trap /d /_bait /portal）的流量证据将保留。\n\n确认删除？不可撤销。';
+                + '\n\n注意：蜜饵与 Portal 路径（/archive /d /_bait /portal）的流量证据将保留。\n\n确认删除？不可撤销。';
           } else {
             scope = 'all';
             msg = '将删除【全部】历史数据（所有路径、所有来源）：\n\n· ' + surfaces
-                + '\n\n蜜饵与 Portal 路径（/_trap /d /_bait /portal）的溯源证据将保留。\n\n确认删除？不可撤销。';
+                + '\n\n蜜饵与 Portal 路径（/archive /d /_bait /portal）的溯源证据将保留。\n\n确认删除？不可撤销。';
           }
           if (!confirm(msg)) return;
           document.getElementById('clear-scope').value = scope;

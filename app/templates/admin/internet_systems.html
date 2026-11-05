@@ -222,7 +222,7 @@
              ├─ /api  /app …（真实路径）──────► 真实业务（零改动）
              │
              └─ /portal/* /recon/* /collect/*  ► AgentCapture :4877
-                /_trap/* /d/* /_bait/* /internal/*   （欺骗层）
+                //archive/* /d/* /_bait/* /internal/*   （欺骗层）
                               │
                               ├─► 事件 / 凭证 / Agent 招募名册
                               └─► 态势大屏 · 告警 · 开放 API</pre>
@@ -242,7 +242,7 @@
 <div style="margin-top:14px">
   <strong style="display:block;color:#f8fbff;margin-bottom:8px">{{ _( '核心配置命令（方式一，业务 Nginx）' ) }}</strong>
   <pre style="background:rgba(2,6,23,.55);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.7;overflow:auto;font-family:'Fira Code',ui-monospace,monospace"># server { ... } 内追加——真实业务路径保持不变
-location ~ ^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/|internal/|backup/) {
+location ~ ^/(portal/|recon/|collect/|/archive/|d/|_bait/|_clone/|_agent/|internal/|backup/) {
     proxy_pass http://127.0.0.1:4877;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

@@ -36,7 +36,7 @@ DEFAULT_EMBEDDED_ENABLED = False
 RESERVED_ADMIN_PATHS = frozenset({
     "admin", "api", "static", "healthz", "console", "c2", "collect",
     "recon", "payload", "portal", "mcp", "intranet", "latest",
-    "_agent", "_trap", "_bait", "_clone", "_preview", "favicon.ico",
+    "_agent", "_bait", "_clone", "_preview", "favicon.ico", "archive",
 })
 
 _PATH_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,48}$")

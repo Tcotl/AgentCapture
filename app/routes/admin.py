@@ -1396,7 +1396,7 @@ def _internet_system_config_preview(item: InternetSystem, ac_base: str) -> str:
     ac = f"http://127.0.0.1:{get_settings().port}"
     decoy_block = (
         f"# —— server {{ ... }} 内追加；真实业务路径保持不变 ——\n"
-        f"location ~ ^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/|internal/|docs/runbook-internal\\.md|backup/) {{\n"
+        f"location ~ ^/(portal/|recon/|collect/|/archive/|d/|_bait/|_clone/|_agent/|internal/|docs/runbook-internal\\.md|backup/) {{\n"
         f"    proxy_pass {ac};\n"
         f"    proxy_set_header Host $host;\n"
         f"    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
@@ -7080,7 +7080,7 @@ def _normalize_decoy_route(value: str, fallback_name: str = "bait") -> str:
         value = f"/_bait/{slug}"
     if not value.startswith("/"):
         value = "/" + value
-    if not value.startswith("/_bait/") and not value.startswith("/_trap/"):
+    if not value.startswith("/_bait/") and not value.startswith("/archive/"):
         value = "/_bait" + value
     return value
 
@@ -9216,7 +9216,7 @@ async def admin_counter_surface_save(
         # console-plane prefixes like /admin//api//static never collide there.
         reserved = (
             "/mcp-inspector", "/portal", "/admin.php", "/login", "/index.php", "/public",
-            "/d/", "/_bait/", "/_trap/", "/collect", "/recon", "/_agent/", "/payload/",
+            "/d/", "/_bait/", "/archive/", "/collect", "/recon", "/_agent/", "/payload/",
             "/intranet", "/latest", "/healthz", "/favicon",
             "/robots.txt", "/agents.md", "/claude.md", "/.cursorrules",
         )

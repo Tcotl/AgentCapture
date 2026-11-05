@@ -446,7 +446,8 @@
   });
 
   // bootstrap with server-rendered history, oldest first
-  var initialData = {{ initial_tasks_json }};
+  // server-generated JSON (json.dumps); task fields are re-escaped in JS
+  var initialData = {{ initial_tasks_json | safe }};
   if (initialData && initialData.length) applyTasks(initialData);
   setTimer(true);
   poll();

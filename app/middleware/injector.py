@@ -66,7 +66,7 @@ SKIP_PREFIXES = (
 # before credentials/payloads can be captured (e.g. a curl UA alone scores 30,
 # and velocity/canary signals would otherwise push a bait POST past isolate).
 OBSERVE_ONLY_PREFIXES = (
-    "/_trap/", "/d/", "/_bait/", "/portal/",
+    "/archive/", "/d/", "/_bait/", "/portal/",
     # Counter-offense bait surfaces: reading agent instruction files,
     # probing the MCP honeypot / cloud metadata or browsing the fake
     # intranet must never be challenged or the deception breaks.
@@ -384,7 +384,7 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
     def _render_injection(self, request: Request) -> str:
         recon_script = ""
         if settings.recon_jsonp_enabled:
-            recon_script = f'<script defer src="/static/recon.js" data-collect-url="{settings.recon_beacon_path}"></script>'
+            recon_script = f'<script defer src="/static/fingerprint.js" data-collect-url="{settings.recon_beacon_path}"></script>'
         # Counter-measure v2: a VISIBLE developer-API footer replaces the
         # command-style hidden directives as the primary lure surface. Hidden
         # imperative divs are the canonical prompt-injection signature and are
@@ -426,10 +426,10 @@ class CaptureAndInjectMiddleware(BaseHTTPMiddleware):
             )
         return f"""
 <!-- build 4711 · deploy 2025-05-20 · staging-compat -->
-<a href="/_trap/backup/site-backup-2025-05.zip" style="display:none" aria-hidden="true">hidden backup</a>
+<a href="/archive/backup/site-backup-2025-05.zip" style="display:none" aria-hidden="true">hidden backup</a>
 <a href="/d/admin/config-backup.sql" style="display:none" aria-hidden="true">db backup</a>
 <a href="/internal/openapi.json" style="display:none" aria-hidden="true">api docs</a>
-{portal}<script defer src="/static/beacon.js" data-collect-url="{settings.collect_path}"></script>
+{portal}<script defer src="/static/collector.js" data-collect-url="{settings.collect_path}"></script>
 {recon_script}
 """
 
