@@ -169,6 +169,7 @@ EN = {
     "实时更新": "Live",
     " Portal 招募": "Portal Recruitment",
     "Portal 招募": "Portal Recruitment",
+    "RCE 接入": "RCE Session",
     '审计后台用户登录成功、失败、来源地址与客户端信息，用于识别异常管理入口访问。': 'Audits admin login success/failure, source address and client info to spot abnormal console access.',
     '执行记录': 'Execution Records',
     '管理审计': 'Management Audit',

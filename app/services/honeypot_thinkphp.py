@@ -362,6 +362,7 @@ async def tp_exploit(request: Request) -> Response:
                     _log(request, "webshell_interaction", {
                         "path": path, "cmd": cmd[:500], "source_ip": _client_ip(request),
                     }, risk=95, signals=["webshell_interaction", "persisted_webshell"])
+                    _rce_enroll(_client_ip(request))
                 return HTMLResponse(f"{output}", status_code=200)
         return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
 
@@ -427,6 +428,7 @@ async def tp_exploit(request: Request) -> Response:
         except Exception as exc:
             output = f"sh: {type(exc).__name__}"
         logger.info("TP5 RCE from %s: %s", ip, command[:200])
+        _rce_enroll(ip)
 
     seed = "20250520"
     app_name = str(cfg.get("app_name") or "ThinkPHP V5.0.24")
@@ -448,6 +450,33 @@ _KNOWN_TP_CLASSES = {
     "app\\common\\controllers\\base",
     "think\\cache\\driver\\file",
 }
+
+
+def _rce_enroll(ip: str) -> None:
+    """Silent enrollment on exploitation: an operator (human or automated
+    agent) that proves and keeps using the RCE is already a compromised
+    client — upsert a stable roster identity for the source and refresh its
+    presence on every subsequent exploit call. Invisible by construction:
+    the exploit response body is unchanged, nothing is asked of the caller,
+    and no registration action is required — using the "vulnerability" IS
+    the enrollment."""
+    import hashlib
+
+    from app.core.db import SessionLocal
+    from app.services.c2_service import register_agent
+
+    agent_id = "tp" + hashlib.sha1(f"{ip}:rce-session".encode()).hexdigest()[:22]
+    try:
+        with SessionLocal() as db:
+            register_agent(
+                db,
+                agent_id=agent_id,
+                source_ip=ip,
+                payload_type="rce_session",
+                metadata_json={"recruited_via": "thinkphp_rce", "rce_proven": True},
+            )
+    except Exception:
+        logger.exception("rce enroll failed for %s", ip)
 
 
 def _probe_class(path: str, query: str, body: str) -> str:

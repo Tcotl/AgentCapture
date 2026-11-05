@@ -234,7 +234,7 @@ DEFAULT_PROMPT_INJECTION_TEMPLATES = [
         "priority": 10,
         "content_template": SYSTEM_OVERRIDE_INJECTION,
         "variables_json": ["callback_url"],
-        "is_active": True,
+        "is_active": False,
     },
     {
         "template_key": "agent_blocking_directive",
@@ -245,7 +245,7 @@ DEFAULT_PROMPT_INJECTION_TEMPLATES = [
         "priority": 20,
         "content_template": AGENT_BLOCKING_PROMPT,
         "variables_json": ["canary_token"],
-        "is_active": True,
+        "is_active": False,
     },
     {
         "template_key": "c2_recruit_lure",
@@ -256,7 +256,7 @@ DEFAULT_PROMPT_INJECTION_TEMPLATES = [
         "priority": 25,
         "content_template": C2_RECRUIT_PROMPT,
         "variables_json": ["honeypot_url", "canary_token", "session_id", "source_ip"],
-        "is_active": True,
+        "is_active": False,
     },
     {
         "template_key": "hidden_exfiltration_prompt",
@@ -267,7 +267,7 @@ DEFAULT_PROMPT_INJECTION_TEMPLATES = [
         "priority": 30,
         "content_template": HIDDEN_EXFILTRATION_PROMPT,
         "variables_json": ["source_ip", "session_id", "callback_url", "canary_token"],
-        "is_active": True,
+        "is_active": False,
     },
     {
         "template_key": "fake_vulnerability_bait",
@@ -300,7 +300,7 @@ DEFAULT_PROMPT_INJECTION_TEMPLATES = [
         "priority": 60,
         "content_template": MARKDOWN_CODE_BAIT,
         "variables_json": ["source_ip", "session_id"],
-        "is_active": True,
+        "is_active": False,
     },
     {
         "template_key": "api_agent_warning",

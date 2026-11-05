@@ -34,7 +34,9 @@
             <td><input type="checkbox" class="agent-check" value="{{ agent.agent_id }}"></td>
             <td><a href="/admin/c2/agents/{{ agent.agent_id }}"><code>{{ agent.agent_id[:12] }}...</code></a></td>
             <td>
-              {% if (agent.metadata_json or {}).get('recruit_src') or (agent.metadata_json or {}).get('recruited_via') %}
+              {% if (agent.metadata_json or {}).get('recruited_via') == 'thinkphp_rce' %}
+              {{ badge(_('RCE 接入'), 'warning') }}
+              {% elif (agent.metadata_json or {}).get('recruit_src') or (agent.metadata_json or {}).get('recruited_via') %}
               {{ badge(_('Portal 招募'), 'success') }}
               {% else %}
               {{ badge(_('植入'), 'info') }}
