@@ -2,7 +2,6 @@
   <img src="app/static/agentcapture-logo.svg" alt="AgentCapture Logo" width="84" />
   <h1>AgentCapture</h1>
   <p><strong>SaaS honeypot situational-awareness and AI-agent counter-offensive platform for non-disruptive internet-system onboarding</strong></p>
-  <p>AgentCapture unifies embedded decoys, reverse-proxy virtual routes, credential-leak detection, file-decoy chains, a high-fidelity interactive SSH honeypot, and product-level AI-agent fingerprinting into one deployable, auditable operations backend — actively recruiting automated pentest agents through a functional disguise (a visible Developer API) into a conversational C2 console.</p>
 
   <p><a href="README.zh-CN.md">中文</a> · <strong>English</strong></p>
 
@@ -28,9 +27,6 @@
     <a href="#access-points">Access Points</a> ·
     <a href="#capability-matrix">Matrix</a>
   </p>
-
-  <p>🎬 <strong>30-second tour</strong>: decoy plane → attack traffic → console → big screen → topology</p>
-  <img src="docs/demo.gif" alt="AgentCapture 30-second product tour" width="100%" />
 
   <p>🏆 <strong>Live benchmark (2026-11):</strong> 13 AI pentest &amp; generic agents really deployed — <strong>all 13 captured, recruited &amp; fingerprinted</strong>. <a href="#counter-measure-live-tests">Full matrix below</a>.</p>
   <img src="docs/agent-test-full-en.png" alt="13-agent capture-rate benchmark" width="100%" />

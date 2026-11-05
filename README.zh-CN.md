@@ -2,7 +2,6 @@
   <img src="app/static/agentcapture-logo.svg" alt="AgentCapture Logo" width="84" />
   <h1>AgentCapture</h1>
   <p><strong>面向互联网业务无损接入的 SaaS 化蜜罐态势感知与 Agent 反制平台</strong></p>
-  <p>AgentCapture 以嵌入式蜜饵、反向代理虚拟路由、凭证泄露感知、文件蜜饵链路、高保真交互式 SSH 蜜罐和 AI Agent 指纹识别为核心，通过功能性伪装（Developer API 伪装）主动收编自动化渗透 Agent，将攻击流量监测、蜜饵投放、证据回收、会话回放、对话式 C2 控制与平台治理统一到一套可部署、可审计、可复盘的后台。</p>
 
   <p><strong>中文</strong> · <a href="README.md">English</a></p>
 
@@ -28,9 +27,6 @@
     <a href="#访问入口">访问入口</a> ·
     <a href="#功能矩阵">功能矩阵</a>
   </p>
-
-  <p>🎬 <strong>30 秒导览</strong>：诱饵面 → 攻击流量 → 控制台 → 态势大屏 → 接入拓扑</p>
-  <img src="docs/demo.gif" alt="AgentCapture 产品导览" width="100%" />
 
   <p>🏆 <strong>实测基准（2026-11）：</strong>13 个 AI 渗透与通用 Agent 真实部署——<strong>全部捕获、收编并完成指纹识别</strong>。<a href="#反制实测">完整矩阵见下</a>。</p>
   <img src="docs/agent-test-full.png" alt="13-Agent 诱捕率基准" width="100%" />
