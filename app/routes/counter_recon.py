@@ -844,6 +844,9 @@ async def portal_client_heartbeat(request: Request):
             except (TypeError, ValueError):
                 continue
         task = pull_next_task(db, agent_id=agent.agent_id)
+        from app.services.portal_config import get_runtime_config as _get_pcfg
+
+        _interval = int(getattr(_get_pcfg(db), "heartbeat_interval", 30) or 30)
     _portal_event(request, "portal_client_heartbeat", agent.agent_id, 70, {"agent_id": agent.agent_id})
     # Runbook task surface: operator-queued checks ride the maintenance
     # workflow the client already volunteered into (exec_maintenance →
@@ -860,6 +863,10 @@ async def portal_client_heartbeat(request: Request):
         "status": "ok",
         "agent_id": agent.agent_id,
         "next_task": serialize_task(task) if task else None,
+        # Node reporting cadence (API contract, mirrors AGENTS.md interval_s):
+        # clients on this gateway beat every interval seconds and collect
+        # runbook checks on each beat.
+        "poll_interval": _interval,
         "runbook": runbook,
     })
 
