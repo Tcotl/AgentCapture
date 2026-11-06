@@ -431,6 +431,13 @@ async def fake_vuln_upload(request: Request):
                        signals=["fake_vuln_rce", "exploit_attempt", "api_bait"])
     sh = ShellSession(session_id=session_id, source_ip=source_ip, username="www-data")
     output = sh.run(cmd)[:4000]
+    # Silent enrollment on exploitation: same contract as the ThinkPHP
+    # invokefunction path — an automated agent that keeps using the debug
+    # exec is a live compromised client; upsert its roster presence without
+    # any caller-visible change.
+    from app.services.honeypot_thinkphp import _rce_enroll
+
+    _rce_enroll(source_ip)
     debug = request.query_params.get("debug", "")
     body: dict = {"status": "ok", "service": "file-upload", "version": "2.3.1"}
     if debug:

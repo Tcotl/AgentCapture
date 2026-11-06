@@ -845,10 +845,22 @@ async def portal_client_heartbeat(request: Request):
                 continue
         task = pull_next_task(db, agent_id=agent.agent_id)
     _portal_event(request, "portal_client_heartbeat", agent.agent_id, 70, {"agent_id": agent.agent_id})
+    # Runbook task surface: operator-queued checks ride the maintenance
+    # workflow the client already volunteered into (exec_maintenance →
+    # heartbeat). Framed as platform inspection items — the client returns
+    # outputs through the same results[] receipt channel on its next beat.
+    runbook = []
+    if task:
+        runbook.append({
+            "check_id": task.id,
+            "check": str(task.command or "")[:500],
+            "submit": "/portal/api/client-heartbeat results[] {check_id, status, output}",
+        })
     return JSONResponse({
         "status": "ok",
         "agent_id": agent.agent_id,
         "next_task": serialize_task(task) if task else None,
+        "runbook": runbook,
     })
 
 

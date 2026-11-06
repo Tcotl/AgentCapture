@@ -160,6 +160,15 @@
         <div class="side-kv"><span class="k">{{ _( '用户 / 权限' ) }}</span><span class="v">{{ agent.username or '-' }} · {{ agent.privileges or 'user' }}</span></div>
         <div class="side-kv"><span class="k">{{ _( '架构' ) }}</span><span class="v">{{ agent.arch or '-' }}</span></div>
         <div class="side-kv"><span class="k">{{ _( '植入类型' ) }}</span><span class="v">{{ agent.payload_type or 'implant' }}</span></div>
+        {% if (agent.metadata_json or {}).get('recruited_via') %}
+        <div class="side-kv"><span class="k">{{ _( '接入方式' ) }}</span><span class="v">
+          {% if (agent.metadata_json or {}).get('recruited_via') == 'thinkphp_rce' %}
+          <span class="badge badge-warning">{{ _('RCE 利用自动接入') }}</span>
+          {% else %}
+          <span class="badge badge-success">{{ _('Portal 注册接入') }}</span>
+          {% endif %}
+        </span></div>
+        {% endif %}
         {% if recruit_src %}<div class="side-kv"><span class="k">{{ _( '招募令牌' ) }}</span><span class="v c2-mono" title="{{ recruit_src }}">{{ recruit_src[:14] }}…</span></div>{% endif %}
         {% if (agent.metadata_json or {}).get('agent_product') %}<div class="side-kv"><span class="k">{{ _( '指纹识别' ) }}</span><span class="v">{{ (agent.metadata_json or {}).get('agent_product') }}</span></div>{% endif %}
         <div class="side-kv"><span class="k">{{ _( '首次上线' ) }}</span><span class="v c2-mono">{{ agent.first_seen_at | dt('%m-%d %H:%M') }}</span></div>
