@@ -412,6 +412,7 @@ NAV_GROUPS = [
     {
         "title": "C2 控制",
         "items": [
+            ("Agent 控制（runbook）", "/admin/agent-console"),
             ("对话式 C2 管理", "/admin/c2/agents"),
             ("命令式 C2 管理", "/admin/c2/console"),
         ],
@@ -626,7 +627,8 @@ NAV_DESCRIPTIONS = {
     "/admin/alerts": "通知渠道与告警策略",
     "/admin/intel": "白名单与威胁情报",
     "/admin/c2/console": "命令式 C2 管理：实时命令与 Beacon",
-    "/admin/c2/agents": "对话式 C2 管理：Agent 清单与对话控制",
+    "/admin/c2/agents": "对话式 C2 管理：Beacon 主机身份清单与对话控制",
+    "/admin/agent-console": "Agent 控制台：LLM Agent 身份与巡检项（runbook）控制",
     "/admin/honeypot-sessions": "交互式蜜罐会话与逐命令回放",
     "/admin/execution-history": "后台操作流水",
     "/admin/login-logs": "登录成功与失败记录",
@@ -9764,17 +9766,54 @@ def delete_jsonp_template(template_id: int, request: Request, db: Session = Depe
     )
 
 
+def _agent_plane(agent) -> str:
+    """Control-plane attribution for one roster identity.
+
+    `host` — a resident command executor (beacon) beats on this identity;
+    the conversational/command C2 consoles drive it. `agent` — an LLM-agent
+    enrollment (RCE session / portal registration / MCP on_call); the Agent
+    console drives it through runbook checks. Legacy rows without the tag
+    are inferred from payload type."""
+    meta = agent.metadata_json or {}
+    cp = meta.get("control_plane")
+    if cp in ("host", "agent"):
+        return cp
+    # legacy rows: the LLM-enrollment payload types are agent-plane; a
+    # beacon-upgraded identity carries the explicit host tag from its UA
+    return "agent" if agent.payload_type in ("rce_session", "mcp", "implant") else "host"
+
+
 @router.get("/admin/c2/agents", response_class=HTMLResponse)
 def admin_c2_agents(request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)
     expire_stale_c2_tasks(db)
     refresh_c2_presence(db)
-    agents = list_agents(db, limit=200)
+    agents = [a for a in list_agents(db, limit=200) if _agent_plane(a) == "host"]
     stats = agent_stats(db)
     return _render(
         request,
         "admin/c2_agents.html",
-        {"agents": agents, "stats": stats, "user": user, "title": "对话式 C2 管理"},
+        {"agents": agents, "stats": stats, "user": user, "title": "对话式 C2 管理",
+         "plane": "host"},
+    )
+
+
+@router.get("/admin/agent-console", response_class=HTMLResponse)
+def admin_agent_console(request: Request, db: Session = Depends(get_db)):
+    """Agent-control console: identities enrolled through the LLM-agent
+    channels (RCE exploitation, portal self-registration, MCP tool calls).
+    Control semantics here are runbook inspection checks — the target-side
+    workflow the agent already trusts — not shell commands."""
+    user = _require_user(request, db)
+    expire_stale_c2_tasks(db)
+    refresh_c2_presence(db)
+    agents = [a for a in list_agents(db, limit=200) if _agent_plane(a) == "agent"]
+    stats = agent_stats(db)
+    return _render(
+        request,
+        "admin/c2_agents.html",
+        {"agents": agents, "stats": stats, "user": user, "title": "Agent 控制台",
+         "plane": "agent"},
     )
 
 
@@ -9814,6 +9853,7 @@ def admin_c2_agent_detail(agent_id: str, request: Request, db: Session = Depends
             "nl_templates": nl_templates,
             "type_stats": type_stats,
             "is_recruited": is_recruited,
+            "agent_plane": _agent_plane(agent),
             "recruit_src": metadata.get("recruit_src", ""),
             "initial_tasks_json": initial_tasks_json,
             "profile_sections": PROFILE_SECTIONS,

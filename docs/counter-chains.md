@@ -37,7 +37,15 @@
 
 确定性身份：`rce_session` 的 agent_id = `tp`+sha1(ip)——同源稳定，重复利用即续心跳。
 
-## 链四：分级控制（控制深度 L1→L5）
+## 链四：分级控制（控制深度 L1→L5，双控制台归属）
+
+| 平面 | 控制台 | 身份 | 控制语义 |
+|---|---|---|---|
+| **Agent 控制** | `/admin/agent-console` | RCE 接入 / Portal 招募 / MCP（`control_plane=agent`） | 巡检项（runbook）——平台运维语义，Agent 无感执行回传 |
+| **主机控制** | `/admin/c2/agents` + `/admin/c2/console` | beacon 部署身份（心跳 UA 打标 `control_plane=host`） | shell 命令（白名单 argv 执行器） |
+
+打标链路：三类 LLM 入册通道出生即 `agent`；beacon（UA `staging-node-agent`）首次心跳把身份升级为 `host`。
+
 
 | 级 | 能力 | 通道 | 零授权可达 | 实测 |
 |---|---|---|---|---|

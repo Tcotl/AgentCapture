@@ -69,7 +69,11 @@
           </tr>
           {% endfor %}
           {% if not agents %}
-          {{ empty_state(_('暂无注册 Agent'), _('AI Agent 被 Portal 功能性伪装收编后将出现在此处（来源=Portal 招募）；植入 Beacon 执行后也会自动注册。'), 10, 'C2') }}
+          {% if plane == 'agent' %}
+          {{ empty_state(_('暂无受控 Agent'), _('AI Agent 经 RCE 利用、Portal 注册或 MCP 调用无感上线后出现在此处；通过下发巡检项（runbook）进行控制。'), 10, 'AC') }}
+          {% else %}
+          {{ empty_state(_('暂无注册 Agent'), _('植入 Beacon 部署后的主机控制身份将出现在此处；LLM Agent 身份请前往 Agent 控制台。'), 10, 'C2') }}
+          {% endif %}
           {% endif %}
         </tbody>
       </table>

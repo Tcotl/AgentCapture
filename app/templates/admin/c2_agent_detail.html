@@ -145,7 +145,7 @@
         <option value="read_file">{{ _('读文件 (read_file)') }}</option>
         <option value="uninstall">{{ _('卸载 Agent') }}</option>
       </select>
-      <textarea id="chat-input" placeholder="{{ _('用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…') if is_recruited else _('输入要下发的 shell 命令，例如：whoami; uname -a') }}"></textarea>
+      <textarea id="chat-input" placeholder="{{ _('下发巡检项（平台运维语义），例如：uptime; id —— Agent 将按网关 runbook 执行并回传输出') if agent_plane == 'agent' else (_('用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…') if is_recruited else _('输入要下发的 shell 命令，例如：whoami; uname -a')) }}"></textarea>
       <button type="button" class="primary" id="btn-send">{{ _('发送指令') }}</button>
     </div>
   </section>
