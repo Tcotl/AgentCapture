@@ -841,6 +841,7 @@ async def portal_client_heartbeat(request: Request):
                 meta["control_plane"] = "host"
                 agent.metadata_json = meta
                 db.add(agent)
+                db.commit()
         # Stable-channel result path: results[] mirrors /c2/heartbeat —
         # recruited agents close dispatched tasks from the same round trip.
         for item in results[:50]:
