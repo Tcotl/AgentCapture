@@ -1,0 +1,153 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state with context %}
+{% block content %}
+{{ page_header('PF', _('系统设置'), _('账号资料、密码与控制台安全路径。'), [_('账号设置'), _('安全路径')]) }}
+
+{% if saved %}
+<div class="panel page-banner success" style="margin-bottom:14px">{{ saved }}</div>
+{% endif %}
+{% if path_error %}
+<div class="panel page-banner error" style="margin-bottom:14px">{{ path_error }}</div>
+{% endif %}
+
+<div class="grid-2">
+  <section class="panel">
+    {{ section_header(_('更新资料'), _('姓名、邮箱与语言偏好')) }}
+    <form method="post" action="/admin/profile" class="stack">
+      <label class="field-label"><span>{{ _('姓名') }}</span><input name="name" value="{{ current_user.name }}" placeholder="{{ _('姓名') }}"></label>
+      <label class="field-label"><span>{{ _('邮箱') }}</span><input name="email" value="{{ current_user.email }}" placeholder="{{ _('邮箱') }}"></label>
+      <label class="field-label">
+        <span>{{ _('语言偏好') }}</span>
+        <select name="preferred_language">
+          <option value="zh" {% if current_user.preferred_language == 'zh' %}selected{% endif %}>{{ _('中文（zh）') }}</option>
+          <option value="en" {% if current_user.preferred_language == 'en' %}selected{% endif %}>English (en)</option>
+        </select>
+      </label>
+      <button type="submit">{{ _('保存资料') }}</button>
+    </form>
+  </section>
+  <section class="panel">
+    {{ section_header(_('修改密码'), _('验证当前密码后设置新密码')) }}
+    <form method="post" action="/admin/profile/change-password" class="stack">
+      <label class="field-label"><span>{{ _('当前密码') }}</span><input name="current_password" type="password" placeholder="{{ _('当前密码') }}" required></label>
+      <label class="field-label"><span>{{ _('新密码') }}</span><input name="new_password" type="password" placeholder="{{ _('请输入密码') }}" required></label>
+      <button type="submit">{{ _('修改密码') }}</button>
+    </form>
+  </section>
+</div>
+
+<section class="panel" style="margin-top:16px">
+  {{ section_header(_('部署向导'), _('交互式部署指引：蜜罐 → 蜜饵 → 域名 → 观测 → 反制，逐步聚光带路。可随时重新打开。')) }}
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span class="muted" style="font-size:13px">{{ _('重新查看部署流程解说，适合新成员学习或回顾配置要点。') }}</span>
+    <button type="button" class="primary btn-sm" style="margin-left:auto" onclick="window.acShowTourPicker && acShowTourPicker()">{{ _('启动部署向导') }}</button>
+  </div>
+</section>
+
+<section class="panel" style="margin-top:16px">
+  {{ section_header(_('控制台安全路径'), _('后台控制台的访问前缀——修改后立即生效（≤5s），旧路径即刻失效并返回 404。请妥善保管新路径，它是控制台的第一道访问屏障。')) }}
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+    <span class="muted" style="font-size:13px">{{ _('当前访问地址：') }}</span>
+    <code style="font-size:13px">http://{{ _("&lt;主机&gt;") }}:{{ settings_port }}/{{ admin_access_path }}/</code>
+    {% if admin_path_is_default %}
+    {{ badge(_('默认路径'), 'warning') }}
+    {% else %}
+    {{ badge(_('已自定义'), 'success') }}
+    {% endif %}
+  </div>
+  <form method="post" action="/admin/profile/access-path" class="stack" style="max-width:560px">
+    <label class="field-label"><span>{{ _('新的访问前缀') }}</span>
+      <input name="access_path" value="{{ admin_access_path }}" placeholder="{{ _('例如：sec-ops-7x9') }}"
+             pattern="[a-z0-9][a-z0-9-]{2,48}" required>
+    </label>
+    <p class="muted" style="font-size:12px;margin:0">
+      {{ _('仅允许小写字母、数字与连字符，长度 3-49；不能使用系统保留路径（admin / static / console / c2 / api 等）。') }}
+      {{ _('修改后请使用新地址访问，本页链接将自动切换；浏览器收藏夹需手动更新。') }}
+    </p>
+    <div><button type="submit">{{ _('更新安全路径') }}</button></div>
+  </form>
+</section>
+
+{% if raw_token %}
+<section class="panel page-banner success" style="margin-top:18px">
+  {{ section_header(_('新建 API Key — 仅显示一次，请立即保存'), _('复制下方令牌并妥善保管，离开此页面后将无法再次查看。')) }}
+  <pre style="margin:0;font-size:14px;color:#bbf7d0;background:rgba(52,211,153,0.06);padding:14px;border-radius:10px;word-break:break-all">{{ raw_token }}</pre>
+</section>
+{% endif %}
+
+<section class="panel" style="margin-top:18px">
+  {{ section_header(_('API Key 清单'), _('MCP 与开放 API 的令牌管理（查看前缀、权限与最后使用）')) }}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>{{ _('名称') }}</th><th>{{ _('前缀') }}</th><th>{{ _('权限') }}</th><th>{{ _('最后使用') }}</th><th>{{ _('操作') }}</th></tr></thead>
+      <tbody>
+        {% for item in api_keys %}
+        <tr>
+          <td><strong>{{ item.name }}</strong></td>
+          <td><code>{{ item.token_prefix }}…</code></td>
+          <td>{% for p in item.permissions_json %}{{ badge(p, 'info') }}{% endfor %}</td>
+          <td class="muted">{% if item.last_used_at %}<code>{{ item.last_used_at | dt('%Y-%m-%d %H:%M') }}</code>{% else %}—{% endif %}</td>
+          <td>
+            <form method="post" action="/admin/profile/api-keys/{{ item.id }}/delete" style="margin:0" data-confirm="{{ _('删除该 API Key？使用它的 MCP/集成将立即失效。') }}">
+              <button class="secondary btn-sm" type="submit">{{ _('删除') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state(_('暂无 API Key'), _('用下方表单或一键按钮创建。'), 5, 'AK') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/profile/api-keys" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;padding:0 16px 14px">
+    <label class="fl" style="margin:0"><span>{{ _('令牌名称') }}</span><input name="name" placeholder="mcp-admin" required style="width:180px"></label>
+    <label class="fl" style="margin:0"><span>{{ _('权限') }}</span><input name="permissions_csv" value="mcp:read,mcp:write" style="width:260px"></label>
+    <button class="primary btn-sm" type="submit" style="width:auto">{{ _('创建 API Key') }}</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:18px">
+  {{ section_header(_('MCP 接入手册'), _('用你的 AI Agent（Claude Code / ZCode / 任何 MCP 客户端）直接运营蜜罐')) }}
+  <div style="padding:14px 16px;display:grid;gap:12px">
+    <div>
+      <div style="font-weight:600;margin-bottom:6px">{{ _('① 创建 API Token') }}</div>
+      <div style="font-size:13px;color:var(--muted-foreground);line-height:1.7;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span>{{ _('在「第三方数源接入 → 开放 API Key」创建 Token：只读填') }}
+          <code>mcp:read</code>{{ _('，可写再填') }}<code>mcp:write</code>{{ _('（下发任务 / 启停蜜罐）。') }}</span>
+        <a class="btn secondary btn-sm" style="width:auto" href="/admin/api-tokens">{{ _('前往创建 Token →') }}</a>
+      </div>
+
+    </div>
+    <div>
+      <div style="font-weight:600;margin-bottom:6px">{{ _('② 接入 Claude Code') }}</div>
+      <pre style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;overflow:auto"><code>claude mcp add -s user agentcapture --transport http \
+  {{ mcp_endpoint }} \
+  --header "Authorization: Bearer &lt;你的Token&gt;"</code></pre>
+    </div>
+    <div>
+      <div style="font-weight:600;margin-bottom:6px">{{ _('③ 通用 MCP 客户端') }}</div>
+      <div style="font-size:13px;color:var(--muted-foreground);line-height:1.7">
+        {{ _('Endpoint：') }}<code>{{ mcp_endpoint }}</code>{{ _('（JSON-RPC：initialize / tools/list / tools/call，Header 同上）。') }}
+      </div>
+    </div>
+    <div>
+      <div style="font-weight:600;margin-bottom:8px">{{ _('可用工具（只读 Token 看不到写操作）') }}</div>
+      <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+        <tbody>
+        <tr><td style="padding:4px 8px"><code>situation_overview</code></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('态势总览（事件/来源/节点/反制）') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>query_events</code></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('事件查询（类型/来源/时间过滤）') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>top_attack_sources</code></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('攻击来源 TOP 榜') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>roster_list</code></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('上线身份名册（agent / host 平面）') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>task_send</code> <span class="badge badge-warning" style="margin-left:4px">{{ _('写') }}</span></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('下发任务（runbook 巡检 / shell / beacon 部署）') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>sensor_network_status</code></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('传感器网络状态与命中') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>honeypot_services</code> / <code>service_toggle</code> <span class="badge badge-warning" style="margin-left:4px">{{ _('写') }}</span></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('端口服务蜜罐清单 / 启停') }}</td></tr>
+        <tr><td style="padding:4px 8px"><code>ssh_replay_recent</code></td><td style="padding:4px 8px;color:var(--muted-foreground)">{{ _('蜜罐会话回放取证') }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--muted-foreground)">
+      {{ _('示例指令：「查看最近 1 小时高危事件」「给名册第一个 agent 平面身份下发 uptime 巡检」「把 MySQL 蜜罐停掉」。') }}
+    </div>
+  </div>
+</section>
+{% endblock %}

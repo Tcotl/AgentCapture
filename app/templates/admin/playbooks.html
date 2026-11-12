@@ -1,0 +1,65 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state with context %}
+{% block content %}
+{{ page_header('PB', _('反制剧本'), _('一键应用成套的反制姿态：联动 Portal 收编、协议蜜罐启停与收编 Agent 任务下发。每步结果落执行历史审计。'), ['Playbooks', _('一键联动')]) }}
+
+{% if applied %}
+<div class="panel page-banner page-banner-success" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <p class="panel-subtitle" style="margin:0;flex:1">{{ applied }}</p>
+  <a class="chip" href="/admin/execution-history">{{ _('查看执行历史') }}</a>
+</div>
+{% endif %}
+
+<div class="table-wrap">
+  <table>
+    <colgroup>
+      <col style="width: 22%"><col style="width: 15%"><col style="width: 43%"><col style="width: 20%">
+    </colgroup>
+    <thead><tr><th>{{ _( '剧本' ) }}</th><th>{{ _( '适用蜜罐类型' ) }}</th><th>{{ _( '执行步骤' ) }}</th><th style="text-align:right">{{ _( '应用' ) }}</th></tr></thead>
+    <tbody>
+    {% for pb in playbooks %}
+      <tr>
+        <td>
+          <strong style="font-size:13px">{{ _(pb.name) }}</strong>
+          <div class="muted" style="font-size:12px;line-height:1.7;margin-top:4px">{{ _(pb.description) }}</div>
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+            {% for t in pb.targets %}
+            <span class="badge badge-info">{{ _(honeypot_type_labels.get(t, t)) }}</span>
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            {% for step in pb.steps %}
+            <div style="font-size:12px;display:flex;gap:6px;align-items:baseline">
+              <span class="pill" style="flex-shrink:0">{{ loop.index }}</span>
+              <span>{{ {'deploy_clone': _('部署克隆门户（Web 蜜罐节点）'), 'start_service': _('启动协议蜜罐：') ~ step.params.service_key, 'portal': _('功能性伪装 Portal：') ~ (_('启用') if step.params.enabled else _('停用')), 'task_recruited': _('向收编 Agent 下发任务')}.get(step.action, step.action) }}</span>
+            </div>
+            {% if step.action == 'task_recruited' %}
+            <div style="margin:-2px 0 4px 26px"><code style="font-size:11px">{{ _(step.params.command) }}</code></div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <form method="post" action="/admin/playbooks/{{ pb.id }}/apply" data-confirm="{{ _('应用反制剧本') }}「{{ pb.name }}」？{{ _('联动动作将立即执行并落入执行历史。') }}" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            <select name="target" style="width:auto;min-width:150px">
+              <option value="">{{ _( '全部适用面' ) }}</option>
+              {% for t in pb.targets %}
+              <option value="{{ t }}">{{ _(honeypot_type_labels.get(t, t)) }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="primary btn-sm">{{ _( '应用此剧本' ) }}</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+    {{ empty_state(_('暂无反制剧本'), _('当前条件下没有可显示的记录。'), 4) }}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

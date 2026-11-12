@@ -1,0 +1,1665 @@
+{% from 'admin/_macros.html' import icon with context %}
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }} - AgentCapture</title>
+    <link rel="icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/static/agentcapture-logo.svg?v=default" />
+    <link rel="stylesheet" href="/static/admin.css?v=0.0.14" />
+    <script>
+      // Apply the stored theme & sidebar state before first paint to avoid a flash.
+      (function () {
+        try {
+          var theme = localStorage.getItem("ach:theme") || "light";
+          document.documentElement.dataset.theme = theme;
+          if (localStorage.getItem("ach:sidebar-collapsed") === "1") {
+            document.documentElement.classList.add("sidebar-collapsed");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="light">
+    <div class="pm-admin-scale-shell">
+      <div class="layout">
+        <aside class="sidebar" id="sidebar-nav">
+          <div class="sidebar-header">
+            <div class="brand">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 600 600"
+                class="brand-mark"
+                role="presentation"
+                aria-hidden="true"
+              >
+                <path fill="currentColor" d="M249,344 L244,343 L233,353 L231,353 L230,350 L224,353 L223,356 L227,355 L228,358 L205,379 L202,379 L201,377 L197,380 L184,378 L181,379 L195,381 L202,380 L203,386 L208,390 L212,390 L248,356 L252,351 Z" />
+                <path fill="currentColor" d="M317,174 L315,180 L312,181 L311,189 L312,206 L309,207 L310,208 L309,219 L304,225 L304,247 L302,250 L304,251 L306,255 L308,250 L311,218 L310,211 L314,207 L314,197 L317,192 L316,191 L318,175 Z" />
+                <path fill="currentColor" d="M290,118 L289,123 L297,135 L302,157 L292,228 L294,248 L306,179 L307,152 L300,129 L296,121 Z" />
+                <path fill="currentColor" d="M280,76 L279,77 L279,103 L282,103 L284,101 L287,101 L290,103 L292,102 L298,103 L301,107 L303,107 L306,110 L308,116 L312,120 L313,128 L315,130 L317,130 L316,122 L311,118 L311,113 L308,112 L305,109 L305,104 L299,99 L299,97 L296,95 L296,93 L294,93 L292,91 L292,88 L290,88 L282,80 Z" />
+                <path fill="currentColor" d="M279,49 L256,132 L253,93 L248,133 L200,90 L176,100 L207,276 L125,508 L164,560 L217,546 L325,438 L360,438 L445,518 L426,487 L445,463 L313,302 L322,423 L196,542 L139,525 L195,308 L254,251 L275,266 L274,65 L327,136 L307,269 L328,247 L508,300 L414,215 L334,185 L334,116 Z" />
+              </svg>
+              <div class="brand-text">
+                <div class="brand-title">AgentCapture</div>
+                <div class="brand-subtitle">Honeypot SaaS Console</div>
+              </div>
+            </div>
+            <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse" aria-label="{{ _('收起/展开侧栏') }}" title="{{ _('收起/展开侧栏') }}">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon-left"><path d="m15 18-6-6 6-6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon-right"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+        <div class="nav-scroll">
+          <div class="nav-home">
+            <a href="/admin" class="nav-link">
+              <span class="dot">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}</span>
+              <span>{{ _("控制台首页") }}</span>
+            </a>
+          </div>
+          {% for group in nav_groups %}
+            <div class="nav-group" data-nav-group="{{ loop.index }}">
+              <button type="button" class="nav-group-title" data-nav-toggle aria-expanded="true">
+                <span>{{ group.title }}</span>
+                <svg class="nav-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="nav-group-items">
+                <div class="nav-group-inner">
+                {% for item in group.links %}
+                  {% if item.header %}
+                  <div class="nav-section">{{ item.label }}</div>
+                  {% else %}
+                  <a href="{{ item.href }}" class="nav-link {% if item.active %}active{% endif %}"{% if item.description %} title="{{ item.description }}"{% endif %}>
+                    <span class="dot">{{ icon(name=item.icon, class_name='ui-icon ui-icon-sm') }}</span>
+                    <span class="nav-label">{{ item.label }}</span>
+                  </a>
+                  {% endif %}
+                {% endfor %}
+                </div>
+              </div>
+              </div>
+            {% endfor %}
+        </div>
+          <div class="sidebar-footer">
+            {% if current_user %}
+              <div class="profile-card">
+                <div class="avatar">{{ current_user.username[:2]|upper }}</div>
+                <div class="profile-meta">
+                  <div class="profile-name-row">
+                    <div class="profile-name">{{ current_user.username }}</div>
+                  </div>
+                </div>
+                <a class="profile-settings" href="/admin/profile" aria-label="{{ _('个人设置') }}" title="{{ _('个人设置') }}">{{ icon(name='settings', class_name='ui-icon ui-icon-sm') }}</a>
+                <a class="profile-settings logout" href="/admin/logout" aria-label="{{ _('退出登录') }}" title="{{ _('退出登录') }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ui-icon ui-icon-sm"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                </a>
+              </div>
+            {% endif %}
+          </div>
+        </aside>
+        <div class="nav-backdrop" id="nav-backdrop" hidden></div>
+
+        <main class="main-shell">
+          <div class="workspace">
+            <div class="utility-strip">
+              <button type="button" class="utility-icon-btn nav-open-btn" id="nav-open" aria-label="{{ _('打开导航菜单') }}" aria-controls="sidebar-nav" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+              </button>
+              <span class="utility-path">{{ icon(name='home', class_name='ui-icon ui-icon-sm') }}<span>/admin{% if active_path and active_path != '/admin' %} · {{ active_path }}{% endif %}</span></span>
+              <div class="utility-right">
+                {% if topbar_note %}<span class="chip">{{ topbar_note }}</span>{% endif %}
+                <form method="post" action="/admin/profile/language" class="lang-toggle-form">
+                  <input type="hidden" name="lang" value="{{ 'en' if lang == 'zh' else 'zh' }}">
+                  <input type="hidden" name="next" value="">
+                  <button type="submit" class="chip chip-lang" id="lang-toggle" aria-label="{{ '切换为中文' if lang == 'en' else 'Switch to English' }}" title="{{ '切换为中文' if lang == 'en' else 'Switch to English' }}">
+                    <span class="lang-opt{{ ' on' if lang == 'zh' else '' }}">中</span>
+                    <span class="lang-sep">/</span>
+                    <span class="lang-opt{{ ' on' if lang == 'en' else '' }}">EN</span>
+                  </button>
+                </form>
+                <div class="health-wrap">
+                  <button type="button" class="chip chip-live" id="sys-health-chip" aria-haspopup="true" aria-expanded="false" title="{{ _('系统运行状态') }}">
+                    <span id="sys-health-text">{{ _('运行中') }}</span>
+                  </button>
+                  <div class="health-pop" id="health-pop" hidden role="dialog" aria-label="{{ _('系统运行状态') }}">
+                    <div class="health-pop-title">{{ _('系统运行状态') }}</div>
+                    <div class="health-metric">
+                      <div class="health-row"><span class="health-k">CPU</span><b class="health-v" id="health-cpu-val">—</b></div>
+                      <div class="health-bar"><i id="health-cpu-bar"></i></div>
+                    </div>
+                    <div class="health-metric">
+                      <div class="health-row"><span class="health-k">{{ _('内存') }}</span><b class="health-v" id="health-mem-val">—</b></div>
+                      <div class="health-bar"><i id="health-mem-bar"></i></div>
+                    </div>
+                    <div class="health-metric">
+                      <div class="health-row"><span class="health-k">{{ _('磁盘') }}</span><b class="health-v" id="health-disk-val">—</b></div>
+                      <div class="health-bar"><i id="health-disk-bar"></i></div>
+                    </div>
+                    <div class="health-sub" id="health-sub">&nbsp;</div>
+                    <div class="health-row health-count">
+                      <span class="health-k">{{ _('运行中蜜罐') }}</span>
+                      <b class="health-v" id="health-hp-val">—</b>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" class="utility-icon-btn cmdk-open-btn" id="cmdk-open" aria-label="{{ _('全局搜索') }}" title="{{ _('全局搜索 (⌘K)') }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+                  <kbd class="cmdk-kbd" id="cmdk-kbd" aria-hidden="true">⌘K</kbd>
+                </button>
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="{{ _('切换明暗主题') }}" title="{{ _('切换明暗主题') }}">
+                  <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                  <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="content">
+              {% if admin_path_is_default and not admin_path_banner_dismissed and active_path != '/admin/profile' %}
+              <div class="panel page-banner page-banner-warning" id="admin-path-banner" data-path-banner>
+                <div class="page-banner-body">
+                  <div class="panel-title page-banner-title">{{ _("安全建议：自定义控制台访问路径") }}</div>
+                  <p class="page-banner-text">
+                    {{ _("当前仍使用默认访问路径") }} <code>/{{ admin_access_path }}/</code>{{ _("。部署完成后请尽快在") }}
+                    <a href="/admin/profile">{{ _("系统设置 → 控制台安全路径") }}</a>
+                    {{ _("中修改，避免控制台被扫描发现。") }}
+                  </p>
+                </div>
+                <div class="page-banner-actions">
+                  <a class="chip" href="/admin/profile">{{ _("前往设置") }}</a>
+                  <button type="button" class="secondary btn-sm" id="dismiss-path-banner">{{ _("不再提示") }}</button>
+                </div>
+              </div>
+              <script>
+                (function () {
+                  var banner = document.getElementById('admin-path-banner');
+                  if (!banner) return;
+                  try {
+                    if (localStorage.getItem('ach:path-banner:dismissed') === '1') {
+                      banner.remove();
+                      return;
+                    }
+                  } catch (e) {}
+                  var btn = document.getElementById('dismiss-path-banner');
+                  if (!btn) return;
+                  btn.addEventListener('click', function () {
+                    try { localStorage.setItem('ach:path-banner:dismissed', '1'); } catch (e) {}
+                    banner.remove();
+                    fetch('/api/admin/dismiss-path-banner', { method: 'POST' }).catch(function () {});
+                  });
+                })();
+              </script>
+              {% endif %}
+              {% block content %}{% endblock %}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script>
+      const RECENT_FILTER_VERSION = 2;
+      const RECENT_FILTER_MAX_HISTORY = 8;
+
+      function initRecentFilterForms() {
+        const forms = document.querySelectorAll("form[data-recent-filter-key]");
+        forms.forEach((form) => {
+          const storageKey = "ach:recent-filter:" + form.dataset.recentFilterKey;
+          const skipAutoRestoreKey = storageKey + ":skip-autorestore";
+          const noticeKey = storageKey + ":notice";
+          const fields = Array.from(form.querySelectorAll("input[name], select[name], textarea[name]")).filter((field) => {
+            return field.name && !field.disabled && field.type !== "password" && field.dataset.recentIgnore !== "1";
+          });
+          if (!fields.length) return;
+
+          const url = new URL(window.location.href);
+          const relevantParamNames = new Set(fields.map((field) => field.name));
+          const hasRelevantUrlParams = Array.from(relevantParamNames).some((name) => url.searchParams.has(name));
+          const restoreButtons = form.querySelectorAll('[data-filter-action="restore"]');
+          const clearButtons = form.querySelectorAll('[data-filter-action="clear"]');
+          const statusNodes = form.querySelectorAll("[data-recent-status]");
+
+          function emptyStore() {
+            return {
+              version: RECENT_FILTER_VERSION,
+              lastUsed: {},
+              defaultValues: {},
+              history: [],
+            };
+          }
+
+          function cloneValues(values) {
+            return JSON.parse(JSON.stringify(values || {}));
+          }
+
+          function readStoredValues() {
+            try {
+              return JSON.parse(localStorage.getItem(storageKey) || "{}");
+            } catch (error) {
+              return {};
+            }
+          }
+
+          function valuesSignature(values) {
+            const compact = Object.fromEntries(
+              Object.entries(values || {})
+                .filter(([, value]) => String(value || "").trim() !== "")
+                .sort(([left], [right]) => left.localeCompare(right))
+            );
+            return JSON.stringify(compact);
+          }
+
+          function normalizeStore(rawStore) {
+            if (!rawStore || typeof rawStore !== "object") {
+              return emptyStore();
+            }
+            if (rawStore.version === RECENT_FILTER_VERSION) {
+              return {
+                version: RECENT_FILTER_VERSION,
+                lastUsed: cloneValues(rawStore.lastUsed || {}),
+                defaultValues: cloneValues(rawStore.defaultValues || {}),
+                history: Array.isArray(rawStore.history) ? rawStore.history.map((entry) => ({
+                  id: entry.id || String(Date.now()),
+                  label: entry.label || "",
+                  updatedAt: entry.updatedAt || new Date().toISOString(),
+                  values: cloneValues(entry.values || {}),
+                })) : [],
+              };
+            }
+            const legacyValues = cloneValues(rawStore);
+            const migrated = emptyStore();
+            migrated.lastUsed = legacyValues;
+            if (Object.values(legacyValues).some((value) => String(value || "").trim() !== "")) {
+              migrated.history = [{
+                id: "legacy-" + Date.now(),
+                label: "迁移的最近使用条件",
+                updatedAt: new Date().toISOString(),
+                values: legacyValues,
+              }];
+            }
+            return migrated;
+          }
+
+          function saveStore(store) {
+            localStorage.setItem(storageKey, JSON.stringify(store));
+          }
+
+          function hasStoredValues(values) {
+            return Object.values(values || {}).some((value) => String(value || "").trim() !== "");
+          }
+
+          function sameValues(left, right) {
+            return valuesSignature(left) === valuesSignature(right);
+          }
+
+          function writeStatus(text) {
+            statusNodes.forEach((node) => {
+              node.textContent = text;
+            });
+          }
+
+          function currentValues() {
+            return fields.reduce((acc, field) => {
+              acc[field.name] = field.value || "";
+              return acc;
+            }, {});
+          }
+
+          function summarizeValues(values) {
+            const parts = Object.entries(values || {})
+              .filter(([, value]) => String(value || "").trim() !== "")
+              .map(([name, value]) => `${name}=${value}`);
+            if (!parts.length) return {{ _('空条件') | tojson }};
+            return parts.slice(0, 4).join(" · ");
+          }
+
+          function createHistoryEntry(values) {
+            return {
+              id: "entry-" + Date.now() + "-" + Math.random().toString(16).slice(2, 8),
+              label: summarizeValues(values),
+              updatedAt: new Date().toISOString(),
+              values: cloneValues(values),
+            };
+          }
+
+          function upsertHistory(store, values) {
+            const signature = valuesSignature(values);
+            if (!signature || signature === "{}") {
+              return store;
+            }
+            const nextHistory = (store.history || []).filter((entry) => valuesSignature(entry.values) !== signature);
+            nextHistory.unshift(createHistoryEntry(values));
+            store.history = nextHistory.slice(0, RECENT_FILTER_MAX_HISTORY);
+            return store;
+          }
+
+          function persistLastUsed(values, { toHistory = false } = {}) {
+            const store = normalizeStore(readStoredValues());
+            store.lastUsed = cloneValues(values);
+            if (toHistory && hasStoredValues(values)) {
+              upsertHistory(store, values);
+            }
+            saveStore(store);
+            return store;
+          }
+
+          function clearStoredHistory() {
+            const store = normalizeStore(readStoredValues());
+            store.history = [];
+            saveStore(store);
+            return store;
+          }
+
+          function buildRestoreUrl(values) {
+            const nextUrl = new URL(window.location.href);
+            fields.forEach((field) => nextUrl.searchParams.delete(field.name));
+            Object.entries(values).forEach(([name, value]) => {
+              if (String(value || "").trim() !== "") {
+                nextUrl.searchParams.set(name, value);
+              }
+            });
+            return nextUrl.toString();
+          }
+
+          function formatTimestamp(isoString) {
+            if (!isoString) return {{ _('未记录时间') | tojson }};
+            const date = new Date(isoString);
+            if (Number.isNaN(date.getTime())) return {{ _('未记录时间') | tojson }};
+            return date.toLocaleString("zh-CN", {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+
+          const manager = document.createElement("div");
+          manager.className = "recent-filter-manager";
+          manager.innerHTML = `
+            <div class="recent-filter-title">{{ _('最近使用条件管理') }}</div>
+            <div class="recent-filter-summary" data-recent-history-summary>{{ _('当前尚未保存历史条件') }}</div>
+            <div class="recent-filter-controls">
+              <select data-recent-history-select>
+                <option value="">{{ _('选择历史条件') }}</option>
+              </select>
+              <button type="button" class="secondary" data-recent-history-apply>{{ _('应用历史') }}</button>
+              <button type="button" class="secondary" data-recent-default-set>{{ _('设为默认') }}</button>
+              <button type="button" class="secondary" data-recent-default-apply>{{ _('使用默认') }}</button>
+              <button type="button" class="secondary" data-recent-history-clear>{{ _('清空历史') }}</button>
+            </div>
+          `;
+          form.appendChild(manager);
+
+          const historySummary = manager.querySelector("[data-recent-history-summary]");
+          const historySelect = manager.querySelector("[data-recent-history-select]");
+          const historyApplyButton = manager.querySelector("[data-recent-history-apply]");
+          const defaultSetButton = manager.querySelector("[data-recent-default-set]");
+          const defaultApplyButton = manager.querySelector("[data-recent-default-apply]");
+          const historyClearButton = manager.querySelector("[data-recent-history-clear]");
+
+          function selectedHistoryValues(store) {
+            const selectedId = historySelect.value;
+            const selectedItem = (store.history || []).find((entry) => entry.id === selectedId);
+            return selectedItem ? cloneValues(selectedItem.values) : null;
+          }
+
+          function renderManager(store) {
+            const previousSelection = historySelect.value;
+            historySelect.innerHTML = '<option value="">{{ _('选择历史条件') }}</option>';
+            (store.history || []).forEach((entry, index) => {
+              const option = document.createElement("option");
+              option.value = entry.id;
+              const isDefault = hasStoredValues(store.defaultValues) && sameValues(store.defaultValues, entry.values);
+              option.textContent = `${isDefault ? {{ _('默认 · ') | tojson }} : ""}${index + 1}. ${formatTimestamp(entry.updatedAt)} · ${entry.label || {{ _('未命名条件') | tojson }}}`;
+              historySelect.appendChild(option);
+            });
+            if ((store.history || []).some((entry) => entry.id === previousSelection)) {
+              historySelect.value = previousSelection;
+            }
+            const defaultSummary = hasStoredValues(store.defaultValues) ? summarizeValues(store.defaultValues) : {{ _('未设置') | tojson }};
+            historySummary.textContent = `{{ _('默认条件') }}: ${defaultSummary} | {{ _('历史条数') }}: ${(store.history || []).length}`;
+            const hasHistory = (store.history || []).length > 0;
+            historyApplyButton.disabled = !hasHistory;
+            historyClearButton.disabled = !hasHistory;
+            defaultApplyButton.disabled = !hasStoredValues(store.defaultValues);
+          }
+
+          function navigateWithValues(values, noticeType) {
+            if (!hasStoredValues(values)) {
+              writeStatus({{ _('暂无可应用的筛选条件') | tojson }});
+              return;
+            }
+            sessionStorage.setItem(noticeKey, noticeType);
+            window.location.assign(buildRestoreUrl(values));
+          }
+
+          const storeBeforeRestore = normalizeStore(readStoredValues());
+          const autoRestoreValues = hasStoredValues(storeBeforeRestore.defaultValues)
+            ? storeBeforeRestore.defaultValues
+            : storeBeforeRestore.lastUsed;
+          const shouldSkipAutoRestore = sessionStorage.getItem(skipAutoRestoreKey) === "1";
+          if (shouldSkipAutoRestore) {
+            sessionStorage.removeItem(skipAutoRestoreKey);
+          } else if (!hasRelevantUrlParams && hasStoredValues(autoRestoreValues)) {
+            sessionStorage.setItem(
+              noticeKey,
+              hasStoredValues(storeBeforeRestore.defaultValues) ? "default-auto" : "recent-auto"
+            );
+            window.location.replace(buildRestoreUrl(autoRestoreValues));
+            return;
+          }
+
+          const notice = sessionStorage.getItem(noticeKey);
+          if (notice === "recent-auto") {
+            writeStatus({{ _('已自动恢复最近使用条件') | tojson }});
+            sessionStorage.removeItem(noticeKey);
+          } else if (notice === "default-auto") {
+            writeStatus({{ _('已自动恢复默认条件') | tojson }});
+            sessionStorage.removeItem(noticeKey);
+          } else if (hasStoredValues(storeBeforeRestore.defaultValues) || hasStoredValues(storeBeforeRestore.lastUsed)) {
+            writeStatus({{ _('当前页已启用最近使用条件记忆') | tojson }});
+          }
+
+          const initialStore = persistLastUsed(currentValues(), { toHistory: false });
+          renderManager(initialStore);
+
+          form.addEventListener("submit", () => {
+            persistLastUsed(currentValues(), { toHistory: true });
+          });
+
+          restoreButtons.forEach((button) => {
+            button.addEventListener("click", (event) => {
+              event.preventDefault();
+              const store = normalizeStore(readStoredValues());
+              const fallbackValues = hasStoredValues(store.defaultValues) ? store.defaultValues : store.lastUsed;
+              if (!hasStoredValues(fallbackValues)) {
+                writeStatus({{ _('暂无默认或最近使用条件') | tojson }});
+                return;
+              }
+              navigateWithValues(
+                fallbackValues,
+                hasStoredValues(store.defaultValues) ? "default-auto" : "recent-auto"
+              );
+            });
+          });
+
+          clearButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              sessionStorage.setItem(skipAutoRestoreKey, "1");
+              writeStatus({{ _('本次已跳过自动恢复') | tojson }});
+            });
+          });
+
+          historyApplyButton.addEventListener("click", () => {
+            const store = normalizeStore(readStoredValues());
+            const values = selectedHistoryValues(store);
+            if (!values) {
+              writeStatus({{ _('请先从下拉框选择一条历史条件') | tojson }});
+              return;
+            }
+            navigateWithValues(values, "recent-auto");
+          });
+
+          defaultSetButton.addEventListener("click", () => {
+            const store = normalizeStore(readStoredValues());
+            const values = selectedHistoryValues(store) || currentValues();
+            if (!hasStoredValues(values)) {
+              writeStatus({{ _('当前条件为空，无法设为默认') | tojson }});
+              return;
+            }
+            store.defaultValues = cloneValues(values);
+            saveStore(store);
+            renderManager(store);
+            writeStatus({{ _('已设为默认条件') | tojson }});
+          });
+
+          defaultApplyButton.addEventListener("click", () => {
+            const store = normalizeStore(readStoredValues());
+            if (!hasStoredValues(store.defaultValues)) {
+              writeStatus({{ _('尚未设置默认条件') | tojson }});
+              return;
+            }
+            navigateWithValues(store.defaultValues, "default-auto");
+          });
+
+          historyClearButton.addEventListener("click", () => {
+            const store = clearStoredHistory();
+            renderManager(store);
+            writeStatus({{ _('历史条件已清空，默认条件保留') | tojson }});
+          });
+        });
+      }
+
+      function initNavGroups() {
+        const KEY = "ach:nav-collapsed";
+        let collapsed = [];
+        try { collapsed = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (error) { collapsed = []; }
+        document.querySelectorAll(".nav-group[data-nav-group]").forEach((group) => {
+          const id = group.dataset.navGroup;
+          const hasActive = !!group.querySelector(".nav-link.active");
+          // The group containing the current page always opens; others honor
+          // the persisted collapsed state.
+          group.classList.toggle("is-collapsed", !hasActive && collapsed.includes(id));
+          const toggle = group.querySelector("[data-nav-toggle]");
+          if (!toggle) return;
+          toggle.setAttribute("aria-expanded", String(!group.classList.contains("is-collapsed")));
+          toggle.addEventListener("click", () => {
+            const isCollapsed = group.classList.toggle("is-collapsed");
+            toggle.setAttribute("aria-expanded", String(!isCollapsed));
+            const idx = collapsed.indexOf(id);
+            if (isCollapsed && idx === -1) collapsed.push(id);
+            if (!isCollapsed && idx !== -1) collapsed.splice(idx, 1);
+            try { localStorage.setItem(KEY, JSON.stringify(collapsed)); } catch (error) {}
+          });
+        });
+      }
+
+      function initFormSubmitGuard() {
+        document.querySelectorAll("form").forEach((form) => {
+          form.addEventListener("submit", (event) => {
+            // Defer so JS-driven (fetch) flows can preventDefault first —
+            // those manage their own button state.
+            setTimeout(() => {
+              if (event.defaultPrevented) return;
+              const btn = form.querySelector('button[type="submit"], button:not([type])');
+              if (!btn || btn.disabled) return;
+              const original = btn.textContent;
+              btn.disabled = true;
+              btn.classList.add("is-loading");
+              btn.textContent = "提交中…";
+              // Safety net: restore if the navigation never happens.
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove("is-loading");
+                btn.textContent = original;
+              }, 8000);
+            }, 0);
+          });
+        });
+      }
+
+      /* ---- Shared UI utilities (toast / confirm / polling) ---- */
+      function showToast(message, type) {
+        var host = document.getElementById("ac-toast-host");
+        if (!host) {
+          host = document.createElement("div");
+          host.id = "ac-toast-host";
+          host.className = "ac-toast-host";
+          document.body.appendChild(host);
+        }
+        var item = document.createElement("div");
+        item.className = "ac-toast ac-toast-" + (type || "info");
+        item.setAttribute("role", type === "error" ? "alert" : "status");
+        item.textContent = message;
+        host.appendChild(item);
+        requestAnimationFrame(function () { item.classList.add("is-in"); });
+        setTimeout(function () {
+          item.classList.remove("is-in");
+          setTimeout(function () { item.remove(); }, 300);
+        }, type === "error" ? 6000 : 3200);
+      }
+
+      /* Pause-aware polling: fn runs immediately, then every intervalMs while
+         the tab is visible. Returns a handle; call .stop() to end it. */
+      function acPoll(fn, intervalMs) {
+        var timer = null;
+        var stopped = false;
+        function tick() {
+          if (stopped || document.hidden) return;
+          try { fn(); } catch (e) { /* keep polling */ }
+        }
+        function loop() {
+          if (stopped) return;
+          timer = setTimeout(function () { tick(); loop(); }, intervalMs);
+        }
+        function onVisible() { if (!document.hidden) tick(); }
+        document.addEventListener("visibilitychange", onVisible);
+        tick();
+        loop();
+        return {
+          stop: function () {
+            stopped = true;
+            if (timer) clearTimeout(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+          },
+        };
+      }
+
+      function initConfirmDelegation() {
+        document.addEventListener("submit", function (event) {
+          var form = event.target.closest("form[data-confirm]");
+          if (!form) return;
+          if (form.dataset.confirmed === "1") { form.dataset.confirmed = ""; return; }
+          event.preventDefault();
+          if (window.confirm(form.getAttribute("data-confirm"))) {
+            form.dataset.confirmed = "1";
+            form.submit();
+          }
+        });
+        document.addEventListener("click", function (event) {
+          var trigger = event.target.closest("[data-confirm]");
+          if (!trigger || trigger.tagName === "FORM") return;
+          if (trigger.tagName === "A" && !window.confirm(trigger.getAttribute("data-confirm"))) {
+            event.preventDefault();
+          }
+        });
+      }
+
+      function initMobileNav() {
+        var openBtn = document.getElementById("nav-open");
+        var backdrop = document.getElementById("nav-backdrop");
+        if (!openBtn || !backdrop) return;
+        function setOpen(open) {
+          document.documentElement.classList.toggle("nav-open", open);
+          openBtn.setAttribute("aria-expanded", String(open));
+          backdrop.hidden = !open;
+        }
+        openBtn.addEventListener("click", function () {
+          setOpen(!document.documentElement.classList.contains("nav-open"));
+        });
+        backdrop.addEventListener("click", function () { setOpen(false); });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") setOpen(false);
+        });
+        document.querySelectorAll(".nav-scroll .nav-link").forEach(function (link) {
+          link.addEventListener("click", function () { setOpen(false); });
+        });
+      }
+
+      /* Programmatic modal API mirroring the [data-modal-open]/[data-modal-close]
+         delegation — pages with prefilled edit forms open dialogs from JS. */
+      var acModal = {
+        open: function (id) {
+          var backdrop = document.getElementById(id);
+          if (!backdrop) return;
+          backdrop.hidden = false;
+          document.body.style.overflow = "hidden";
+        },
+        close: function (id) {
+          var backdrop = document.getElementById(id);
+          if (!backdrop) return;
+          backdrop.hidden = true;
+          document.body.style.overflow = "";
+        },
+      };
+
+      function initThemeToggle() {
+      // ---- Global modal wiring: [data-modal-open] / [data-modal-close] ----
+      document.addEventListener("click", (event) => {
+        const opener = event.target.closest("[data-modal-open]");
+        if (opener) {
+          const target = document.getElementById(opener.getAttribute("data-modal-open"));
+          if (target) { target.hidden = false; document.body.style.overflow = "hidden"; }
+          return;
+        }
+        const closer = event.target.closest("[data-modal-close]");
+        if (closer) {
+          const backdrop = closer.closest("[data-modal-backdrop]");
+          if (backdrop) { backdrop.hidden = true; document.body.style.overflow = ""; }
+          return;
+        }
+        const backdropHit = event.target.closest("[data-modal-backdrop]");
+        if (backdropHit && event.target === backdropHit) {
+          backdropHit.hidden = true; document.body.style.overflow = "";
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        document.querySelectorAll("[data-modal-backdrop]:not([hidden])").forEach((b) => { b.hidden = true; });
+        document.body.style.overflow = "";
+      });
+      const btn = document.getElementById("theme-toggle");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+          const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("ach:theme", next); } catch (error) {}
+        });
+      }
+
+      function initLangToggle() {
+        // Language toggle posts back to the current page so context is kept.
+        const form = document.querySelector(".lang-toggle-form");
+        if (!form) return;
+        const nextInput = form.querySelector('input[name="next"]');
+        if (nextInput) nextInput.value = window.location.pathname + window.location.search;
+      }
+
+      function initCmdkHint() {
+        // Template ships the macOS ⌘K badge; Windows/Linux show Ctrl+K
+        // (the keydown handler already accepts both modifiers).
+        const kbd = document.getElementById("cmdk-kbd");
+        if (!kbd) return;
+        const ua = navigator.userAgent || "";
+        const isApple = /Mac|iPhone|iPad|iPod/i.test(ua) || navigator.platform === "MacIntel";
+        if (isApple) return;
+        kbd.textContent = "Ctrl+K";
+        const btn = document.getElementById("cmdk-open");
+        if (btn) btn.title = btn.title.replace("⌘K", "Ctrl+K");
+      }
+
+      function initHealthChip() {
+        // Utility-strip status chip: hover or click reveals CPU / memory /
+        // disk / running-honeypot popover; data refreshes while visible.
+        const chip = document.getElementById("sys-health-chip");
+        const pop = document.getElementById("health-pop");
+        if (!chip || !pop) return;
+        let showTimer = null, hideTimer = null, pollTimer = null, pinned = false;
+        function setBar(id, pct) {
+          const bar = document.getElementById("health-" + id + "-bar");
+          const val = document.getElementById("health-" + id + "-val");
+          if (!bar || !val) return;
+          const v = typeof pct === "number" ? Math.max(0, Math.min(100, pct)) : null;
+          bar.style.width = (v === null ? 0 : v) + "%";
+          bar.classList.toggle("hot", v !== null && v >= 85);
+          bar.classList.toggle("warm", v !== null && v >= 60 && v < 85);
+          val.textContent = v === null ? "—" : v.toFixed(1) + "%";
+        }
+        async function refresh() {
+          try {
+            const res = await fetch("/admin/system-health", { headers: { Accept: "application/json" } });
+            if (!res.ok) throw new Error(String(res.status));
+            const d = await res.json();
+            const ok = !!d.ok;
+            setBar("cpu", ok ? d.cpu_percent : null);
+            setBar("mem", ok ? d.mem_percent : null);
+            setBar("disk", ok ? d.disk_percent : null);
+            const sub = document.getElementById("health-sub");
+            sub.textContent = ok
+              ? d.mem_used_gb + " / " + d.mem_total_gb + " GB · " + d.disk_used_gb + " / " + d.disk_total_gb + " GB"
+              : document.documentElement.lang === "en" ? "unavailable" : "暂无数据";
+            document.getElementById("health-hp-val").textContent = ok || d.honeypots_running != null ? d.honeypots_running : "—";
+            chip.classList.toggle("down", !ok);
+            const label = document.getElementById("sys-health-text");
+            if (label && !ok) label.textContent = document.documentElement.lang === "en" ? "Unknown" : "状态未知";
+          } catch (err) {
+            chip.classList.add("down");
+          }
+        }
+        function open() {
+          clearTimeout(hideTimer);
+          pop.hidden = false;
+          chip.setAttribute("aria-expanded", "true");
+          refresh();
+          if (!pollTimer) pollTimer = setInterval(refresh, 10000);
+        }
+        function close() {
+          pop.hidden = true;
+          chip.setAttribute("aria-expanded", "false");
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+        chip.addEventListener("mouseenter", () => {
+          clearTimeout(hideTimer);
+          if (!pop.hidden || pinned) return;
+          showTimer = setTimeout(open, 150);
+        });
+        chip.addEventListener("mouseleave", () => {
+          clearTimeout(showTimer);
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => { if (!pinned) close(); }, 250);
+        });
+        pop.addEventListener("mouseenter", () => clearTimeout(hideTimer));
+        pop.addEventListener("mouseleave", () => { if (!pinned) close(); });
+        chip.addEventListener("click", () => {
+          if (pop.hidden) { pinned = true; open(); }
+          else if (pinned) { pinned = false; close(); }
+          else { pinned = true; } // hover-opened: click pins it in place
+        });
+        document.addEventListener("click", (ev) => {
+          if (pop.hidden) return;
+          if (!pop.contains(ev.target) && !chip.contains(ev.target)) { pinned = false; close(); }
+        });
+        document.addEventListener("keydown", (ev) => {
+          if (ev.key === "Escape" && !pop.hidden) { pinned = false; close(); }
+        });
+      }
+
+      function initSidebarCollapse() {
+        const btn = document.getElementById("sidebar-collapse");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+          const collapsed = document.documentElement.classList.toggle("sidebar-collapsed");
+          try { localStorage.setItem("ach:sidebar-collapsed", collapsed ? "1" : "0"); } catch (error) {}
+        });
+      }
+
+      function initTableColumnResize() {
+        const KEY = "ach:col-widths";
+        let store = {};
+        try { store = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (error) { store = {}; }
+        const pageKey = window.location.pathname;
+
+        const shell = document.querySelector(".pm-admin-scale-shell");
+        function uiScale() {
+          // The desktop shell renders at 80% CSS scale: mouse deltas are
+          // screen-px but widths are layout-px, so compensate.
+          if (!shell) return 1;
+          const rect = shell.getBoundingClientRect();
+          return rect.width && shell.offsetWidth ? rect.width / shell.offsetWidth : 1;
+        }
+
+        document.querySelectorAll(".table-wrap table").forEach((table, tableIdx) => {
+          const heads = table.querySelectorAll("thead th");
+          if (!heads.length) return;
+
+          const saved = (store[pageKey] || {})[tableIdx];
+          if (saved && saved.length === heads.length) {
+            // colgroup widths (e.g. percentage hints) would override th widths
+            // in fixed layout — clear them so restored widths take effect.
+            table.querySelectorAll("col").forEach((c) => c.style.removeProperty("width"));
+            table.style.tableLayout = "fixed";
+            heads.forEach((th, i) => { if (saved[i]) th.style.width = saved[i]; });
+          }
+
+          heads.forEach((th) => {
+            if (th.querySelector(".th-resizer")) return;
+            const handle = document.createElement("span");
+            handle.className = "th-resizer";
+            handle.setAttribute("aria-hidden", "true");
+            // The handle only *looks* like a separate widget; hit-testing on
+            // sticky positioned TH children was unreliable (a neighbouring
+            // sticky TH could paint over the strip and swallow the click), so
+            // the mousedown listener lives on the TH itself and triggers when
+            // the press lands in the 16px strip at the right edge.
+            function startResize(ev) {
+              const rect = th.getBoundingClientRect();
+              // Right-edge 40px strip resizes; the th-level handler is needed
+              // because hit-testing the tiny resizer span reliably landed on
+              // the neighbouring sticky column under the 0.8 UI scale.
+              if (ev.clientX < rect.right - 40) return;
+              ev.preventDefault();
+              ev.stopPropagation();
+              // Freeze current widths before going fixed-layout so columns
+              // don't jump when the layout mode flips.
+              table.querySelectorAll("col").forEach((c) => c.style.removeProperty("width"));
+              heads.forEach((h) => { h.style.width = h.getBoundingClientRect().width + "px"; });
+              table.style.tableLayout = "fixed";
+              const scale = uiScale() || 1;
+              const startX = ev.clientX;
+              const startW = th.getBoundingClientRect().width / scale;
+              document.body.classList.add("col-resizing");
+
+              function onMove(e) {
+                const next = Math.max(48, startW + (e.clientX - startX) / scale);
+                th.style.width = next + "px";
+              }
+              function onUp() {
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+                document.body.classList.remove("col-resizing");
+                store[pageKey] = store[pageKey] || {};
+                store[pageKey][tableIdx] = Array.from(heads).map((h) => h.style.width);
+                try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (error) {}
+              }
+              document.addEventListener("mousemove", onMove);
+              document.addEventListener("mouseup", onUp);
+            }
+            th.addEventListener("mousedown", startResize);
+            th.appendChild(handle);
+          });
+        });
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        initThemeToggle();
+        initLangToggle();
+        initCmdkHint();
+        initHealthChip();
+        initSidebarCollapse();
+        initNavGroups();
+        initFormSubmitGuard();
+        initRecentFilterForms();
+        initTableColumnResize();
+        initConfirmDelegation();
+        initMobileNav();
+      });
+    </script>
+    <script>
+      /* Sidebar scroll persistence: keep .nav-scroll at the user's position
+         across page navigations (session-scoped, per tab). */
+      (function () {
+        var KEY = "ach:navscroll";
+        var nav = document.querySelector(".nav-scroll");
+        if (!nav) return;
+        var saved = parseInt(sessionStorage.getItem(KEY) || "0", 10);
+        if (saved > 0) nav.scrollTop = saved;
+        var t = null;
+        nav.addEventListener("scroll", function () {
+          if (t) clearTimeout(t);
+          t = setTimeout(function () {
+            try { sessionStorage.setItem(KEY, String(Math.round(nav.scrollTop))); } catch (e) {}
+          }, 120);
+        });
+      })();
+    </script>
+    <script>
+      /* Enhanced selects: themed dropdown UI over native <select> (forms
+         keep submitting the real control). Skips multi/size selects. */
+      (function () {
+        var openMenu = null;
+        function closeMenu() {
+          if (openMenu) { openMenu.remove(); openMenu = null; }
+          document.querySelectorAll(".sel-x.open").forEach(function (w) { w.classList.remove("open"); });
+        }
+        function labelOf(sel) {
+          var opt = sel.options[sel.selectedIndex];
+          return opt ? opt.textContent : "";
+        }
+        function enhance(sel) {
+          if (sel.dataset.selx || sel.multiple || sel.size > 1 || sel.closest(".no-selx")) return;
+          sel.dataset.selx = "1";
+          // While the native select is still in flow, capture its intrinsic
+          // width (longest option, incl. inline min-width) — once absolutely
+          // positioned it stops contributing, so seed it as the wrapper's
+          // min-width to keep long labels fully visible. Clamped for safety.
+          var intrinsicW = Math.min(sel.offsetWidth || 0, 320);
+          var wrap = document.createElement("span");
+          wrap.className = "sel-x";
+          if (intrinsicW > 0) wrap.style.minWidth = intrinsicW + "px";
+          sel.parentNode.insertBefore(wrap, sel);
+          wrap.appendChild(sel);
+          sel.classList.add("sel-x-native");
+          // Keep the native select in the tab order so keyboard users can
+          // reach it; the visual button mirrors its value. Arrow keys change
+          // the selection natively and `change` re-syncs the button label.
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "sel-x-btn";
+          btn.setAttribute("aria-hidden", "true");
+          btn.tabIndex = -1;
+          btn.textContent = labelOf(sel);
+          wrap.appendChild(btn);
+          function sync() { btn.textContent = labelOf(sel); }
+          sel.addEventListener("change", sync);
+          sel.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              btn.click();
+            }
+          });
+          var form = sel.closest("form");
+          if (form) form.addEventListener("reset", function () { setTimeout(sync, 0); });
+          btn.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            var wasOpen = wrap.classList.contains("open");
+            closeMenu();
+            if (wasOpen) return;
+            var menu = document.createElement("div");
+            menu.className = "sel-x-menu";
+            var r = btn.getBoundingClientRect();
+            var width = Math.max(r.width, 170);
+            menu.style.left = r.left + "px";
+            menu.style.top = (r.bottom + 6) + "px";
+            menu.style.width = width + "px";
+            Array.prototype.forEach.call(sel.options, function (opt) {
+              var item = document.createElement("div");
+              item.className = "sel-x-opt" + (opt.selected ? " active" : "") + (opt.disabled ? " disabled" : "");
+              item.textContent = opt.textContent;
+              if (!opt.disabled) {
+                item.addEventListener("click", function () {
+                  sel.value = opt.value;
+                  sel.dispatchEvent(new Event("change", { bubbles: true }));
+                  sync();
+                  closeMenu();
+                });
+              }
+              menu.appendChild(item);
+            });
+            document.body.appendChild(menu);
+            // flip up if clipped by the viewport bottom
+            var mh = menu.getBoundingClientRect().height;
+            if (r.bottom + 6 + mh > window.innerHeight - 8) {
+              menu.style.top = Math.max(8, r.top - mh - 6) + "px";
+            }
+            wrap.classList.add("open");
+            openMenu = menu;
+          });
+        }
+        document.addEventListener("click", function () { closeMenu(); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
+        window.addEventListener("scroll", closeMenu, true);
+        function enhanceAll() {
+          document.querySelectorAll("select").forEach(enhance);
+        }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", enhanceAll);
+        } else { enhanceAll(); }
+      })();
+    </script>
+  
+<div class="cmdk-overlay" id="cmdk" hidden>
+  <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="{{ _('全局搜索') }}">
+    <div class="cmdk-head">
+      <div class="cmdk-inputbox">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input id="cmdk-input" type="text" placeholder="{{ _('搜索页面、IP、域名、会话…') }}" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="cmdk-tabs" id="cmdk-tabs">
+        <button type="button" class="secondary cmdk-tab active" data-tab="all">{{ _('全部') }}</button>
+        <button type="button" class="secondary cmdk-tab" data-tab="page">{{ _('页面') }}</button>
+        <button type="button" class="secondary cmdk-tab" data-tab="entity">{{ _('实体') }}</button>
+      </div>
+    </div>
+    <div class="cmdk-results" id="cmdk-results"></div>
+    <div class="cmdk-foot">
+      <span>{{ _('↑↓ 选择 · Enter 打开') }}</span>
+      <span class="cmdk-foot-keys"><kbd>Esc</kbd> {{ _('关闭') }}</span>
+    </div>
+  </div>
+</div>
+<script id="cmdk-pages" type="application/json">{{ cmdk_pages | tojson }}</script>
+<script>
+(function () {
+  var overlay = document.getElementById('cmdk');
+  var input = document.getElementById('cmdk-input');
+  var resultsEl = document.getElementById('cmdk-results');
+  var PAGES = [];
+  try { PAGES = JSON.parse(document.getElementById('cmdk-pages').textContent); } catch (e) {}
+  var GROUP_LABEL = {
+    page: {{ _('页面') | tojson }},
+    system: {{ _('资产节点') | tojson }},
+    agent: {{ _('上线 Agent') | tojson }},
+    managed: {{ _('受管主机') | tojson }},
+    session: {{ _('蜜罐会话') | tojson }},
+    credential: {{ _('凭证记录') | tojson }},
+    decoy: {{ _('蜜饵部署') | tojson }},
+    attack: {{ _('攻击流量') | tojson }}
+  };
+  var ICONS = {
+    page: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    system: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>',
+    agent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>',
+    managed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 8h.01M7 17h.01"/></svg>',
+    session: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    credential: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M18 5l2 2M15 8l2 2"/></svg>',
+    decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c2 0 3 1 4 1s2-1 4-1a6 6 0 0 1 3.6 1.2A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-2 0-3-1-4-1s-2 1-4 1a6 6 0 0 1-3.6-1.2"/></svg>',
+    attack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3-8 4 16 3-8h6"/></svg>'
+  };
+  var items = [], all = [], active = -1, timer = null, tab = 'all';
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function open() {
+    overlay.hidden = false;
+    input.value = '';
+    setTab('all');
+    runQuery('');
+    setTimeout(function () { input.focus(); }, 0);
+  }
+  function close() { overlay.hidden = true; }
+  function isOpen() { return !overlay.hidden; }
+
+  function render() {
+    var list = items.filter(function (o) {
+      if (tab === 'all') return true;
+      if (tab === 'page') return o.group === 'page';
+      return o.group !== 'page';
+    });
+    if (!list.length) {
+      resultsEl.innerHTML = '<div class="cmdk-empty">' + {{ _('无结果') | tojson }} + '</div>';
+      active = -1;
+      return;
+    }
+    if (active >= list.length) active = list.length - 1;
+    if (active < 0) active = 0;
+    var html = '', lastGroup = null;
+    list.forEach(function (o, idx) {
+      if (o.group !== lastGroup) {
+        html += '<div class="cmdk-group">' + esc(GROUP_LABEL[o.group] || o.group) + '</div>';
+        lastGroup = o.group;
+      }
+      html += '<div class="cmdk-item' + (idx === active ? ' active' : '') + '" data-idx="' + idx + '">'
+        + '<span class="cmdk-ic">' + (ICONS[o.group] || ICONS.page) + '</span>'
+        + '<span class="cmdk-item-main"><b>' + esc(o.title) + '</b>'
+        + (o.sub ? '<small>' + esc(o.sub) + '</small>' : '') + '</span>'
+        + (idx === active ? '<kbd>↵</kbd>' : '') + '</div>';
+    });
+    resultsEl.innerHTML = html;
+    var el = resultsEl.querySelector('.cmdk-item.active');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+  function move(dir) {
+    if (!items.length) return;
+    active = (active + dir + items.length) % items.length;
+    render();
+  }
+  function go(idx) {
+    var o = items[idx];
+    if (!o) return;
+    close();
+    window.location.assign(o.url);
+  }
+  function applyTab(list) {
+    return list.filter(function (o) {
+      if (tab === 'all') return true;
+      if (tab === 'page') return o.group === 'page';
+      return o.group !== 'page';
+    });
+  }
+  function refresh() {
+    items = applyTab(all);
+    render();
+  }
+  function setTab(t) {
+    tab = t;
+    document.querySelectorAll('.cmdk-tab').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-tab') === t);
+    });
+    refresh();
+  }
+  function runQuery(q) {
+    var ql = q.trim().toLowerCase();
+    var list = PAGES.filter(function (p) {
+      return !ql || (p.title + ' ' + p.sub + ' ' + p.groupLabel + ' ' + p.url).toLowerCase().indexOf(ql) >= 0;
+    }).slice(0, 8).map(function (p) {
+      return { group: 'page', title: p.title, sub: p.sub, url: p.url };
+    });
+    if (!ql) { all = list; refresh(); return; }
+    fetch('/api/admin/search?q=' + encodeURIComponent(ql), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var seen = {};
+        list.forEach(function (o) { seen[o.url] = 1; });
+        (d.items || []).forEach(function (o) { if (!seen[o.url]) list.push(o); });
+        all = list;
+        refresh();
+      })
+      .catch(function () { all = list; refresh(); });
+  }
+
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    var q = input.value;
+    timer = setTimeout(function () { runQuery(q); }, 160);
+  });
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); move(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); move(-1); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); go(active); }
+  });
+  resultsEl.addEventListener('click', function (ev) {
+    var el = ev.target.closest('.cmdk-item');
+    if (el) go(Number(el.getAttribute('data-idx')));
+  });
+  document.querySelectorAll('.cmdk-tab').forEach(function (b) {
+    b.addEventListener('click', function () { setTab(b.getAttribute('data-tab')); });
+  });
+  document.getElementById('cmdk-open').addEventListener('click', open);
+  overlay.addEventListener('click', function (ev) { if (ev.target === overlay) close(); });
+  document.addEventListener('keydown', function (ev) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault();
+      if (isOpen()) close(); else open();
+    } else if (ev.key === 'Escape' && isOpen()) {
+      close();
+    }
+  });
+})();
+</script>
+
+
+<script>
+/* ── UX infra: glossary tooltips / global time range / drawer ── */
+(function () {
+  var lang = {{ (lang or 'zh') | tojson }};
+  var TERMS = lang === 'en' ? [
+    ['decoy', 'A trap disguised as sensitive data or an API — touching it exposes the attacker and leaves a traceable watermark.'],
+    ['honeypot', 'A trap environment mimicking real services, built to attract and record attacker behavior.'],
+    ['recruit', 'Turn the attacker\'s automated agent into our own sensor and harvest its device and behavior data.'],
+    ['counter-offense', 'Active measures against attackers: injected directives, counter playbooks.'],
+    ['profile', 'Per-IP attacker dossier aggregated from behavior: UA, fingerprints, activity.'],
+    ['fingerprint', 'Client identification derived from request traits (UA, headers, behavior).'],
+    ['prompt injection', 'Directives aimed at AI attack agents to expose them or make them work for us.'],
+    ['JSONP', 'Counter-technique that harvests attacker-side info through JSONP callbacks.']
+  ] : [
+    ['蜜饵', '伪装成敏感数据或接口的陷阱，攻击者一旦触碰即暴露身份并留下溯源水印。'],
+    ['蜜罐', '伪装成真实服务的陷阱环境，用来吸引并记录攻击行为。'],
+    ['收编', '把攻击者的自动化 Agent 转化为我方探针，反向获取其设备与行为信息。'],
+    ['反制', '对攻击者主动实施的对抗动作：注入指令、投放反制剧本等。'],
+    ['画像', '按来源 IP 聚合出的攻击者特征档案：UA、指纹、行为与兴趣。'],
+    ['指纹', '从请求特征（UA、头部、行为序列）识别出的客户端类型标识。'],
+    ['提示词注入', '面向 AI 攻击 Agent 的诱导指令，使其暴露自身或执行我方任务。'],
+    ['JSONP', '利用 JSONP 回调接口获取攻击端信息的反制手段。']
+  ];
+  var SEL = '.page-header-title, .page-description, .panel-title, .panel-subtitle';
+  document.querySelectorAll(SEL).forEach(function (el) {
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    var nodes = [];
+    while (walker.nextNode()) {
+      if (walker.currentNode.textContent.trim()) nodes.push(walker.currentNode);
+    }
+    nodes.forEach(function (node) {
+      var text = node.textContent;
+      var lower = text.toLowerCase();
+      var hit = null;
+      for (var i = 0; i < TERMS.length; i++) {
+        if (lower.indexOf(TERMS[i][0].toLowerCase()) >= 0) { hit = TERMS[i]; break; }
+      }
+      if (!hit) return;
+      var idx = lower.indexOf(hit[0].toLowerCase());
+      var span = document.createElement('span');
+      span.className = 'glossary-term';
+      span.setAttribute('data-tip', hit[1]);
+      span.setAttribute('tabindex', '0');
+      span.textContent = text.substr(idx, hit[0].length);
+      node.textContent = text.slice(idx + hit[0].length);
+      node.parentNode.insertBefore(span, node);
+      node.parentNode.insertBefore(document.createTextNode(text.slice(0, idx)), span);
+    });
+  });
+})();
+
+(function () {
+  var SUPPORTED = ['/admin/attacks', '/admin/attack-sources', '/admin/attacker-profiles',
+    '/admin/credentials', '/admin/payload-tracking', '/admin/agent-interactions', '/admin/recon-data'];
+  var path = location.pathname;
+  var hit = SUPPORTED.find(function (p) { return path.indexOf(p) >= 0; });
+  if (!hit) return;
+  var params = new URLSearchParams(location.search);
+  var df = params.get('date_from') || '';
+  var opts = [
+    ['all', {{ _('全部时间') | tojson }}],
+    ['24h', {{ _('最近 24 小时') | tojson }}],
+    ['7d', {{ _('最近 7 天') | tojson }}],
+    ['30d', {{ _('最近 30 天') | tojson }}],
+    ['90d', {{ _('最近 90 天') | tojson }}]
+  ];
+  var select = document.createElement('select');
+  select.id = 'global-time';
+  select.className = 'chip';
+  select.style.cursor = 'pointer';
+  opts.forEach(function (o) {
+    var op = document.createElement('option');
+    op.value = o[0]; op.textContent = o[1];
+    select.appendChild(op);
+  });
+  var cur = 'all';
+  if (df) {
+    var from = new Date(df), to = params.get('date_to') ? new Date(params.get('date_to')) : new Date();
+    var days = Math.round((to - from) / 86400000) + 1;
+    cur = { 1: '24h', 2: '24h', 7: '7d', 8: '7d', 30: '30d', 31: '30d', 90: '90d', 91: '90d' }[days] || 'custom';
+  }
+  if (cur === 'custom') {
+    var oc = document.createElement('option');
+    oc.value = 'custom'; oc.textContent = {{ _('自定义区间') | tojson }};
+    select.appendChild(oc);
+  }
+  select.value = cur;
+  var right = document.querySelector('.utility-right');
+  if (right) right.insertBefore(select, document.getElementById('cmdk-open'));
+  function iso(daysAgo) {
+    return new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+  }
+  function apply(v) {
+    var p = new URLSearchParams(location.search);
+    if (v === 'all' || v === 'custom') { p.delete('date_from'); p.delete('date_to'); }
+    else {
+      var days = v === '24h' ? 1 : v === '7d' ? 7 : v === '30d' ? 30 : 90;
+      p.set('date_from', iso(days - 1));
+      p.set('date_to', iso(0));
+    }
+    p.delete('page');
+    try { localStorage.setItem('ach:timeRange', v); } catch (e) {}
+    var qs = p.toString();
+    window.location.assign(location.pathname + (qs ? '?' + qs : ''));
+  }
+  select.addEventListener('change', function () { apply(select.value); });
+  if (!df) {
+    var saved = null;
+    try { saved = localStorage.getItem('ach:timeRange'); } catch (e) {}
+    if (saved && saved !== 'all' && saved !== 'custom') apply(saved);
+  }
+})();
+
+window.acDrawer = function (title, bodyHtml, fullUrl, fullLabel) {
+  var ov = document.getElementById('ac-drawer-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ac-drawer-overlay';
+    ov.className = 'ac-drawer-overlay';
+    ov.innerHTML = '<aside class="ac-drawer"><div class="ac-drawer-head">'
+      + '<div class="ac-drawer-title"></div><div class="ac-drawer-actions"></div>'
+      + '<button type="button" class="ac-drawer-close" aria-label="{{ _('关闭') }}">✕</button></div>'
+      + '<div class="ac-drawer-body"></div></aside>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) ov.hidden = true; });
+    ov.querySelector('.ac-drawer-close').addEventListener('click', function () { ov.hidden = true; });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && !ov.hidden && !document.getElementById('cmdk').hidden) { /* cmdk 优先 */ }
+      else if (ev.key === 'Escape' && !ov.hidden) ov.hidden = true;
+    });
+  }
+  ov.hidden = false;
+  ov.querySelector('.ac-drawer-title').textContent = title;
+  var acts = ov.querySelector('.ac-drawer-actions');
+  acts.innerHTML = '';
+  if (fullUrl) {
+    var a = document.createElement('a');
+    a.className = 'chip';
+    a.href = fullUrl;
+    a.textContent = {{ _('在完整页打开') | tojson }};
+    acts.appendChild(a);
+  }
+  ov.querySelector('.ac-drawer-body').innerHTML = bodyHtml;
+  return ov;
+};
+</script>
+</body>
+<script id="tour-data" type="application/json">{{ deploy_scenarios | tojson }}</script>
+<script id="tour-labels" type="application/json">{{ {
+    "prev": _('上一步'), "next": _('下一步'), "finish": _('完成引导'), "skip": _('跳过引导'),
+    "stepWord": _('第'), "ofWord": _('步'),
+    "pickerTitle": _('部署向导 · 选择部署场景'),
+    "pickerDesc": _('选择一个最接近你需求的部署场景')
+} | tojson }}</script>
+<script>
+(function () {
+  var SCEN = [];
+  try { SCEN = JSON.parse(document.getElementById('tour-data').textContent); } catch (e) {}
+  var KEY = 'ach:deployTour';
+  var TL = {};
+  try { TL = JSON.parse(document.getElementById('tour-labels').textContent); } catch (e) {}
+  var AP = {{ admin_access_path | tojson }};
+  var SEC = '/' + AP;
+  // NOTE: never write '/admin' as a literal in this script — the outbound
+  // middleware rewrites every '/admin…' occurrence in the HTML (including
+  // JS strings and the tour-data JSON payload) to the security-prefixed
+  // form. Normalize the step paths back to the raw '/admin…' convention by
+  // stripping the security prefix, and navigate by re-adding it.
+  SCEN.forEach(function (sc) {
+    sc.steps.forEach(function (st) {
+      if (AP && st.path.indexOf(SEC + '/') === 0) st.path = st.path.slice(SEC.length);
+    });
+  });
+  var overlay = null, spot = null, card = null;
+  var sc = -1, i = -1;
+  var spotRetries = 0, spotTimer = null;
+
+  function store() { try { sessionStorage.setItem(KEY, JSON.stringify({ sc: sc, i: i })); } catch (e) {} }
+  function state() { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function teardown() {
+    // remove the spotlight overlay (card included); recreated by ensureUI()
+    if (overlay) { overlay.remove(); overlay = null; spot = null; card = null; }
+  }
+  function done() { sc = -1; i = -1; try { sessionStorage.removeItem(KEY); } catch (e) {} teardown(); }
+  function scenario() { return SCEN[sc] || null; }
+  function step() { var s = scenario(); return s ? s.steps[i] : null; }
+  function localPath() {
+    // current pathname in the same raw '/admin…' convention as st.path
+    var p = location.pathname;
+    if (AP && p.indexOf(SEC + '/') === 0) p = p.slice(SEC.length);
+    return p;
+  }
+  function pathMatches(st) { return localPath() === st.path; }
+
+  function ensureUI() {
+    if (overlay) return;
+    overlay = document.createElement('div');
+    overlay.className = 'tour-overlay';
+    document.body.appendChild(overlay);
+    spot = document.createElement('div');
+    spot.className = 'tour-spot';
+    overlay.appendChild(spot);
+    card = document.createElement('div');
+    card.className = 'tour-card';
+    overlay.appendChild(card);
+    window.addEventListener('resize', function () { if (sc >= 0 && i >= 0) { var t = targetEl(step()); position(t); positionCard(t); } });
+    window.addEventListener('scroll', function () { if (sc >= 0 && i >= 0) position(targetEl(step())); }, true);
+    window.addEventListener('load', function () { if (sc >= 0 && i >= 0) { var t = targetEl(step()); position(t); positionCard(t); } });
+    // pages re-render their own toolbars after load — keep the spotlight
+    // glued to the target while a step is active (no-op when idle)
+    setInterval(function () {
+      if (sc < 0 || i < 0 || !overlay) return;
+      var st = step();
+      if (!st || !overlay || document.querySelector('.tour-picker')) return;
+      var t = targetEl(st);       // takes the step object, reads .sel itself
+      position(t);
+      positionCard(t);
+    }, 500);
+  }
+  function targetEl(st) {
+    if (!st || !st.sel) return null;
+    try { return document.querySelector(st.sel); } catch (e) { return null; }
+  }
+  function position(target) {
+    var pad = 6;
+    if (target && target.getBoundingClientRect && target.getBoundingClientRect().width) {
+      var r = target.getBoundingClientRect();
+      spot.style.display = 'block';
+      spot.style.background = 'transparent';
+      spot.style.boxShadow = '0 0 0 9999px rgba(2, 6, 23, .62)';
+      spot.style.borderRadius = '12px';
+      spot.style.left = (r.left - pad) + 'px';
+      spot.style.top = (r.top - pad) + 'px';
+      spot.style.width = (r.width + pad * 2) + 'px';
+      spot.style.height = (r.height + pad * 2) + 'px';
+    } else {
+      spot.style.display = 'block';
+      spot.style.left = '0'; spot.style.top = '0';
+      spot.style.width = '100vw'; spot.style.height = '100vh';
+      spot.style.borderRadius = '0';
+      spot.style.boxShadow = 'none';
+      spot.style.background = 'rgba(2, 6, 23, .45)';
+    }
+  }
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function setCardPos(left, top) {
+    card.style.left = Math.round(left) + 'px';
+    card.style.top = Math.round(top) + 'px';
+    // the admin shell can translate the fixed-position coordinate space
+    // (spot placements survive because both ends shift equally; the card
+    // targets absolute viewport coords and does not) — measure the real
+    // landing spot and close the residual; one pass is exact for pure
+    // offsets, two for scaled spaces
+    for (var pass = 0; pass < 2; pass++) {
+      var r = card.getBoundingClientRect();
+      var dx = left - r.left, dy = top - r.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) break;
+      var k = card.offsetWidth ? (r.width / card.offsetWidth) || 1 : 1;
+      card.style.left = Math.round((parseFloat(card.style.left) || left) + dx / k) + 'px';
+      card.style.top = Math.round((parseFloat(card.style.top) || top) + dy / k) + 'px';
+    }
+  }
+  function positionCard(target) {
+    // keep the card next to the spotlight: below the target, flip above
+    // when the viewport bottom is tight, clamp into the viewport; center
+    // when there is no target (intro/finish steps and the picker)
+    if (!card) return;
+    var cr = card.getBoundingClientRect();
+    var m = 16, gap = 12;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left, top;
+    if (target && target.getBoundingClientRect && target.getBoundingClientRect().width) {
+      var r = target.getBoundingClientRect();
+      left = Math.min(Math.max(m, r.left), Math.max(m, vw - cr.width - m));
+      top = r.bottom + gap;
+      if (top + cr.height + m > vh) top = r.top - cr.height - gap;      // flip above
+      if (top < m) top = Math.min(r.bottom + gap, vh - cr.height - m);  // tall target: stay below
+      top = Math.min(Math.max(m, top), Math.max(m, vh - cr.height - m));
+    } else {
+      left = Math.max(m, (vw - cr.width) / 2);
+      top = Math.max(m, (vh - cr.height) / 2);
+    }
+    setCardPos(left, top);
+  }
+  function show() {
+    var st = step();
+    if (!st) { done(); return; }
+    if (!pathMatches(st)) return;   // 等待：下一步按钮已带路跳页
+    ensureUI();
+    var target = targetEl(st);      // takes the step object, reads .sel itself
+    // pages built by their own scripts may render the target long after
+    // DOMContentLoaded — retry a while before falling back to full dim
+    if (st.sel && !target && spotRetries < 40) {
+      spotRetries += 1;
+      if (spotTimer) clearTimeout(spotTimer);
+      spotTimer = setTimeout(show, 250);
+    } else {
+      spotRetries = 0;
+    }
+    position(target);
+    renderCard(st);
+    positionCard(target);
+  }
+  function renderCard(st) {
+    var s = scenario();
+    var prevLabel = {{ _('上一步') | tojson }};
+    var nextLabel = i === s.steps.length - 1 ? {{ _('完成引导') | tojson }} : {{ _('下一步') | tojson }};
+    var progress = '{{ _('第') }} ' + (i + 1) + ' / ' + s.steps.length + ' {{ _('步') }}';
+    card.innerHTML = '<div class="tour-progress">' + esc(progress) + '</div>'
+      + '<div class="tour-title">' + esc(st.title) + '</div>'
+      + '<div class="tour-body">' + esc(st.body) + '</div>'
+      + '<div class="tour-btns">'
+      + '<button type="button" class="tour-skip">' + esc(TL.skip) + '</button>'
+      + '<span style="flex:1"></span>'
+      + (i > 0 ? '<button type="button" class="tour-prev">' + esc(prevLabel) + '</button>' : '')
+      + '<button type="button" class="tour-next tour-primary">' + esc(nextLabel) + '</button>'
+      + '</div>';
+    card.querySelector('.tour-skip').addEventListener('click', done);
+    var prevBtn = card.querySelector('.tour-prev');
+    if (prevBtn) prevBtn.addEventListener('click', function () { prev(); });
+    card.querySelector('.tour-next').addEventListener('click', function () { next(); });
+  }
+
+  // ── scenario picker ────────────────────────────────────────────
+  var SC_ICONS = {
+    globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>',
+    terminal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>',
+    bot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/><path d="M12 4v4M9 2h6"/></svg>'
+  };
+  function showPicker() {
+    ensureUI();
+    position(null);
+    card.className = 'tour-card tour-picker';
+    var rows = SCEN.map(function (s, k) {
+      return '<div class="tour-scenario" data-k="' + k + '" role="button" tabindex="0">'
+        + '<span class="tour-sc-ic">' + (SC_ICONS[s.icon] || '') + '</span>'
+        + '<span class="tour-sc-main"><b>' + esc(s.name) + '</b><small>' + esc(s.desc) + '</small></span>'
+        + '<span class="tour-sc-n">' + s.steps.length + ' {{ _('步') }}</span></div>';
+    }).join('');
+    card.innerHTML = '<div class="tour-progress">' + esc(TL.pickerTitle) + '</div>'
+      + '<div class="tour-title">' + esc(TL.pickerDesc) + '</div>'
+      + '<div class="tour-sc-list">' + rows + '</div>'
+      + '<div class="tour-btns"><button type="button" class="tour-skip">' + esc(TL.skip) + '</button></div>';
+    card.querySelectorAll('.tour-scenario').forEach(function (el) {
+      el.addEventListener('click', function () { choose(Number(el.getAttribute('data-k'))); });
+      el.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(Number(el.getAttribute('data-k'))); }
+      });
+    });
+    card.querySelector('.tour-skip').addEventListener('click', done);
+    positionCard(null);
+  }
+  function choose(k) {
+    sc = k; i = 0;
+    card.className = 'tour-card';
+    spotRetries = 0;
+    if (spotTimer) clearTimeout(spotTimer);
+    store();
+    var st = step();
+    if (!pathMatches(st)) { teardown(); location.assign('/' + AP + st.path); }
+    else show();
+  }
+
+  function next() {
+    var s = scenario();
+    if (!s) { done(); return; }
+    if (i >= s.steps.length - 1) { done(); return; }
+    i += 1;
+    spotRetries = 0;
+    if (spotTimer) clearTimeout(spotTimer);
+    store();
+    var st = step();
+    if (!pathMatches(st)) { teardown(); location.assign('/' + AP + st.path); }
+    else show();
+  }
+  function prev() {
+    if (i <= 0) return;
+    i -= 1;
+    spotRetries = 0;
+    if (spotTimer) clearTimeout(spotTimer);
+    store();
+    var st = step();
+    if (!pathMatches(st)) { teardown(); location.assign('/' + AP + st.path); }
+    else show();
+  }
+
+  function injectLauncher() {
+    if (localPath() !== '/admin') return;
+    var doneFlag = false;
+    try { doneFlag = !!localStorage.getItem('ach:deployTourDone'); } catch (e) {}
+    var st = null;
+    try { st = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (doneFlag || st) return;
+    // fixed floating card: dashboard scripts re-render .content, so a
+    // DOM-inserted banner would be wiped — fixed pos is immune
+    var banner = document.createElement('div');
+    banner.className = 'tour-launcher';
+    banner.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:94;width:min(380px,calc(100vw - 36px));';
+    banner.innerHTML = '<div class="panel page-banner" style="margin:0"><div class="page-banner-body">'
+      + '<div class="panel-title page-banner-title">{{ _('部署向导') }}</div>'
+      + '<p class="page-banner-text">{{ _('第一次使用？选择一个部署场景，跟着交互式指引逐步完成配置：蜜罐 → 蜜饵 → 域名 → 观测 → 反制。') }}</p>'
+      + '<div class="tour-launch-btns">'
+      + '<button type="button" class="primary btn-sm" id="tour-launch">{{ _('启动向导') }}</button>'
+      + '<button type="button" class="chip" id="tour-dismiss">{{ _('不再显示') }}</button>'
+      + '</div></div>';
+    document.body.appendChild(banner);
+    banner.querySelector('#tour-launch').addEventListener('click', function () {
+      banner.remove();
+      showPicker();
+    });
+    banner.querySelector('#tour-dismiss').addEventListener('click', function () {
+      try { localStorage.setItem('ach:deployTourDone', '1'); } catch (e) {}
+      banner.remove();
+    });
+  }
+
+  function boot() {
+    try {
+      if (!SCEN.length) return;
+      var st = state();
+      var resume = false;
+      if (st && typeof st.sc === 'number' && SCEN[st.sc] && typeof st.i === 'number') {
+        var s = SCEN[st.sc], stp = s.steps[st.i];
+        if (stp && pathMatches(stp)) {
+          sc = st.sc; i = st.i;
+          resume = true;
+        } else {
+          try { sessionStorage.removeItem(KEY); } catch (e) {}  // stale state on another page: drop
+        }
+      }
+      if (resume) { show(); } else { injectLauncher(); }
+    } catch (e) {
+      window.__tourErr = String(e && e.stack || e);
+      injectLauncher();          // never let a bug hide the launcher
+    }
+  }
+  window.__tourDebug = {
+    scen: SCEN,
+    showPicker: function () { try { showPicker(); } catch (e) { window.__tourErr = String(e && e.stack || e); } },
+    err: function () { return window.__tourErr || null; },
+  };
+
+  window.acStartDeployTour = function () {
+    try {
+      localStorage.removeItem('ach:deployTourDone');
+      sessionStorage.removeItem(KEY);
+    } catch (e) {}
+    showPicker();
+  };
+  window.acShowTourPicker = showPicker;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body></body>
+</html>

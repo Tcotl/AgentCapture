@@ -1,0 +1,255 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, badge, empty_state with context %}
+{% block content %}
+{{ page_header('ON', _('子节点接入'), _('把远程网段的子节点接入主控制台：注册节点 → 快捷接入 → 下发蜜罐导流。三步完成，全程心跳回连。'), [_('主控制台'), _('快捷接入'), _('心跳回连')]) }}
+
+{% if created %}
+<div class="panel page-banner page-banner-success" style="margin-bottom:14px">
+  {{ _('节点已创建') }}：<code>{{ created }}</code> —— {{ _('可跳过手动登记，直接使用 ② 快捷接入。') }}
+</div>
+{% endif %}
+
+<div class="ob-steps">
+  <div class="ob-step"><span class="ob-num">1</span><span>{{ _('主控制台准备') }}</span></div>
+  <span class="ob-arrow">→</span>
+  <div class="ob-step"><span class="ob-num">2</span><span>{{ _('快捷接入') }}</span></div>
+  <span class="ob-arrow">→</span>
+  <div class="ob-step"><span class="ob-num">3</span><span>{{ _('下发蜜罐与验证') }}</span></div>
+</div>
+
+<section class="panel ob-sec">
+  {{ section_header(_('① 主控制台准备'), _('生成节点 API 令牌，并为每个远程网段登记一个节点。')) }}
+  <div class="grid-2" style="align-items:stretch">
+    <div class="ob-card">
+      <div class="ob-card-head">
+        <strong>{{ _('节点 API 令牌') }}</strong>
+        {% if token_configured %}<span class="pill">{{ _('已配置') }} <code>{{ token_masked }}</code></span>
+        {% else %}<span class="pill" style="color:var(--warning,#f59e0b);border-color:var(--warning,#f59e0b)">{{ _('未配置') }}</span>{% endif %}
+      </div>
+      <p class="muted" style="margin:0 0 8px;font-size:12px;line-height:1.7">{% if token_configured %}{{ _('完整值仅存于 .env.docker；接入命令已自动携带。') }}{% else %}{{ _('当前节点 API 不校验令牌；生产环境建议设置后再分发接入命令。') }}{% endif %}</p>
+      <pre class="ob-cmd" data-copy># {{ _('主控制台（AC 主机）生成并写入环境') }}
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+echo 'NODE_AUTH_TOKEN=<{{ _('令牌') }}>' >> .env.docker
+docker compose --env-file .env.docker up -d</pre>
+    </div>
+    <div class="ob-card">
+      <div class="ob-card-head"><strong>{{ _('创建节点台账') }}</strong><span class="muted" style="font-size:11.5px">{{ _('可选：也可由子节点 --enroll 自助注册') }}</span></div>
+      <form method="post" action="/admin/nodes?next=/admin/nodes/onboarding" class="stack" style="margin-top:8px">
+        <input name="name" placeholder="{{ _('节点名，如 dc1-edge' ) }}" required>
+        <div class="grid-2">
+          <input name="listen_address" placeholder="{{ _('监听地址，如 10.20.1.1' ) }}" value="0.0.0.0" required>
+          <input name="callback_address" placeholder="{{ _('回连地址' ) }}" value="0.0.0.0">
+        </div>
+        <select name="network_zone">
+          <option value="">{{ _( '未分区' ) }}</option>
+          <option value="DMZ">DMZ</option>
+          <option value="业务内网">{{ _( '业务内网' ) }}</option>
+          <option value="核心内网">{{ _( '核心内网' ) }}</option>
+          <option value="管理网">{{ _( '管理网' ) }}</option>
+        </select>
+        <input type="hidden" name="node_type" value="remote">
+        <button type="submit" class="btn-sm" style="justify-self:start">{{ _( '创建节点' ) }}</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel ob-sec">
+  {{ section_header(_('② 快捷接入（推荐）'), _('生成一行命令，在子节点上以 root 执行即可完成：下载执行器 → 自助注册 → systemd 常驻。')) }}
+  <div class="grid-4" style="align-items:end">
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _( '节点名' ) }}</label>
+      <input id="qj-name" placeholder="dc3-edge">
+    </div>
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _( '网络区域' ) }}</label>
+      <select id="qj-zone">
+        <option value="">{{ _( '未分区' ) }}</option>
+        <option value="DMZ">DMZ</option>
+        <option value="业务内网">{{ _( '业务内网' ) }}</option>
+        <option value="核心内网">{{ _( '核心内网' ) }}</option>
+        <option value="管理网">{{ _( '管理网' ) }}</option>
+      </select>
+    </div>
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _( '导流端口白名单' ) }}</label>
+      <input id="qj-ports" value="22,3306,6379,21,9200">
+    </div>
+    <div>
+      <label class="muted" style="display:block;font-size:12px;margin-bottom:4px">{{ _( '主控制台地址' ) }}</label>
+      <input id="qj-ac" value="{{ ac_host }}:{{ ac_port }}">
+    </div>
+  </div>
+  <div class="ob-cmd-wrap">
+    <div class="ob-cmd-head">
+      <span class="muted" style="font-size:11px">{{ _('在子节点上以 root 执行') }}</span>
+      <button type="button" class="secondary btn-sm" id="qj-copy">{{ _( '复制' ) }}</button>
+    </div>
+    <pre id="qj-cmd" class="ob-cmd"></pre>
+    <p class="muted" style="margin:8px 0 0;font-size:11.5px">{{ _('命令内嵌接入令牌，请通过内部渠道分发给下属单位；执行后节点自动注册并常驻回连。') }}</p>
+  </div>
+</section>
+
+<section class="panel ob-sec">
+  {{ section_header(_('③ 下发蜜罐与验证'), _('节点上线后，从拓扑或节点详情把蜜罐导流任务下发给对应网段。')) }}
+  <div class="grid-2" style="align-items:stretch">
+    <div class="ob-card">
+      <div class="ob-card-head"><strong>{{ _('下发蜜罐导流') }}</strong></div>
+      <p class="muted" style="margin:0 0 8px;font-size:12px;line-height:1.7">{{ _('接入拓扑页点击节点 → 右侧「蜜罐发布」勾选协议端口并下发；或节点详情页同款面板。节点执行器会把本网段对标准端口的扫描导流到主控制台蜜罐。') }}</p>
+      <a class="chip primary" href="/admin/nodes">{{ _( '打开接入拓扑' ) }}</a>
+    </div>
+    <div class="ob-card">
+      <div class="ob-card-head"><strong>{{ _('验证与回退' ) }}</strong><button type="button" class="secondary btn-sm ob-copy" data-copy-target="ob-verify-cmd">{{ _( '复制' ) }}</button></div>
+      <pre class="ob-cmd" id="ob-verify-cmd" data-copy># {{ _('心跳自检') }}
+curl -s -X POST http://{{ ac_host }}:{{ ac_port }}/api/node/heartbeat \
+  -H 'Content-Type: application/json' \
+  -d '{"node_name":"<node-name>","status":"online"}'
+
+# {{ _('节点侧确认 DNAT（下发导流任务后）') }}
+iptables -t nat -S PREROUTING | grep agentcapture
+
+# {{ _('回退') }}: {{ _('停止 agent + 拓扑检查器「回收导流」+ 停用 systemd') }}</pre>
+    </div>
+  </div>
+</section>
+
+<section class="panel ob-sec">
+  <details class="ob-advanced">
+    <summary>{{ _( '高级：手动接入命令（调试 / 正式 / systemd）' ) }}</summary>
+    <div class="ob-adv-body">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label class="muted" style="font-size:12px">{{ _( '选择节点' ) }}</label>
+        <select id="adv-node" style="min-width:220px">
+          {% for name in remote_names %}
+          <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+        <span class="muted" style="font-size:11.5px">{{ _('命令随上方「主控制台地址」联动。') }}</span>
+      </div>
+      <div class="ob-card" style="margin-bottom:12px">
+        <div class="ob-card-head"><strong>{{ _('调试运行（dry-run：只打印 iptables，不实际执行）' ) }}</strong><button type="button" class="secondary btn-sm ob-copy" data-copy-target="adv-dry">{{ _( '复制' ) }}</button></div>
+        <pre class="ob-cmd" id="adv-dry">sudo python3 node_agent.py --server __SERVER__ \
+  --name __NODE__ \
+  --token '${NODE_AUTH_TOKEN:-x}' \
+  --enroll \
+  --target-host __HOST__ \
+  --allow-ports __PORTS__</pre>
+      </div>
+      <div class="ob-card" style="margin-bottom:12px">
+        <div class="ob-card-head"><strong>{{ _('正式运行（--apply 真正落 DNAT 导流规则）' ) }}</strong><button type="button" class="secondary btn-sm ob-copy" data-copy-target="adv-prod">{{ _( '复制' ) }}</button></div>
+        <pre class="ob-cmd" id="adv-prod">sudo NODE_AUTH_TOKEN='<{{ _('令牌' ) }}>' python3 node_agent.py \
+  --server __SERVER__ \
+  --name __NODE__ \
+  --token "$NODE_AUTH_TOKEN" \
+  --enroll --apply \
+  --target-host __HOST__ \
+  --allow-ports __PORTS__</pre>
+      </div>
+      <div class="ob-card">
+        <div class="ob-card-head"><strong>{{ _('systemd 常驻（开机自启）' ) }}</strong><button type="button" class="secondary btn-sm ob-copy" data-copy-target="adv-systemd">{{ _( '复制' ) }}</button></div>
+        <pre class="ob-cmd" id="adv-systemd"># /etc/systemd/system/agentcapture-node.service
+[Unit]
+Description=AgentCapture node agent
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/agentcapture-node
+Environment=NODE_AUTH_TOKEN=<{{ _('令牌' ) }}>
+ExecStart=/usr/bin/python3 /opt/agentcapture-node/node_agent.py \
+  --server __SERVER__ --name __NODE__ --token "$NODE_AUTH_TOKEN" \
+  --enroll --apply --target-host __HOST__ --allow-ports __PORTS__
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# systemctl daemon-reload && systemctl enable --now agentcapture-node</pre>
+      </div>
+    </div>
+  </details>
+</section>
+
+<style>
+  .ob-steps { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .ob-step { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--foreground); }
+  .ob-num { width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--primary, #2563eb); color: #fff; font-size: 12px; font-weight: 700; }
+  .ob-arrow { color: var(--muted-foreground); }
+  .ob-sec { margin-bottom: 16px; }
+  .ob-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--foreground) 3%, transparent); }
+  .ob-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .ob-card-head strong { font-size: 13px; color: var(--foreground); }
+  .ob-cmd-wrap { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: color-mix(in srgb, var(--foreground) 3%, transparent); }
+  .ob-cmd-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .ob-cmd { margin: 0; font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 11.5px; line-height: 1.8; white-space: pre-wrap; word-break: break-all; color: var(--foreground);
+    max-height: 240px; overflow: auto; }
+  .ob-advanced summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted-foreground); padding: 4px 0; }
+  .ob-advanced summary:hover { color: var(--foreground); }
+  .ob-adv-body { margin-top: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1180px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+<script id="ob-nodes" type="application/json">{{ remote_names | tojson }}</script>
+<script>
+(function () {
+  const TOKEN_VALUE = {{ token_value | tojson }};
+  const NODE_NAMES = JSON.parse(document.getElementById('ob-nodes').textContent || '[]');
+  const PORTS_DEFAULT = '22,3306,6379,21,9200';
+  function acAddr() { return (document.getElementById('qj-ac').value || '').trim(); }
+
+  function buildQj() {
+    const name = (document.getElementById('qj-name').value || '').trim();
+    const zone = document.getElementById('qj-zone').value;
+    const ports = (document.getElementById('qj-ports').value || '').trim();
+    const ac = acAddr();
+    const q = new URLSearchParams();
+    if (name) q.set('name', name);
+    if (TOKEN_VALUE) q.set('token', TOKEN_VALUE);
+    if (zone) q.set('zone', zone);
+    if (ports) q.set('ports', ports);
+    return 'curl -fsSL "http://' + ac + '/api/node/join?' + q.toString() + '" -o join.sh && sudo bash join.sh';
+  }
+  function refreshQj() { document.getElementById('qj-cmd').textContent = buildQj(); }
+  ['qj-name', 'qj-zone', 'qj-ports', 'qj-ac'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', refreshQj);
+  });
+
+  function fillAdvanced() {
+    const sel = document.getElementById('adv-node');
+    const node = sel.value || NODE_NAMES[0] || '__NODE__';
+    const acRaw = acAddr() || '127.0.0.1:4877';
+    const colon = acRaw.lastIndexOf(':');
+    const host = colon > 0 ? acRaw.slice(0, colon) : acRaw;
+    const port = colon > 0 ? acRaw.slice(colon + 1) : '4877';
+    const server = 'http://' + host + ':' + port;
+    const ports = (document.getElementById('qj-ports').value || PORTS_DEFAULT);
+    [['adv-dry', node, server, host, ports], ['adv-prod', node, server, host, ports], ['adv-systemd', node, server, host, ports]].forEach(function (item) {
+      const el = document.getElementById(item[0]);
+      if (el) el.textContent = el.textContent.split('__NODE__').join(node).split('__SERVER__').join(item[2]).split('__HOST__').join(item[3]).split('__PORTS__').join(item[4]);
+    });
+  }
+  document.getElementById('adv-node').addEventListener('change', fillAdvanced);
+  document.getElementById('qj-ac').addEventListener('input', fillAdvanced);
+  document.getElementById('qj-ports').addEventListener('input', fillAdvanced);
+
+  // one delegated copy handler for every copy button on the page
+  document.addEventListener('click', function (ev) {
+    const btn = ev.target.closest ? ev.target.closest('.ob-copy') : null;
+    if (!btn) return;
+    const target = document.getElementById(btn.getAttribute('data-copy-target'));
+    if (target) navigator.clipboard.writeText(target.textContent).then(function () {
+      if (window.showToast) showToast({{ _('已复制到剪贴板') | tojson }}, 'success');
+    });
+  });
+  document.getElementById('qj-copy').addEventListener('click', function () {
+    navigator.clipboard.writeText(document.getElementById('qj-cmd').textContent).then(function () {
+      if (window.showToast) showToast({{ _('已复制到剪贴板') | tojson }}, 'success');
+    });
+  });
+
+  refreshQj();
+  fillAdvanced();
+})();
+</script>
+{% endblock %}

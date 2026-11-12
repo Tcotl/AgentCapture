@@ -1,0 +1,1073 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, icon, service_tags, modal_dialog with context %}
+{% block content %}
+{{ page_header('ND', _('节点管理'), _('统一维护内置与远程节点、挂载模板、观察最近心跳，并为节点排入任务分发雏形。'), [_('心跳'), _('任务分发')],
+      actions='<button type="button" class="chip primary" data-modal-open="nodes-create-modal">' ~ _('＋ 新增节点') ~ '</button>') }}
+
+<section class="panel node-topo-panel">
+  {{ section_header(_('节点拓扑'), _('中心为主控制台，节点环绕排布。拖拽调整位置（自动保存）；连线流光 = 心跳活跃，琥珀实线 = 心跳超时，红虚线 = 离线。点击节点查看详情。')) }}
+  <div class="node-topo-wrap" id="node-topo-wrap">
+    <svg id="node-topo-svg" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMid meet">      <defs>
+        <linearGradient id="nt-card-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="var(--nt-card-hi, var(--card))"/>
+          <stop offset="1" stop-color="var(--nt-card, var(--card))"/>
+        </linearGradient>
+      </defs>
+      <g id="nt-zones"></g>
+      <g id="nt-edges"></g>
+      <g id="nt-nodes"></g>
+      <g id="nt-core"></g>
+    </svg>
+    <div class="nt-zoom">
+      <button type="button" id="nt-zoom-in" title="{{ _( '放大' ) }}">+</button>
+      <button type="button" id="nt-zoom-out" title="{{ _( '缩小' ) }}">−</button>
+      <button type="button" id="nt-zoom-fit" title="{{ _( '重置视图' ) }}">⤢</button>
+    </div>
+    <aside class="node-topo-insp collapsed" id="nt-insp">
+      <div class="nt-insp-body" id="nt-insp-body">
+      <div class="nt-insp-head">
+        <strong id="nt-insp-title"></strong>
+        <button type="button" class="secondary btn-sm" id="nt-insp-close" title="{{ _( '收回菜单栏' ) }}">×</button>
+      </div>
+      <div class="kv"><div class="key">{{ _( '状态' ) }}</div><div id="nt-insp-status"></div></div>
+      <div class="kv"><div class="key">{{ _( '类型' ) }}</div><div><code id="nt-insp-type"></code></div></div>
+      <div class="kv"><div class="key">{{ _( '监听地址' ) }}</div><div><code id="nt-insp-listen"></code></div></div>
+      <div class="kv"><div class="key">{{ _( '最后在线' ) }}</div><div id="nt-insp-seen"></div></div>
+      <div class="kv"><div class="key">{{ _( '网络区域' ) }}</div><div>
+        <select id="nt-insp-zone" style="width:100%">
+          <option value="">{{ _( '未分区' ) }}</option>
+          <option value="平台控制区" disabled>◈ {{ _( '平台控制区' ) }}</option>
+          <option value="DMZ">DMZ</option>
+          <option value="业务内网">{{ _( '业务内网' ) }}</option>
+          <option value="核心内网">{{ _( '核心内网' ) }}</option>
+          <option value="管理网">{{ _( '管理网' ) }}</option>
+        </select>
+      </div></div>
+      <div class="kv"><div class="key">{{ _( '挂载服务' ) }}</div><div id="nt-insp-services"></div></div>
+      <div class="kv"><div class="key">{{ _( '待执行任务' ) }}</div><div id="nt-insp-pending"></div></div>
+      <div class="nt-insp-menu">
+        <div class="nt-menu-title">{{ _( '重命名与备注' ) }}</div>
+        <input type="text" id="nt-rename-input" placeholder="{{ _( '节点名称' ) }}" style="margin-bottom:6px">
+        <textarea id="nt-notes-input" rows="2" placeholder="{{ _( '备注，如网段/负责人/用途' ) }}" style="margin-bottom:6px"></textarea>
+        <div class="nt-menu-actions" style="margin-bottom:4px">
+          <button type="button" class="primary btn-sm" id="nt-rename-save">{{ _( '保存' ) }}</button>
+        </div>
+        <div class="nt-menu-title">{{ _( '蜜罐发布' ) }}</div>
+        <div class="nt-publish-grid" id="nt-pub-services">
+          {% for s in publish_services %}
+          <label class="nt-pub-item"><input type="checkbox" value="{{ s.key }}" checked><span>{{ s.label }} <code>{{ s.node_port }}→{{ s.ac_port }}</code></span></label>
+          {% endfor %}
+        </div>
+        <input type="text" id="nt-pub-host" placeholder="{{ _( 'AC 内网地址' ) }}">
+        <div class="nt-menu-actions">
+          <button type="button" class="primary btn-sm" id="nt-pub-apply">{{ _( '下发导流' ) }}</button>
+          <button type="button" class="secondary btn-sm" id="nt-pub-retract">{{ _( '回收导流' ) }}</button>
+        </div>
+        <div class="nt-menu-title">{{ _( '更多操作' ) }}</div>
+        <a class="chip" id="nt-insp-link" href="#">{{ _( '打开节点详情' ) }} →</a>
+      </div>
+      </div>
+      <button type="button" class="nt-insp-rail" id="nt-insp-rail" title="{{ _( '展开节点管理菜单' ) }}"><span>{{ _( '节点管理' ) }}</span></button>
+    </aside>
+  </div>
+</section>
+
+<script id="node-topo-data" type="application/json">{{ node_topology | tojson }}</script>
+<script id="node-topo-layout" type="application/json">{{ node_topology_layout | tojson }}</script>
+<style>
+  .node-topo-wrap { display: flex; align-items: stretch; position: relative; }
+  .nt-zoom { position: absolute; top: 10px; left: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 6; }
+  .nt-zoom button {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid var(--border-strong); background: var(--card);
+    color: var(--foreground); font-size: 15px; line-height: 1; cursor: pointer;
+    transition: border-color 150ms var(--ease-out, ease), color 150ms var(--ease-out, ease);
+  }
+  .nt-zoom button:hover { border-color: var(--ring); color: var(--ring); }
+  #node-topo-svg { flex: 1; min-width: 0; height: auto; display: block; touch-action: none;
+    --nt-card: var(--card); --nt-core: var(--card);
+    --nt-card-hi: color-mix(in srgb, var(--foreground) 5%, var(--card));
+    --nt-core-hi: color-mix(in srgb, var(--primary, #2563eb) 20%, var(--card)); }
+  #node-topo-svg .nt-edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .34; stroke-width: 1.5; stroke-dasharray: 7 6; }
+  #node-topo-svg #nt-edges, #node-topo-svg #nt-zones { pointer-events: none; }
+  #node-topo-svg .nt-zone-box { pointer-events: all; cursor: move; }
+  #node-topo-svg .nt-edge.stale { stroke: #f59e0b; stroke-opacity: .6; }
+  #node-topo-svg .nt-edge.off { stroke: #f43f5e; stroke-opacity: .6; }
+  #node-topo-svg .nt-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
+    stroke-dasharray: 9 91; animation: nt-flow 1.6s linear infinite; }
+  @keyframes nt-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { #node-topo-svg .nt-flow { display: none; } }
+  [data-theme="light"] #node-topo-svg .nt-flow { stroke: rgba(37, 99, 235, .78); }
+  #node-topo-svg .nt-side3d { fill: color-mix(in srgb, var(--foreground) 16%, transparent); }
+  #node-topo-svg .nt-card-rect { fill: url(#nt-card-grad); stroke: var(--border-strong); stroke-width: 1.2; }
+  #node-topo-svg g.nt-node { cursor: pointer; filter: drop-shadow(0 2px 4px rgba(2, 6, 23, .3)); }
+  #node-topo-svg g.nt-node:hover .nt-card-rect { stroke: var(--ring); }
+  #node-topo-svg g.nt-node.selected .nt-card-rect { stroke: var(--ring); stroke-width: 1.8; }
+  #node-topo-svg g.nt-node.selected { filter: drop-shadow(0 7px 14px rgba(2, 6, 23, .45)); }
+  #node-topo-svg .nt-name { font-size: 13px; font-weight: 600; fill: var(--foreground); }
+  #node-topo-svg .nt-meta { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
+  #node-topo-svg .nt-badge { fill: color-mix(in srgb, var(--primary, #2563eb) 16%, transparent); stroke: var(--ring); stroke-width: .8; }
+  #node-topo-svg .nt-badge-text { font-size: 10px; font-weight: 700; fill: var(--foreground); font-family: "Fira Code", ui-monospace, monospace; }
+  #node-topo-svg .nt-core-glow { animation: nt-breathe 3.2s ease-in-out infinite; }
+  @keyframes nt-breathe { 0%, 100% { opacity: .16; } 50% { opacity: .32; } }
+  @media (prefers-reduced-motion: reduce) { #node-topo-svg .nt-core-glow { animation: none; } }
+  #node-topo-svg .nt-core-label { font-size: 14px; font-weight: 700; fill: var(--foreground); }
+  #node-topo-svg .nt-core-sub { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; }
+  #node-topo-svg g.nt-core { cursor: pointer; }
+  .node-topo-insp {
+    flex: none; width: 320px;
+    border-left: 1px solid var(--border);
+    display: flex; align-items: stretch;
+    overflow: hidden;
+    transition: width 220ms var(--ease-out, ease);
+  }
+  .node-topo-insp.collapsed { width: 46px; }
+  .node-topo-insp .nt-insp-body { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px; }
+  .node-topo-insp.collapsed .nt-insp-body { display: none; }
+  .nt-insp-rail {
+    display: none; width: 100%; height: 100%;
+    align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted-foreground); font-size: 12px;
+  }
+  .nt-insp-rail span { writing-mode: vertical-rl; letter-spacing: .35em; font-weight: 600; }
+  .nt-insp-rail:hover { color: var(--foreground); background: var(--accent); }
+  .node-topo-insp.collapsed .nt-insp-rail { display: flex; }
+  .node-topo-insp .nt-insp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .node-topo-insp .nt-insp-head strong { font-size: 13px; color: var(--foreground); }
+  .node-topo-insp .kv { margin-bottom: 6px; }
+  .nt-insp-menu { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+  .nt-menu-title { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); font-family: "Fira Code", ui-monospace, monospace; margin: 8px 0 6px; }
+  .nt-publish-grid { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .nt-pub-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--foreground); cursor: pointer; padding: 2px 0; }
+  .nt-pub-item input { width: auto; }
+  .nt-pub-item code { font-size: 10.5px; color: var(--muted-foreground); }
+  #nt-pub-host { margin-bottom: 8px; }
+  .nt-menu-actions { display: flex; gap: 6px; margin-bottom: 4px; }
+</style>
+<script>
+(function () {
+  var NODES = [];
+  var LAYOUT = {};
+  try { NODES = JSON.parse(document.getElementById('node-topo-data').textContent) || []; } catch (e) {}
+  try { LAYOUT = JSON.parse(document.getElementById('node-topo-layout').textContent) || {}; } catch (e) {}
+  var svg = document.getElementById('node-topo-svg');
+  if (!svg || !NODES.length) return;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var VW = 1440, VH = 560;  // live viewBox extents (auto-fits content)
+  var CW = 210, CH = 72;
+  var CORE0 = { x: VW / 2 - 90, y: VH / 2 - 60 };
+  var core = { x: CORE0.x, y: CORE0.y, w: 180, h: 168 };
+  if (LAYOUT.core && LAYOUT.core.length === 2) { core.x += LAYOUT.core[0]; core.y += LAYOUT.core[1]; }
+  var edgeLayer = document.getElementById('nt-edges');
+  var nodeLayer = document.getElementById('nt-nodes');
+  var coreLayer = document.getElementById('nt-core');
+
+  function el(name, attrs, parent) {
+    var n = document.createElementNS(SVGNS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+
+  function freshClass(n) {
+    if (n.status !== 'online') return 'off';
+    if (n.fresh_seconds == null) return 'stale';
+    return n.fresh_seconds <= 300 ? 'fresh' : 'stale';
+  }
+
+  // ── zone grid layout ─────────────────────────────────────────────
+  // Zones are draggable clusters anchored around the console: a zone
+  // parked left/right of the console stacks its nodes vertically, one
+  // parked above/below lays them out in rows — 4 nodes per row/column,
+  // overflow wraps to the next row/column. Zone anchors persist in the
+  // layout payload as zone:<name> keys.
+  var zoneAnchors = {};
+  Object.keys(LAYOUT).forEach(function (k) {
+    if (k.indexOf('zone:') === 0 && LAYOUT[k] && typeof LAYOUT[k] === 'object' && LAYOUT[k].x != null) {
+      zoneAnchors[k.slice(5)] = { x: LAYOUT[k].x, y: LAYOUT[k].y, o: LAYOUT[k].o === 'v' ? 'v' : 'h' };
+    }
+  });
+  var ZONE_PAD = 18, ZONE_HEAD = 34, ZONE_GAP = 14;
+  // zone names are operator data (stored values) — display-translate the
+  // well-known ones; grouping/colors keep using the raw stored name
+  var LANG = {{ lang | tojson }};
+  var ZONE_I18N = {
+    '业务内网': {{ _('业务内网') | tojson }},
+    '核心内网': {{ _('核心内网') | tojson }},
+    '管理网': {{ _('管理网') | tojson }}
+  };
+  function zoneLabel(z) {
+    if (LANG === 'en' && ZONE_I18N[z]) return ZONE_I18N[z];
+    return z;
+  }
+  function zoneMembers(z) {
+    return NODES.filter(function (n) { return !n.is_builtin && n.zone === z; });
+  }
+  function zoneOrient(z) {
+    if (zoneAnchors[z]) return zoneAnchors[z].o;
+    var idx = Object.keys(zoneAnchors).length;
+    zoneAnchors[z] = { x: core.x + core.w + 180, y: core.y + idx * 60, o: 'v' };
+    return 'v';
+  }
+  function arrangeZone(z) {
+    var nodes = zoneMembers(z);
+    if (!nodes.length) { delete zoneAnchors[z]; return null; }
+    var o = zoneOrient(z);
+    var a = zoneAnchors[z];
+    var cols, rows;
+    if (o === 'h') { cols = Math.min(4, nodes.length); rows = Math.ceil(nodes.length / 4); }
+    else { cols = Math.ceil(nodes.length / 4); rows = Math.min(4, nodes.length); }
+    // cell pitch follows the widest/tallest RENDERED node (getBBox covers
+    // every text line) so long values never escape the zone box
+    var cellW = CW, cellH = CH;
+    nodes.forEach(function (n) {
+      var ref = cardRefs[n.id];
+      if (!ref) return;
+      var b = ref.g.getBBox();
+      cellW = Math.max(cellW, b.width + 12);
+      cellH = Math.max(cellH, b.height + 8);
+    });
+    nodes.forEach(function (n, i) {
+      var col, row;
+      if (o === 'h') { col = i % 4; row = Math.floor(i / 4); }
+      else { col = Math.floor(i / 4); row = i % 4; }
+      n.x = a.x + ZONE_PAD + col * cellW;
+      n.y = a.y + ZONE_HEAD + row * cellH;
+    });
+    nodes.forEach(function (n) {
+      if (cardRefs[n.id]) cardRefs[n.id].g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    });
+    var w = ZONE_PAD * 2 + cols * cellW;
+    var h = ZONE_HEAD + rows * cellH + ZONE_PAD;
+    return { label: z, fixed: false, nodes: nodes, o: o,
+      x0: a.x, y0: a.y, x1: a.x + w, y1: a.y + h };
+  }
+
+  var ring = 0;
+  NODES.forEach(function (n) {
+    if (n.is_builtin) return;          // rides on the console, no tower
+    if (n.zone) return;                // zoned nodes are grid-arranged
+    var saved = LAYOUT[String(n.id)];
+    if (saved && saved.length === 2) { n.x = saved[0]; n.y = saved[1]; return; }
+    var unzoned = NODES.filter(function (x) { return !x.is_builtin && !x.zone; });
+    var angle = -Math.PI / 2 + (ring * 2 * Math.PI) / Math.max(unzoned.length, 1);
+    ring += 1;
+    n.x = core.x + core.w / 2 + Math.cos(angle) * 430 - CW / 2;
+    n.y = core.y + core.h / 2 + Math.sin(angle) * 175 - CH / 2;
+  });
+
+  var ZONE_RULES = [[/DMZ/i, '#f59e0b'], [/业务/, '#3b82f6'], [/核心/, '#a855f7'], [/管理/, '#10b981']];
+  var ZONE_PALETTE = ['#64748b', '#0ea5e9', '#ec4899', '#22c55e'];
+  function zoneColor(z) {
+    for (var i = 0; i < ZONE_RULES.length; i++) if (ZONE_RULES[i][0].test(z)) return ZONE_RULES[i][1];
+    var h = 0;
+    for (var j = 0; j < z.length; j++) h = (h * 31 + z.charCodeAt(j)) >>> 0;
+    return ZONE_PALETTE[h % ZONE_PALETTE.length];
+  }
+  var zoneLayer = document.getElementById('nt-zones');
+  function contentBBox(n) {
+    // real rendered extents of the node group (tower + every text line),
+    // so zone boxes always enclose all displayed values
+    var ref = cardRefs[n.id];
+    if (!ref) return null;
+    var b = ref.g.getBBox();
+    return { x: b.x + n.x, y: b.y + n.y, w: b.width, h: b.height };
+  }
+
+  function drawZoneBox(x0, y0, x1, y1, label, color) {
+    var g = el('g', { class: 'nt-zone-box' }, zoneLayer);
+    el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 16,
+      fill: color, 'fill-opacity': .07, stroke: color, 'stroke-opacity': .45,
+      'stroke-width': 1.2, 'stroke-dasharray': '6 5' }, g);
+    var labelW = label.length * 13 + 26;
+    el('rect', { x: x0 + 12, y: y0 + 8, width: labelW, height: 20, rx: 10,
+      fill: color, 'fill-opacity': .18, stroke: color, 'stroke-opacity': .5 }, g);
+    var labelEl = el('text', { x: x0 + 12 + labelW / 2, y: y0 + 22, 'text-anchor': 'middle',
+      style: 'fill:' + color + ';font-size:11px;font-weight:700' }, g);
+    labelEl.textContent = label;
+    return g;
+  }
+
+  var CORE_ZONE_LABEL = {{ _('平台控制区') | tojson }};
+  function zoneBoxes() {
+    var boxes = [];
+    var cz = { label: CORE_ZONE_LABEL, fixed: true, nodes: [],
+      x0: core.x - 18, y0: core.y - 6, x1: core.x + core.w + 18, y1: core.y + core.h + 4 };
+    boxes.push(cz);
+    var zoneNames = [];
+    NODES.forEach(function (n) {
+      if (!n.is_builtin && n.zone && zoneNames.indexOf(n.zone) < 0) zoneNames.push(n.zone);
+    });
+    zoneNames.forEach(function (z) {
+      var b = arrangeZone(z);
+      if (b) boxes.push(b);
+    });
+    return boxes;
+  }
+  function shiftBox(box, dx, dy) {
+    if (!dx && !dy) return;
+    box.x0 += dx; box.x1 += dx; box.y0 += dy; box.y1 += dy;
+    box.nodes.forEach(function (n) {
+      n.x += dx; n.y += dy;
+      cardRefs[n.id].g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    });
+  }
+  function resolveZoneOverlaps() {
+    // zones are derived from node clusters, so resolving an overlap moves
+    // the cluster (never the boxes alone) — the console zone is the fixed
+    // anchor and its counterpart takes the full push
+    var boxes = zoneBoxes();
+    for (var iter = 0; iter < 80; iter++) {
+      var any = false;
+      for (var i = 0; i < boxes.length; i++) {
+        for (var j = i + 1; j < boxes.length; j++) {
+          var a = boxes[i], b = boxes[j];
+          var ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+          var oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+          if (ox <= 0 || oy <= 0) continue;
+          any = true;
+          if (ox <= oy) {
+            var dir = ((a.x0 + a.x1) <= (b.x0 + b.x1)) ? -1 : 1;
+            var push = ox + 6;
+            shiftBox(a, dir * push * (a.fixed ? 0 : (b.fixed ? 1 : 0.5)), 0);
+            shiftBox(b, -dir * push * (b.fixed ? 0 : (a.fixed ? 1 : 0.5)), 0);
+          } else {
+            var dir = ((a.y0 + a.y1) <= (b.y0 + b.y1)) ? -1 : 1;
+            var push = oy + 6;
+            shiftBox(a, 0, dir * push * (a.fixed ? 0 : (b.fixed ? 1 : 0.5)));
+            shiftBox(b, 0, -dir * push * (b.fixed ? 0 : (a.fixed ? 1 : 0.5)));
+          }
+        }
+      }
+      if (!any) break;
+    }
+    // keep anchors in sync with the resolved positions
+    boxes.forEach(function (b) {
+      if (!b.fixed && b.label) {
+        if (!zoneAnchors[b.label]) zoneAnchors[b.label] = { x: b.x0, y: b.y0, o: b.o || 'h' };
+        zoneAnchors[b.label].x = b.x0;
+        zoneAnchors[b.label].y = b.y0;
+      }
+    });
+    drawEdges();
+    drawZones();
+  }
+  function drawZones() {
+    zoneLayer.innerHTML = '';
+    zoneBoxes().forEach(function (zb) {
+      var color = zb.label === CORE_ZONE_LABEL ? '#4493f8' : zoneColor(zb.label);
+      var g = drawZoneBox(zb.x0, zb.y0, zb.x1, zb.y1, zoneLabel(zb.label), color);
+      if (!zb.fixed) {
+        g.addEventListener('pointerdown', function (ev) {
+          var a = zoneAnchors[zb.label];
+          zoneDrag = { z: zb.label, cx: ev.clientX, cy: ev.clientY, ax: a.x, ay: a.y, moved: false };
+          ev.preventDefault();
+        });
+      }
+    });
+  }
+
+  var FIT = { x: 0, y: 0, w: 1440, h: 560 };
+  var view = { x: 0, y: 0, w: 1440, h: 560 };
+  function applyView() {
+    svg.setAttribute('viewBox', view.x + ' ' + view.y + ' ' + view.w + ' ' + view.h);
+    VW = view.w;
+    VH = view.h;
+  }
+  function clampView() {
+    var minW = FIT.w * 0.35, maxW = FIT.w * 2.6;
+    view.w = Math.max(minW, Math.min(maxW, view.w));
+    view.h = view.w * (FIT.h / FIT.w);
+    var ccx = FIT.x + FIT.w / 2, ccy = FIT.y + FIT.h / 2;
+    var cx = view.x + view.w / 2, cy = view.y + view.h / 2;
+    cx = Math.min(Math.max(cx, ccx - FIT.w * 0.55), ccx + FIT.w * 0.55);
+    cy = Math.min(Math.max(cy, ccy - FIT.h * 0.55), ccy + FIT.h * 0.55);
+    view.x = cx - view.w / 2;
+    view.y = cy - view.h / 2;
+  }
+  function zoomAt(factor, clientX, clientY) {
+    var rect = svg.getBoundingClientRect();
+    var vx = view.x + (clientX - rect.left) / rect.width * view.w;
+    var vy = view.y + (clientY - rect.top) / rect.height * view.h;
+    var nw = Math.max(FIT.w * 0.35, Math.min(FIT.w * 2.6, view.w / factor));
+    var nh = nw * (FIT.h / FIT.w);
+    view.x = vx - (clientX - rect.left) / rect.width * nw;
+    view.y = vy - (clientY - rect.top) / rect.height * nh;
+    view.w = nw;
+    view.h = nh;
+    clampView();
+    applyView();
+  }
+  function fitViewBox() {
+    // keep every node, label and zone on-canvas no matter how many nodes
+    var x0 = core.x - 70, y0 = core.y - 60, x1 = core.x + core.w + 70, y1 = core.y + core.h + 40;
+    NODES.forEach(function (n) {
+      var b = contentBBox(n);
+      if (!b) return;
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+      x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
+    });
+    var pad = 46;
+    x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+    FIT = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    view = { x: x0, y: y0, w: FIT.w, h: FIT.h };
+    applyView();
+  }
+
+  var edgePool = [];
+  function edgeSlot(i) {
+    if (!edgePool[i]) {
+      var base = el('path', { class: 'nt-edge' }, edgeLayer);
+      var flow = el('path', { class: 'nt-flow' }, edgeLayer);
+      flow.style.display = 'none';
+      edgePool[i] = { base: base, flow: flow };
+    }
+    var slot = edgePool[i];
+    slot.base.style.display = '';
+    slot.flow.style.display = 'none';
+    return slot;
+  }
+
+  function curve(cx, cy, nx, ny) {
+    var mx = (cx + nx) / 2;
+    return 'M ' + cx + ' ' + cy + ' C ' + mx + ' ' + cy + ', ' + mx + ' ' + ny + ', ' + nx + ' ' + ny;
+  }
+
+  function drawEdges() {
+    var i = 0;
+    var ccx = core.x + core.w / 2, ccy = core.y + core.h / 2;
+    NODES.forEach(function (n) {
+      if (n.is_builtin) return;  // rides on the console — no edge, no tower
+      var state = freshClass(n);
+      var slot = edgeSlot(i++);
+      slot.base.setAttribute('d', curve(ccx, ccy, n.x + CW / 2, n.y + CH / 2));
+      slot.base.setAttribute('class', 'nt-edge' + (state === 'stale' ? ' stale' : '') + (state === 'off' ? ' off' : ''));
+      if (state === 'fresh') {
+        slot.flow.setAttribute('d', slot.base.getAttribute('d'));
+        slot.flow.style.display = '';
+      }
+    });
+    for (; i < edgePool.length; i++) {
+      edgePool[i].base.style.display = 'none';
+      edgePool[i].flow.style.display = 'none';
+    }
+  }
+
+  var SEEN_NEVER = {{ _('从未上报') | tojson }};
+  var SEEN_JUST = {{ _('（刚刚）') | tojson }};
+  var SEEN_MIN = {{ _('分钟前') | tojson }};
+  function fmtSeen(n) {
+    if (!n.last_seen) return SEEN_NEVER;
+    if (n.fresh_seconds == null) return n.last_seen;
+    if (n.fresh_seconds < 60) return n.last_seen + ' ' + SEEN_JUST;
+    if (n.fresh_seconds < 3600) return n.last_seen + '（' + Math.floor(n.fresh_seconds / 60) + ' ' + SEEN_MIN + '）';
+    return n.last_seen;
+  }
+
+  var cardRefs = {};
+  var coreGroup = null;
+  function drawCore() {
+    coreLayer.innerHTML = '';
+    coreGroup = el('g', { class: 'nt-core' }, coreLayer);
+    coreGroup.setAttribute('transform', 'translate(' + core.x + ',' + core.y + ')');
+    // isometric two-tier server platform (same 3D language as the internet
+    // topology): gradient top faces, shaded sides, glowing vents, LEDs,
+    // breathing under-glow — center at (90, 60)
+    var defs = el('defs', {}, coreGroup);
+    function linGrad(id, stops) {
+      var g2 = el('linearGradient', { id: id, x1: '0%', y1: '0%', x2: '0%', y2: '100%' }, defs);
+      stops.forEach(function (s) { el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] }, g2); });
+    }
+    linGrad('nt-core-top', [['0%', '#b7d9ff', '0.95'], ['100%', '#4493f8', '0.60']]);
+    linGrad('nt-core-left', [['0%', '#143a6e', '0.95'], ['100%', '#0a1c38', '0.98']]);
+    linGrad('nt-core-right', [['0%', '#2e6fc4', '0.92'], ['100%', '#12325e', '0.96']]);
+    var blur = el('filter', { id: 'nt-core-blur', x: '-50%', y: '-150%', width: '200%', height: '400%' }, defs);
+    el('feGaussianBlur', { stdDeviation: 7 }, blur);
+    var cx = core.w / 2, cy = 60;
+    el('ellipse', { cx: cx, cy: cy + 30, rx: 48, ry: 12, class: 'nt-core-glow',
+      style: 'fill:#4493f8;opacity:.16;filter:url(#nt-core-blur)' }, coreGroup);
+    el('polygon', { points: (cx - 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx - 52) + ',' + (cy + 6),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx + 52) + ',' + (cy + 6),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: cx + ',' + (cy - 34) + ' ' + (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + (cx - 52) + ',' + (cy - 8),
+      fill: 'url(#nt-core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1.1 }, coreGroup);
+    el('polygon', { points: (cx - 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx - 33) + ',' + (cy - 17),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx + 33) + ',' + (cy - 17),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, coreGroup);
+    el('polygon', { points: cx + ',' + (cy - 47) + ' ' + (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + (cx - 33) + ',' + (cy - 30),
+      fill: 'url(#nt-core-top)', stroke: '#9ecbff', 'stroke-opacity': .9, 'stroke-width': 1.1 }, coreGroup);
+    [[cx - 29, cy - 22, cx - 4, cy - 9], [cx + 29, cy - 22, cx + 4, cy - 9]].forEach(function (s) {
+      el('line', { x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+        style: 'stroke:#9ecbff;stroke-opacity:.9;stroke-width:2;stroke-linecap:round' }, coreGroup);
+    });
+    [[cx - 36, cy + 6, '#34d399'], [cx - 26, cy + 11, '#9ecbff'], [cx - 16, cy + 16, '#9ecbff']].forEach(function (d) {
+      el('circle', { cx: d[0], cy: d[1], r: 2, style: 'fill:' + d[2] + ';opacity:.9' }, coreGroup);
+    });
+    var t1 = el('text', { class: 'nt-core-label', x: cx, y: cy + 60, 'text-anchor': 'middle' }, coreGroup);
+    t1.textContent = {{ _( '主控制台' ) | tojson }};
+    var online = NODES.filter(function (n) { return freshClass(n) === 'fresh'; }).length;
+    var t2 = el('text', { class: 'nt-core-sub', x: cx, y: cy + 76, 'text-anchor': 'middle' }, coreGroup);
+    t2.textContent = {{ _('节点') | tojson }} + ' ' + online + '/' + NODES.length + ' · ' + {{ site_id | tojson }};
+    // the builtin node lives on this host — its info rides on the console
+    // instead of a separate tower
+    var bn = null;
+    NODES.forEach(function (x) { if (x.is_builtin) bn = x; });
+    if (bn) {
+      var bnUp = freshClass(bn) === 'fresh';
+      var t3 = el('text', { class: 'nt-core-sub', x: cx, y: cy + 91, 'text-anchor': 'middle' }, coreGroup);
+      t3.textContent = '◈ ' + {{ _('内置节点') | tojson }} + ' · ' + (bnUp ? {{ _('在线') | tojson }} : {{ _('离线') | tojson }}) + ' · ' + (bn.listen || '');
+      t3.style.fill = bnUp ? 'var(--success)' : '#f43f5e';
+    }
+    coreGroup.addEventListener('pointerdown', function (ev) {
+      coreDrag = { cx: ev.clientX, cy: ev.clientY, ox: core.x, oy: core.y, moved: false };
+      ev.preventDefault();
+    });
+  }
+
+  function drawTower(g, tx, ty, dotColor) {
+    // mini isometric server tower — same 3D language as the console
+    // pedestal, scaled down; gradients come from the core defs by id
+    el('polygon', { points: (tx - 32) + ',' + (ty - 5) + ' ' + tx + ',' + (ty + 11) + ' ' + tx + ',' + (ty + 19) + ' ' + (tx - 32) + ',' + (ty + 3),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .3, 'stroke-width': .9 }, g);
+    el('polygon', { points: (tx + 32) + ',' + (ty - 5) + ' ' + tx + ',' + (ty + 11) + ' ' + tx + ',' + (ty + 19) + ' ' + (tx + 32) + ',' + (ty + 3),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .3, 'stroke-width': .9 }, g);
+    el('polygon', { points: tx + ',' + (ty - 20) + ' ' + (tx + 32) + ',' + (ty - 5) + ' ' + tx + ',' + (ty + 11) + ' ' + (tx - 32) + ',' + (ty - 5),
+      fill: 'url(#nt-core-top)', stroke: '#8fbcf5', 'stroke-opacity': .7, 'stroke-width': .9 }, g);
+    el('polygon', { points: (tx - 20) + ',' + (ty - 17) + ' ' + tx + ',' + (ty - 8) + ' ' + tx + ',' + ty + ' ' + (tx - 20) + ',' + (ty - 10),
+      fill: 'url(#nt-core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .8 }, g);
+    el('polygon', { points: (tx + 20) + ',' + (ty - 17) + ' ' + tx + ',' + (ty - 8) + ' ' + tx + ',' + ty + ' ' + (tx + 20) + ',' + (ty - 10),
+      fill: 'url(#nt-core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': .8 }, g);
+    el('polygon', { points: tx + ',' + (ty - 28) + ' ' + (tx + 20) + ',' + (ty - 17) + ' ' + tx + ',' + (ty - 8) + ' ' + (tx - 20) + ',' + (ty - 17),
+      fill: 'url(#nt-core-top)', stroke: '#9ecbff', 'stroke-opacity': .8, 'stroke-width': .8 }, g);
+    [[tx - 18, ty - 14, tx - 4, ty - 7], [tx + 18, ty - 14, tx + 4, ty - 7]].forEach(function (s) {
+      el('line', { x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+        style: 'stroke:#9ecbff;stroke-opacity:.85;stroke-width:1.6;stroke-linecap:round' }, g);
+    });
+    el('circle', { cx: tx - 22, cy: ty + 6, r: 2.6, fill: dotColor,
+      style: 'filter:drop-shadow(0 0 3px ' + dotColor + ')' }, g);
+  }
+
+  function drawNode(n) {
+    var g = el('g', { class: 'nt-node' }, nodeLayer);
+    g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    var state = freshClass(n);
+    var dotColor = state === 'fresh' ? 'var(--success)' : state === 'stale' ? '#f59e0b' : '#f43f5e';
+    // invisible bounding box for edges / zones / hit-testing
+    el('rect', { x: 0, y: 0, width: CW, height: CH, fill: 'transparent' }, g);
+    drawTower(g, 40, 44, dotColor);
+    var name = el('text', { class: 'nt-name', x: 86, y: 22 }, g);
+    name.textContent = n.name.length > 12 ? n.name.slice(0, 11) + '…' : n.name;
+    var meta = el('text', { class: 'nt-meta', x: 86, y: 40 }, g);
+    meta.textContent = (n.type || 'node') + ' · ' + fmtSeen(n);
+    var meta2 = el('text', { class: 'nt-meta', x: 86, y: 56 }, g);
+    meta2.textContent = {{ _('挂载') | tojson }} + ' ' + n.services + ' · ' + (n.listen || '');
+    if (n.pending > 0) {
+      el('rect', { class: 'nt-badge', x: CW - 52, y: 6, width: 44, height: 17, rx: 9 }, g);
+      var bt = el('text', { class: 'nt-badge-text', x: CW - 30, y: 18, 'text-anchor': 'middle' }, g);
+      bt.textContent = {{ _('待执行') | tojson }} + ' ' + n.pending;
+    }
+    if (n.zone) {
+      var zc = zoneColor(n.zone);
+      var zt = el('text', { x: 86, y: CH - 2, style: 'fill:' + zc + ';font-size:9.5px;font-weight:700;font-family:"Fira Code",ui-monospace,monospace' }, g);
+      zt.textContent = '◈ ' + zoneLabel(n.zone);
+    }
+    cardRefs[n.id] = { g: g, node: n };
+    if (n.zone) {
+      // zoned nodes are grid-arranged — the zone box moves the cluster
+      g.addEventListener('click', function () { select(n.id); });
+    } else {
+      attachDrag(g, n);
+    }
+  }
+
+  var drag = null;
+  var coreDrag = null;
+  function attachDrag(g, n) {
+    g.addEventListener('pointerdown', function (ev) {
+      drag = { n: n, cx: ev.clientX, cy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+      ev.preventDefault();
+    });
+  }
+  window.addEventListener('pointermove', function (ev) {
+    var rect = svg.getBoundingClientRect();
+    var kx = VW / rect.width, ky = VH / rect.height;
+    if (drag) {
+      var dx = (ev.clientX - drag.cx) * kx, dy = (ev.clientY - drag.cy) * ky;
+      if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
+      drag.n.x = drag.ox + dx;
+      drag.n.y = drag.oy + dy;
+      cardRefs[drag.n.id].g.setAttribute('transform', 'translate(' + drag.n.x + ',' + drag.n.y + ')');
+      drawEdges();
+      drawZones();
+    } else if (coreDrag) {
+      var cdx = (ev.clientX - coreDrag.cx) * kx, cdy = (ev.clientY - coreDrag.cy) * ky;
+      if (Math.abs(ev.clientX - coreDrag.cx) + Math.abs(ev.clientY - coreDrag.cy) > 4) coreDrag.moved = true;
+      core.x = coreDrag.ox + cdx;
+      core.y = coreDrag.oy + cdy;
+      coreGroup.setAttribute('transform', 'translate(' + core.x + ',' + core.y + ')');
+      drawEdges();
+    } else if (panDrag) {
+      var rect = svg.getBoundingClientRect();
+      var pdx = (ev.clientX - panDrag.cx) / rect.width * view.w;
+      var pdy = (ev.clientY - panDrag.cy) / rect.height * view.h;
+      if (Math.abs(ev.clientX - panDrag.cx) + Math.abs(ev.clientY - panDrag.cy) > 4) panDrag.moved = true;
+      view.x = panDrag.x - pdx;
+      view.y = panDrag.y - pdy;
+      clampView();
+      applyView();
+    } else if (zoneDrag) {
+      var rect = svg.getBoundingClientRect();
+      var zdx = (ev.clientX - zoneDrag.cx) / rect.width * view.w;
+      var zdy = (ev.clientY - zoneDrag.cy) / rect.height * view.h;
+      if (Math.abs(ev.clientX - zoneDrag.cx) + Math.abs(ev.clientY - zoneDrag.cy) > 4) zoneDrag.moved = true;
+      if (!zoneAnchors[zoneDrag.z]) zoneAnchors[zoneDrag.z] = { x: zoneDrag.ax, y: zoneDrag.ay, o: 'h' };
+      zoneAnchors[zoneDrag.z].x = zoneDrag.ax + zdx;
+      zoneAnchors[zoneDrag.z].y = zoneDrag.ay + zdy;
+      arrangeZone(zoneDrag.z);
+      refreshTransforms();
+      drawEdges();
+      drawZones();
+    }
+  });
+  window.addEventListener('pointerup', function () {
+    if (drag) {
+      var d = drag;
+      drag = null;
+      if (d.moved) { saveLayout(); resolveZoneOverlaps(); fitViewBox(); }
+      else select(d.n.id);
+    } else if (coreDrag) {
+      var c = coreDrag;
+      coreDrag = null;
+      if (c.moved) { saveLayout(); resolveZoneOverlaps(); fitViewBox(); }
+      else {
+        // plain click on the console = edit the builtin node it hosts
+        var bn = null;
+        NODES.forEach(function (x) { if (x.is_builtin) bn = x; });
+        if (bn) select(bn.id);
+      }
+    } else if (panDrag) {
+      var p = panDrag;
+      panDrag = null;
+      if (!p.moved) clearSelection();
+    } else if (zoneDrag) {
+      var z = zoneDrag;
+      zoneDrag = null;
+      if (z.moved) {
+        // re-evaluate orientation from the new position: left/right of the
+        // console stacks the zone vertically, above/below lays it out in
+        // horizontal rows of four
+        var a = zoneAnchors[z.z];
+        var zcx = a.x + ZONE_PAD + 60, zcy = a.y + 40;
+        var ccx2 = core.x + core.w / 2, ccy2 = core.y + core.h / 2;
+        a.o = Math.abs(zcx - ccx2) >= Math.abs(zcy - ccy2) ? 'v' : 'h';
+        arrangeZone(z.z);
+        refreshTransforms();
+        saveLayout();
+        resolveZoneOverlaps();
+        fitViewBox();
+      }
+    }
+  });
+  function refreshTransforms() {
+    NODES.forEach(function (n) {
+      if (cardRefs[n.id]) cardRefs[n.id].g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    });
+  }
+
+  function saveLayout() {
+    var payload = { core: [Math.round(core.x - CORE0.x), Math.round(core.y - CORE0.y)] };
+    NODES.forEach(function (n) { if (!n.is_builtin && !n.zone) payload[String(n.id)] = [Math.round(n.x), Math.round(n.y)]; });
+    Object.keys(zoneAnchors).forEach(function (z) {
+      var a = zoneAnchors[z];
+      payload['zone:' + z] = { x: Math.round(a.x), y: Math.round(a.y), o: a.o };
+    });
+    fetch('/admin/nodes/topology/layout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ layout: payload }),
+    }).catch(function () {});
+  }
+
+  var insp = document.getElementById('nt-insp');
+  var STATUS_TEXT = { online: {{ _('在线') | tojson }}, offline: {{ _('离线') | tojson }} };
+  var STALE_NOTE = {{ _('心跳超时') | tojson }};
+  var currentId = null;
+  var COLLAPSE_KEY = 'ach:node-topo-insp';
+  function setCollapsed(collapsed, persist) {
+    insp.classList.toggle('collapsed', collapsed);
+    if (persist) { try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {} }
+  }
+  try { setCollapsed(localStorage.getItem(COLLAPSE_KEY) === '1', false); } catch (e) {}
+  document.getElementById('nt-insp-rail').addEventListener('click', function () { setCollapsed(false, true); });
+  function clearSelection() {
+    currentId = null;
+    Object.keys(cardRefs).forEach(function (k) { cardRefs[k].g.classList.remove('selected'); });
+  }
+  function sendPublish(action) {
+    if (!currentId) return;
+    const services = [...document.querySelectorAll('#nt-pub-services input:checked')].map(i => i.value);
+    const host = document.getElementById('nt-pub-host').value.trim();
+    const body = new URLSearchParams({ action: action, target_host: host });
+    services.forEach(s => body.append('services', s));
+    fetch('/admin/nodes/' + currentId + '/publish-honeypots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(function (r) {
+      if (r.ok) {
+        if (window.showToast) showToast({{ _('已下发到节点任务队列') | tojson }}, 'success');
+        setTimeout(function () { window.location.reload(); }, 700);
+      } else {
+        return r.json().then(function (j) {
+          if (window.showToast) showToast(j.detail || {{ _('下发失败') | tojson }}, 'error');
+        });
+      }
+    }).catch(function () {
+      if (window.showToast) showToast({{ _('网络错误') | tojson }}, 'error');
+    });
+  }
+  document.getElementById('nt-pub-apply').addEventListener('click', function () { sendPublish('publish'); });
+  document.getElementById('nt-pub-retract').addEventListener('click', function () { sendPublish('retract'); });
+  document.getElementById('nt-rename-save').addEventListener('click', function () {
+    if (!currentId) return;
+    var changedNode = null;
+    NODES.forEach(function (x) { if (String(x.id) === String(currentId)) changedNode = x; });
+    if (!changedNode || changedNode.is_builtin) return;
+    const name = document.getElementById('nt-rename-input').value.trim();
+    const notes = document.getElementById('nt-notes-input').value;
+    if (!name) { if (window.showToast) showToast({{ _('节点名不能为空') | tojson }}, 'error'); return; }
+    const body = new URLSearchParams({ name: name, notes: notes });
+    fetch('/admin/nodes/' + currentId + '/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+    }).then(function (res) {
+      if (!res.ok) { if (window.showToast) showToast(res.j.detail || {{ _('保存失败') | tojson }}, 'error'); return; }
+      changedNode.name = name;
+      changedNode.notes = notes;
+      const ref = cardRefs[currentId];
+      if (ref) {
+        const nameEl = ref.g.querySelector('.nt-name');
+        if (nameEl) nameEl.textContent = name.length > 12 ? name.slice(0, 11) + '…' : name;
+      }
+      document.getElementById('nt-insp-title').textContent = name;
+      drawZones();
+      if (window.showToast) showToast({{ _('已保存') | tojson }}, 'success');
+    }).catch(function () {
+      if (window.showToast) showToast({{ _('网络错误') | tojson }}, 'error');
+    });
+  });
+  function select(id) {
+    var n = null;
+    NODES.forEach(function (x) { if (String(x.id) === String(id)) n = x; });
+    if (!n) { clearSelection(); return; }
+    currentId = n.id;
+    Object.keys(cardRefs).forEach(function (k) {
+      cardRefs[k].g.classList.toggle('selected', String(k) === String(id));
+    });
+    var state = freshClass(n);
+    document.getElementById('nt-insp-title').textContent = n.name;
+    document.getElementById('nt-rename-input').value = n.name;
+    document.getElementById('nt-notes-input').value = n.notes || '';
+    document.getElementById('nt-rename-save').style.display = n.is_builtin ? 'none' : '';
+    document.getElementById('nt-rename-input').disabled = !!n.is_builtin;
+    document.getElementById('nt-notes-input').disabled = !!n.is_builtin;
+    document.getElementById('nt-insp-status').innerHTML = '<span class="status-' + (n.status || 'unknown') + '">' + (STATUS_TEXT[n.status] || n.status) + '</span>' + (state === 'stale' ? ' <span class="muted">(' + STALE_NOTE + ')</span>' : '');
+    document.getElementById('nt-insp-type').textContent = n.type || '-';
+    document.getElementById('nt-insp-listen').textContent = n.listen || '-';
+    document.getElementById('nt-insp-seen').textContent = fmtSeen(n);
+    document.getElementById('nt-insp-services').textContent = n.services;
+    document.getElementById('nt-insp-pending').textContent = n.pending;
+    const zoneSel = document.getElementById('nt-insp-zone');
+    zoneSel.value = n.is_builtin ? {{ _('平台控制区') | tojson }} : (n.zone || '');
+    zoneSel.disabled = !!n.is_builtin;  // the builtin node belongs to the console zone
+    zoneSel.dispatchEvent(new Event('change'));  // re-sync the sel-x button label
+    document.getElementById('nt-insp-link').setAttribute('href', '/admin/nodes/' + n.id);
+    setCollapsed(false, false);  // selecting a node always opens the menu bar
+  }
+  document.getElementById('nt-insp-zone').addEventListener('change', function () {
+    if (!currentId) return;
+    var changedNode = null;
+    NODES.forEach(function (x) { if (String(x.id) === String(currentId)) changedNode = x; });
+    if (!changedNode || changedNode.is_builtin) return;       // console zone is fixed
+    if (changedNode.zone === document.getElementById('nt-insp-zone').value) return;  // sel-x re-sync, not a real change
+    const zone = document.getElementById('nt-insp-zone').value;
+    const body = new URLSearchParams({ zone: zone });
+    fetch('/admin/nodes/' + currentId + '/zone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    }).then(function (r) {
+      if (!r.ok) throw new Error(String(r.status));
+      NODES.forEach(function (x) { if (String(x.id) === String(currentId)) x.zone = zone; });
+      Object.keys(cardRefs).forEach(function (k) {
+        if (String(k) === String(currentId)) cardRefs[k].node.zone = zone;
+      });
+      // re-arrange both the source and the target zone grids
+      NODES.forEach(function (n) {
+        if (!n.is_builtin && n.zone && arrangeZone(n.zone)) { /* positions updated */ }
+      });
+      refreshTransforms();
+      drawEdges();
+      resolveZoneOverlaps();
+      fitViewBox();
+      if (window.showToast) showToast({{ _('网络区域已更新') | tojson }}, 'success');
+    }).catch(function () {
+      if (window.showToast) showToast({{ _('区域更新失败') | tojson }}, 'error');
+    });
+  });
+  document.getElementById('nt-insp-close').addEventListener('click', function () {
+    clearSelection();
+    setCollapsed(true, true);   // 收回菜单栏
+  });
+  var panDrag = null;
+  svg.addEventListener('pointerdown', function (ev) {
+    if (ev.target !== svg) return;
+    // empty-canvas drag pans the view; a plain click clears the selection
+    panDrag = { cx: ev.clientX, cy: ev.clientY, x: view.x, y: view.y, moved: false };
+    ev.preventDefault();
+  });
+  svg.addEventListener('wheel', function (ev) {
+    ev.preventDefault();
+    zoomAt(ev.deltaY < 0 ? 1.18 : 1 / 1.18, ev.clientX, ev.clientY);
+  }, { passive: false });
+  document.getElementById('nt-zoom-in').addEventListener('click', function () {
+    var r = svg.getBoundingClientRect();
+    zoomAt(1.3, r.left + r.width / 2, r.top + r.height / 2);
+  });
+  document.getElementById('nt-zoom-out').addEventListener('click', function () {
+    var r = svg.getBoundingClientRect();
+    zoomAt(1 / 1.3, r.left + r.width / 2, r.top + r.height / 2);
+  });
+  document.getElementById('nt-zoom-fit').addEventListener('click', fitViewBox);
+
+  drawCore();
+  // zoned nodes take their grid positions before anything draws
+  var zoneNames = [];
+  NODES.forEach(function (n) {
+    if (!n.is_builtin && n.zone && zoneNames.indexOf(n.zone) < 0) zoneNames.push(n.zone);
+  });
+  zoneNames.forEach(function (z) { arrangeZone(z); });
+  NODES.forEach(function (n) { if (!n.is_builtin) drawNode(n); });
+  drawEdges();
+  drawZones();
+  resolveZoneOverlaps();
+  fitViewBox();
+})();
+</script>
+<style>
+  /* ---------- Server-management-table 风格：行卡片清单 ---------- */
+  .nd-list-head {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .nd-list-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600; color: #f3f4f6;
+  }
+  .nd-list-title::before {
+    content: ""; width: 8px; height: 8px; border-radius: 999px;
+    background: var(--success); box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+  }
+  .nd-list-count { font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .nd-cols {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1.35fr) minmax(0, 1.1fr) minmax(0, 0.9fr) 130px 96px;
+    gap: 14px;
+    padding: 0 18px 8px;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(148, 163, 184, 0.6);
+    font-family: "Fira Code", ui-monospace, monospace;
+  }
+  .nd-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1.35fr) minmax(0, 1.1fr) minmax(0, 0.9fr) 130px 96px;
+    gap: 14px;
+    align-items: center;
+    padding: 13px 18px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    background: rgba(17, 24, 39, 0.55);
+    transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+  }
+  .nd-row:hover {
+    border-color: rgba(34, 211, 238, 0.3);
+    background: rgba(17, 24, 39, 0.85);
+    transform: translateY(-1px);
+  }
+  .nd-row.is-online { box-shadow: inset -3px 0 0 rgba(52, 211, 153, 0.35); }
+  .nd-row.is-paused { box-shadow: inset -3px 0 0 rgba(245, 158, 11, 0.35); }
+  .nd-row.is-offline { box-shadow: inset -3px 0 0 rgba(251, 113, 133, 0.3); }
+  .nd-idx {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 17px; font-weight: 700;
+    color: rgba(226, 232, 240, 0.85);
+    font-variant-numeric: tabular-nums;
+  }
+  .nd-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .nd-os {
+    width: 34px; height: 34px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    border-radius: 9px;
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.14);
+    border: 1px solid rgba(96, 165, 250, 0.22);
+  }
+  .nd-row.is-paused .nd-os { color: #fcd34d; background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.25); }
+  .nd-row.is-offline .nd-os { color: #fda4af; background: rgba(251, 113, 133, 0.1); border-color: rgba(251, 113, 133, 0.22); }
+  .nd-name-text { min-width: 0; }
+  .nd-name-main {
+    display: block;
+    font-size: 13px; font-weight: 600; color: #f3f4f6;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nd-name-main:hover { color: #67e8f9; }
+  .nd-name-sub { display: block; margin-top: 3px; font-size: 11px; color: var(--muted-foreground); }
+  .nd-name-sub code { font-size: 10.5px; padding: 1px 6px; }
+  .nd-addr { display: flex; flex-direction: column; gap: 3px; min-width: 0; align-items: flex-start; }
+  .nd-addr code { font-size: 11px; }
+  .nd-heart { font-family: "Fira Code", ui-monospace, monospace; font-size: 11.5px; color: #d7e3f4; }
+  .nd-meter { display: flex; align-items: center; gap: 8px; }
+  .nd-segs { display: flex; gap: 2.5px; }
+  .nd-segs i {
+    width: 4px; height: 14px; border-radius: 2px;
+    background: rgba(148, 163, 184, 0.18);
+  }
+  .nd-segs i.on { background: #a7f3d0; box-shadow: 0 0 6px rgba(52, 211, 153, 0.35); }
+  .nd-segs i.on.warn { background: #fcd34d; box-shadow: 0 0 6px rgba(245, 158, 11, 0.35); }
+  .nd-meter b {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 12px; font-weight: 700; color: #e5edf8;
+    font-variant-numeric: tabular-nums;
+  }
+  .nd-status {
+    justify-self: start;
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+  }
+  .nd-status.online { color: #6ee7b7; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.3); }
+  .nd-status.paused { color: #fcd34d; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); }
+  .nd-status.offline { color: #fda4af; background: rgba(251, 113, 133, 0.1); border: 1px solid rgba(251, 113, 133, 0.28); }
+  .nd-actions {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding-top: 10px;
+    border-top: 1px solid rgba(148, 163, 184, 0.08);
+  }
+  .nd-actions form { margin: 0; display: flex; gap: 8px; }
+  .nd-actions select { width: auto; min-width: 130px; height: 32px; padding: 5px 9px; font-size: 12px; }
+  .nd-actions button, .nd-actions .chip { width: auto; height: 32px; padding: 5px 12px; font-size: 12px; }
+  .nd-actions-spacer { flex: 1; }
+  .nd-services { display: flex; flex-wrap: wrap; gap: 6px; }
+  @media (max-width: 1180px) {
+    .nd-cols { display: none; }
+    .nd-row { grid-template-columns: 40px minmax(0, 1fr); }
+    .nd-row > * { grid-column: 2; }
+    .nd-row > .nd-idx { grid-column: 1; grid-row: 1; }
+    .nd-actions { grid-column: 1 / -1; }
+  }
+</style>
+
+<section class="panel">
+  {% set online_count = nodes|selectattr('node.status', 'equalto', 'online')|list|length %}
+  <div class="nd-list-head">
+    <div class="nd-list-title">{{ _('节点清单') }}</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);cursor:pointer">
+        <input type="checkbox" class="bulk-select-all" style="cursor:pointer">{{ _('全选') }}
+      </label>
+      <form method="post" action="/admin/nodes/bulk-delete" data-confirm="{{ _('确认删除选中的 {n} 个节点？内置节点不受影响，不可撤销。') }}" class="bulk-del-form">
+        <input type="hidden" name="ids" value="">
+        <button type="button" class="danger btn-sm bulk-del-btn">{{ _('批量删除') }}</button>
+      </form>
+      <div class="nd-list-count">{{ nodes|length }} {{ _('个节点') }} · {{ online_count }} {{ _('在线') }}</div>
+    </div>
+  </div>
+  <div class="nd-cols">
+    <span>NO</span><span>{{ _('节点') }}</span><span>{{ _('监听 / 回连') }}</span><span>{{ _('最近心跳') }}</span><span>{{ _('待办任务') }}</span><span>{{ _('状态') }}</span>
+  </div>
+  {% for item in nodes %}
+    {% set node = item.node %}
+    {% set segs = [item.pending_count, 10]|min %}
+    <div class="nd-row is-{{ node.status }}">
+      <span class="nd-idx"><input type="checkbox" class="bulk-check" value="{{ node.id }}" style="cursor:pointer" {% if node.is_builtin %}disabled title="{{ _('内置节点不可删除') }}"{% endif %}> {{ '%02d' % loop.index }}</span>
+      <div class="nd-name">
+        <span class="nd-os">{{ icon(name='server', class_name='ui-icon ui-icon-sm') }}</span>
+        <span class="nd-name-text">
+          <a class="nd-name-main" href="/admin/nodes/{{ node.id }}">{{ node.name }}</a>
+          <span class="nd-name-sub"><code>{{ node.node_type }}</code>{% if node.is_builtin %} <span class="pill">{{ _('内置') }}</span>{% endif %}</span>
+        </span>
+      </div>
+      <div class="nd-addr">
+        <code>{{ node.listen_address }}</code>
+        <code>{{ node.callback_address }}</code>
+      </div>
+      <div class="nd-heart">
+        {% if item.latest_heartbeat %}{{ item.latest_heartbeat.created_at | dt('%Y-%m-%d %H:%M') }}{% else %}<span class="muted">{{ _('暂无心跳') }}</span>{% endif %}
+      </div>
+      <div class="nd-meter">
+        <span class="nd-segs">{% for i in range(10) %}<i class="{% if i < segs %}on{% if node.status != 'online' %} warn{% endif %}{% endif %}"></i>{% endfor %}</span>
+        <b>{{ item.pending_count }}</b>
+      </div>
+      <span class="nd-status {{ node.status }}">{{ node.status|status_zh }}</span>
+      <div class="nd-actions">
+        <form method="post" action="/admin/nodes/{{ node.id }}/template">
+          <select name="template_id">{% for t in templates_list %}<option value="{{ t.id }}" {% if node.template_id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select>
+          <button type="submit" class="secondary">{{ _('应用模板') }}</button>
+        </form>
+        <form method="post" action="/admin/nodes/{{ node.id }}/status">
+          <select name="status_value"><option value="online" {% if node.status == 'online' %}selected{% endif %}>{{ _('在线') }}</option><option value="paused" {% if node.status == 'paused' %}selected{% endif %}>{{ _('暂停') }}</option><option value="offline" {% if node.status == 'offline' %}selected{% endif %}>{{ _('离线') }}</option></select>
+          <button type="submit" class="secondary">{{ _('更新状态') }}</button>
+        </form>
+        <span class="nd-actions-spacer"></span>
+        <span class="nd-services">{{ service_tags(node.deployed_services_json, service_name_map) }}</span>
+        <a class="chip primary" href="/admin/nodes/{{ node.id }}">{{ _('节点详情') }}</a>
+        {% if not node.is_builtin %}
+          <form method="post" action="/admin/nodes/{{ node.id }}/delete"><button class="danger" type="submit">{{ _('删除') }}</button></form>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">ND</div>
+      <div class="empty-title">{{ _('暂无节点') }}</div>
+      <div class="empty-description">{{ _('添加节点后可在此分配模板与查看心跳。') }}</div>
+    </div>
+  {% endfor %}
+</section>
+
+{% call modal_dialog('nodes-create-modal', _('新增节点'), _('用于对接内置或远程节点，承载蜜罐服务与任务分发')) %}
+<form method="post" action="/admin/nodes" class="stack">
+  <div class="grid-2"><input name="name" placeholder="{{ _('节点名称') }}" required><select name="node_type"><option value="remote">{{ _('远程节点') }}</option><option value="embedded">{{ _('内置节点') }}</option></select></div>
+  <div class="grid-2"><input name="listen_address" placeholder="{{ _('监听地址') }}" value="127.0.0.1" required><input name="callback_address" placeholder="{{ _('回连地址') }}" value="127.0.0.1" required></div>
+  <select name="template_id"><option value="">{{ _('不指定模板') }}</option>{% for item in templates_list %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:6px">
+    <button type="button" class="secondary" data-modal-close>{{ _('取消') }}</button>
+    <button type="submit">{{ _('新增节点') }}</button>
+  </div>
+</form>
+{% endcall %}
+<script>
+(function () {
+  var bulkAll = document.querySelector('.bulk-select-all');
+  if (bulkAll) bulkAll.addEventListener('change', function () {
+    document.querySelectorAll('.bulk-check').forEach(function (c) { if (!c.disabled) c.checked = bulkAll.checked; });
+  });
+  var bulkBtn = document.querySelector('.bulk-del-btn');
+  if (bulkBtn) bulkBtn.addEventListener('click', function () {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked'));
+    if (!checked.length) { alert('{{ _('请先勾选要删除的节点') }}'); return; }
+    var form = bulkBtn.closest('form');
+    if (!confirm(form.dataset.confirm.replace('{n}', checked.length))) return;
+    form.querySelector('input[name="ids"]').value = checked.map(function (c) { return c.value; }).join(',');
+    form.submit();
+  });
+})();
+</script>
+{% endblock %}

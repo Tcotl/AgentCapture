@@ -1,0 +1,38 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/agent_capture.db*
+data/*.db-*
+.env.docker
+.DS_Store
+.claude/
+data/
+
+# Internal working documents & AI-agent workspace instructions (not part of the product)
+/AGENTS.md
+/CLAUDE.md
+/plan.md
+/AUDIT_REPORT.md
+/tests/
+DEVELOPMENT.md
+CHANGELOG.md
+/design-system/
+.vercel
+.env*
+.vercel-token
+.zcode/
+benchmark/
+scripts/agent_benchmark.py
+
+# local tool residue & runtime-generated TLS material (regenerated per data dir)
+.video_agent/
+.workbuddy/
+mysql_tls_*.pem
+*.docx
+
+# AI coding-tool instruction files — local development aids, not part of the product
+AGENTS.md
+CLAUDE.md

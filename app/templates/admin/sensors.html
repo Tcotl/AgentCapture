@@ -1,0 +1,82 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, metric_card, section_header, empty_state, badge with context %}
+{% block content %}
+{{ page_header('SN', _('传感器网络'), _('员工 Agent 上的只读蜜标探针（Claude Code Hook 旗舰 / MCP 兜底）：扫描流经 Agent 上下文的内容，命中蜜罐水印即上报——蜜饵数据外泄的第二跳捕获。'), [_('只读传感'), _('企业内网')],
+      actions='') }}
+
+<div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+  {{ metric_card(_('传感器'), stats.sensors, 'info') }}
+  {{ metric_card(_('在线（5 分钟内心跳）'), stats.online, 'success') }}
+  {{ metric_card(_('命中上报'), stats.hits, 'warning') }}
+  {{ metric_card(_('已验证归因'), stats.verified, 'danger') }}
+</div>
+
+<section class="panel">
+  {{ section_header(_('传感器列表'), _('创建后令牌仅显示一次，交给企业部署通道（MDM/配置管理）写入员工机 ~/.agentcapture/sensor.env。')) }}
+  {% if new_token %}
+  <div class="alert alert-success" style="margin:12px 0;padding:12px 16px;border-radius:8px;border:1px solid var(--success,#22c55e)">
+    <strong>{{ _('传感器已创建：') }}</strong><code id="new-sensor-token" style="user-select:all">{{ new_token }}</code>
+    <br><small class="muted">{{ _('令牌仅此一次显示——AC_SENSOR_URL=<平台地址> / AC_SENSOR_TOKEN=<令牌>。') }}</small>
+  </div>
+  {% endif %}
+  <form method="post" action="/admin/sensors/create" class="stack" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:12px 0">
+    <label class="fl"><span>{{ _('员工') }}</span><input name="employee" placeholder="zhang.san" style="width:140px"></label>
+    <label class="fl"><span>{{ _('设备') }}</span><input name="device" placeholder="mbp-0231" style="width:130px"></label>
+    <label class="fl"><span>{{ _('Agent') }}</span><input name="agent_product" placeholder="claude-code" style="width:130px"></label>
+    <label class="fl"><span>{{ _('接入模式') }}</span>
+      <select name="mode" style="width:120px">
+        <option value="hooks">Hook（Claude Code）</option>
+        <option value="mcp">MCP（通用）</option>
+      </select></label>
+    <button class="primary btn-sm" type="submit" style="width:auto">{{ _('创建传感器') }}</button>
+  </form>
+  <div class="table-wrap" style="margin-top:12px;">
+    <table>
+      <thead><tr><th>{{ _('ID') }}</th><th>{{ _('员工 / 设备') }}</th><th>{{ _('Agent') }}</th><th>{{ _('模式') }}</th><th>{{ _('最近心跳') }}</th><th>{{ _('命中 / 已归因') }}</th><th>{{ _('状态') }}</th><th>{{ _('操作') }}</th></tr></thead>
+      <tbody>
+        {% for s in sensors %}
+        <tr>
+          <td><code>{{ s.sensor_id[:14] }}…</code></td>
+          <td>{{ s.employee or '—' }}<br><small class="muted">{{ s.device or '' }}</small></td>
+          <td><small>{{ s.agent_product or '—' }} {{ s.agent_version or '' }}</small></td>
+          <td>{{ badge(_('Hook') if s.mode == 'hooks' else 'MCP', 'info') }}</td>
+          <td><span class="c2-mono">{{ s.last_seen_at | dt('%m-%d %H:%M') if s.last_seen_at else '—' }}</span></td>
+          <td>{{ hit_counts.get(s.sensor_id, 0) }} / {{ verified_counts.get(s.sensor_id, 0) }}</td>
+          <td>{% if not s.enabled %}{{ badge(_('已停用'), 'muted') }}{% elif s.online %}{{ badge(_('在线'), 'success') }}{% else %}{{ badge(_('离线'), 'warning') }}{% endif %}</td>
+          <td>
+            <form method="post" action="/admin/sensors/{{ s.id }}/toggle" style="display:inline">
+              <button class="chip" type="submit">{{ _('停用') if s.enabled else _('启用') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        {{ empty_state(_('暂无传感器'), _('创建第一个传感器，把令牌部署到员工 Agent（Hook 脚本或 MCP Server 见 scripts/sensor/）。'), 10, 'SN') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel" style="margin-top:18px">
+  {{ section_header(_('最近命中上报'), _('已验证 = 平台确认蜜标并归因到原蜜罐会话（攻击链第二跳证据）。')) }}
+  <div class="table-wrap" style="margin-top:12px;">
+    <table>
+      <thead><tr><th>{{ _('时间') }}</th><th>{{ _('特征') }}</th><th>{{ _('命中串') }}</th><th>{{ _('来源') }}</th><th>{{ _('传感器') }}</th><th>{{ _('归因') }}</th></tr></thead>
+      <tbody>
+        {% for h in hits %}
+        <tr>
+          <td><code>{{ h.created_at | dt('%m-%d %H:%M:%S') }}</code></td>
+          <td><code>{{ h.feature }}</code></td>
+          <td><code style="color:var(--danger,#fb7185)">{{ h.hit_token[:44] }}</code></td>
+          <td><small>{{ h.source_kind }}:{{ (h.source_ref or '')[:44] }}</small></td>
+          <td><code>{{ h.sensor_id[:12] }}…</code></td>
+          <td>{% if h.verified %}{{ badge(_('已归因 '), 'success') }}<small class="muted">{{ h.attributed_session[:16] }}</small>{% else %}{{ badge(_('未验证'), 'muted') }}{% endif %}</td>
+        </tr>
+        {% else %}
+        {{ empty_state(_('暂无命中'), _('蜜饵数据被搬运进任何已部署 Agent 的上下文时，命中会出现在这里。'), 9, 'SN') }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

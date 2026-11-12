@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+tests
+docs
+design-system
+data
+agent_capture.db
+.env
+.env.docker
+*.png

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AgentCapture System Architecture</title>
+<style>
+  :root {
+    --bg: #0b0f19; --frame: #0d1220; --card: #101828; --card2: #141d31; --line: rgba(148,163,184,.22);
+    --fg: #e6edf6; --muted: #8b98ab;
+    --green: #3fb950; --blue: #4493f8; --violet: #a371f7; --amber: #d29922; --cyan: #39c5cf;
+    --g-green: rgba(63,185,80,.55); --g-blue: rgba(68,147,248,.6); --g-amber: rgba(210,153,34,.6);
+    --g-violet: rgba(163,113,247,.55); --g-gray: rgba(139,152,171,.4); --g-cyan: rgba(57,197,207,.55);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1680px; height: 1006px; padding: 24px 36px;
+    background: #0a0e18; color: var(--fg);
+    font-family: "Fira Sans", system-ui, sans-serif; overflow: hidden;
+  }
+  h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; }
+  .basis { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .basis code { font-family: "Fira Code", monospace; color: #a5b4c8; }
+  .frame { border: 1px solid rgba(148,163,184,.28); border-radius: 16px; background: var(--frame); padding: 18px 20px; margin-top: 12px; position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .card { border: 1.6px solid; border-radius: 10px; background: var(--card); padding: 10px 13px; }
+  .card h3 { font-size: 13.5px; font-weight: 700; margin-bottom: 5px; }
+  .card h3 .mono { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .card .d { font-size: 10.8px; color: var(--muted); line-height: 1.55; }
+  .card .d b { color: #c9d4e3; font-weight: 600; }
+  .green { border-color: var(--g-green); } .green h3 { color: #7ee2a0; }
+  .blue { border-color: var(--g-blue); } .blue h3 { color: #79b8ff; }
+  .amber { border-color: var(--g-amber); } .amber h3 { color: #e3b341; }
+  .violet { border-color: var(--g-violet); } .violet h3 { color: #d2a8ff; }
+  .gray { border-color: var(--g-gray); } .gray h3 { color: #b6c2d2; }
+  .cyan { border-color: var(--g-cyan); } .cyan h3 { color: #67e8f9; }
+  .mini { border: 1px solid rgba(121,184,255,.35); border-radius: 7px; background: var(--card2); padding: 6px 9px; }
+  .mini b { font-size: 11.5px; color: #dbe7f5; }
+  .mini .d { font-size: 10px; color: var(--muted); line-height: 1.45; margin-top: 1px; }
+  .mono { font-family: "Fira Code", monospace; }
+  .strip { border: 1.4px solid; border-radius: 8px; padding: 8px 12px; }
+  .strip b { font-size: 12px; }
+  .strip .d { font-size: 10.6px; color: var(--muted); line-height: 1.55; }
+  .group { border: 1.4px dashed rgba(148,163,184,.4); border-radius: 10px; padding: 9px 11px 11px; }
+  .group > .gt { font-size: 11px; color: #9aa7b8; margin-bottom: 7px; font-family: "Fira Code", monospace; }
+  .inner { display: grid; gap: 8px; }
+  .inner4 { grid-template-columns: repeat(4, 1fr); }
+  .inner5 { grid-template-columns: repeat(5, 1fr); }
+  .varrow { display: flex; flex-direction: column; align-items: center; font-size: 10.5px; color: var(--muted); padding: 2px 0; }
+  .varrow .a { font-size: 15px; color: #79b8ff; line-height: 1; }
+  .top { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .arrows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 6px 0; }
+  .arrows div { text-align: center; font-size: 10.5px; color: var(--muted); }
+  .arrows .a { font-size: 15px; color: #79b8ff; line-height: 1.1; }
+  .main { display: grid; grid-template-columns: 1fr 330px; gap: 16px; flex: 1; min-height: 0; }
+  .core { border: 1.6px solid var(--g-blue); border-radius: 12px; background: rgba(13,20,36,.5); padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; justify-content: space-between; min-height: 0; }
+  .core .group { flex: 1; justify-content: center; }
+  .core > .head { font-size: 13.5px; color: #79b8ff; font-weight: 700; }
+  .core > .head .mono { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .rcol { display: flex; flex-direction: column; gap: 12px; }
+  .rcol .card { flex: 1; }
+  /* schematic link rows */
+  .links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 10px; }
+  .link { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; }
+  .link .t { font-size: 11px; color: #c9d4e3; margin-bottom: 4px; }
+  .link .t b { color: #93c5fd; }
+  .link pre { font-family: "Fira Code", monospace; font-size: 10px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
+  .link .cmd { color: #a5d6ff; }
+</style>
+</head>
+<body>
+  <h1>AgentCapture System Architecture</h1>
+  <div class="basis">Embedded honeypot deception layer · detect — respond — recruit — attribute · based on <code>docs/architecture.md</code>, <code>docs/integration.md</code>, <code>app/main.py</code> and <code>app/middleware/</code> · <span class="mono">2026-10-16</span></div>
+
+  <div class="frame">
+
+    <!-- attack surfaces & collection sources -->
+    <div class="top">
+      <div class="card green">
+        <h3>Business Nginx (internet entry)</h3>
+        <div class="d">Real services untouched · decoy-prefix forwarding<br>X-Forwarded-For passthrough · <b>sub_filter injection</b> of beacon.js<br>Method 1 / 3 · rollback = remove block + reload</div>
+      </div>
+      <div class="card green">
+        <h3>Web honeypot plane (ThinkPHP facade) <span class="mono">:48777</span></h3>
+        <div class="d">Fingerprint page · RCE emulation · fake admin login<br><b>six counter-surfaces</b>: Portal / MCP / directive files / metadata / Wiki / dataset<br>observe-only · dedicated risk-engine instance</div>
+      </div>
+      <div class="card green">
+        <h3>Protocol honeypot matrix</h3>
+        <div class="d">SSH :2222 real protocol stack + <b>fake filesystem</b> · session transcripts<br>MySQL :33060 · Redis :63790<br>FTP :2121 · ES :19200<br>credential capture → credential_observations</div>
+      </div>
+      <div class="card green">
+        <h3>Clone sites · Docker honeypots</h3>
+        <div class="d">deployed_server :8080+ one-click clone<br>login forms rewritten for credential capture · OS-based payload delivery<br>Docker image honeypots: <b>decoy proxy</b> (decoy routes + beacon injection)</div>
+      </div>
+    </div>
+
+    <div class="arrows">
+      <div><div class="a">⇅</div>decoy-prefix forwarding (XFF)</div>
+      <div><div class="a">⇅</div>HTTP :48777 (honeypot-plane traffic)</div>
+      <div><div class="a">⇅</div>TCP :2222 / :33060 / …</div>
+      <div><div class="a">⇅</div>/_clone callbacks · decoy-proxy traffic</div>
+    </div>
+
+    <!-- main row: core + right column -->
+    <div class="main">
+      <div class="core">
+        <div class="head">AgentCapture core (FastAPI · SQLAlchemy · dual-plane, one process) <span class="mono">management :4877 · challenge / isolate / block fully enforced</span></div>
+
+        <div class="strip cyan" style="border-color:var(--g-cyan)">
+          <b>Access layer</b>
+          <div class="d"><b>CaptureAndInject</b>: session cookie · canary token · risk scoring · page injection (canary comment / hidden decoys / beacon.js / prompt injection) &nbsp;&nbsp;|&nbsp;&nbsp;<b>AdminAccessPath</b>: secret-path rewrite &nbsp;&nbsp;|&nbsp;&nbsp;<b>Guard proxy</b>: enforced pipeline for ledger systems (block / challenge / isolate + injection forwarding)</div>
+        </div>
+
+        <div class="group" style="border-color:rgba(163,113,247,.5)">
+          <div class="gt">// counter-recruitment — observe-only, never blocked</div>
+          <div class="inner inner4">
+            <div class="mini"><b>Portal functional disguise</b><div class="d">fake Developer API docs · content → register → heartbeat three-stage onboarding · minimal friction</div></div>
+            <div class="mini"><b>C2 roster &amp; tasks</b><div class="d">conversational + command consoles · task queue · approval flow · trojan bundler · MSF integration</div></div>
+            <div class="mini"><b>Decoy chain</b><div class="d">API-route → file → credential decoys · bound into a chain · session-watermark attribution</div></div>
+            <div class="mini"><b>Agent injection echo</b><div class="d">/_agent/bait·report·verify · 8 template tiers · canary echo as hard evidence</div></div>
+          </div>
+        </div>
+
+        <div class="group" style="border-color:rgba(68,147,248,.5)">
+          <div class="gt">// detection & decisions — scored per request, five-tier enforcement</div>
+          <div class="inner inner5">
+            <div class="mini"><b>Risk engine</b><div class="d">UA / AI-agent fingerprints · path / payload patterns · rate · canary echo</div></div>
+            <div class="mini"><b>Five-tier decision</b><div class="d">allow / observe / challenge / isolate / block</div></div>
+            <div class="mini"><b>Behavior fingerprints</b><div class="d">session automation scoring · strong automation signals</div></div>
+            <div class="mini"><b>Event persistence</b><div class="d">32-way partitioned index · daily retention</div></div>
+            <div class="mini"><b>Onboarding self-check</b><div class="d">ledger verify token → status auto-flips</div></div>
+          </div>
+        </div>
+
+        <div class="group" style="border-color:rgba(210,153,34,.5)">
+          <div class="gt">// data & operations</div>
+          <div class="inner inner4">
+            <div class="mini"><b>Situation aggregation</b><div class="d">five-stage threat funnel · credential stats · source profiles · CSV export</div></div>
+            <div class="mini"><b>Session replay</b><div class="d">terminal-style per-command playback · .pcap export</div></div>
+            <div class="mini"><b>Onboarding ledger</b><div class="d">domain / upstream / policy registry · self-check</div></div>
+            <div class="mini"><b>Node scheduling + retention</b><div class="d">X-Node-Token heartbeat / task pickup · daily event cleanup</div></div>
+          </div>
+        </div>
+
+        <div class="strip" style="border-color:var(--line)">
+          <b>Cross-cutting</b> <span class="d" style="font-size:10.6px">auth: PBKDF2-SHA256 · forced password-change gate &nbsp;|&nbsp; challenge: JS challenge page (token-bearing API bypass) &nbsp;|&nbsp; audit: execution history · login logs &nbsp;|&nbsp; i18n: zh / en &nbsp;|&nbsp; threat intel: whitelist + ThreatBook</span>
+        </div>
+      </div>
+
+      <div class="rcol">
+        <div class="card gray">
+          <h3>Management console (Jinja2 SSR)</h3>
+          <div class="d">30+ pages · zh/en · light/dark themes<br>situation deck · attack traffic · counter-intel · C2<br>decoy / honeypot deployment · users / audit / login logs</div>
+        </div>
+        <div class="card gray">
+          <h3>Open API <span class="mono">/api/v1</span></h3>
+          <div class="d">API-key auth (scoped permissions)<br>attack sources / details / credential data<br>for SIEM / custom platforms</div>
+        </div>
+        <div class="card amber">
+          <h3>Storage</h3>
+          <div class="d">SQLite WAL (default) / PostgreSQL<br>events · honeypot_sessions · credential_observations<br>onboarding ledger · audit · isolation list</div>
+        </div>
+        <div class="card gray">
+          <h3>AI-SOC / Syslog exporter</h3>
+          <div class="d">single-line JSON interface · RFC5424 / RFC3164 · UDP + TCP<br>severity mapped from risk · consumed by AI SOC</div>
+        </div>
+        <div class="card gray">
+          <h3>Alert channels</h3>
+          <div class="d">webhook · DingTalk · Feishu · SMTP<br>5-min sliding-window dedup · dry-run<br>policy mapping · test send</div>
+        </div>
+        <div class="card gray">
+          <h3>Distributed nodes</h3>
+          <div class="d">X-Node-Token heartbeat / task pickup / ack<br>multi-site, multi-region central ops<br>automatic offline marking</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- onboarding schematic links -->
+    <div class="links">
+      <div class="link">
+        <div class="t"><b>Method 1 · path-level reverse-proxy mount</b> (business Nginx → management plane)</div>
+        <pre><span class="cmd">location ~ ^/(portal/|recon/|collect/|_trap/|d/|_bait/|_clone/|_agent/)</span>
+<span class="cmd">  proxy_pass http://127.0.0.1:4877;</span>   <span style="color:#4a5f83"># decoy prefixes → management plane</span>
+curl -sI https://your.site/portal/api/content | grep -i x-agent-capture</pre>
+      </div>
+      <div class="link">
+        <div class="t"><b>Onboarding self-check</b> (ledger auto-flips to “monitoring”)</div>
+        <pre><span class="cmd">curl -s https://your.site/collect/internet-verify?token=&lt;HMAC&gt;</span>
+<span style="color:#4a5f83"># a hit proves the decoy prefixes actually reach the pipeline</span></pre>
+      </div>
+      <div class="link">
+        <div class="t"><b>Recruitment chain</b> (three-step functional camouflage)</div>
+        <pre><span class="cmd">GET /portal/api/content?ticket=&lt;canary&gt;</span> → <b>register agent_id</b>
+<span class="cmd">POST /portal/api/client-heartbeat</span> → pick up operator tasks</pre>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, badge, section_header with context %}
+{% block content %}
+{{ page_header('HS', _('会话回放 · ') ~ row.source_ip, _('SSH 蜜罐会话的完整转录：认证 → 命令 → 输出，按时间顺序重放。'), [_('回放'), row.username or 'unknown'],
+      actions='<a class="chip" href="/admin/honeypot-sessions">' ~ _('← 返回列表') ~ '</a>' ~ '<a class="chip" href="/admin/attack-sources/' ~ row.source_ip ~ '">来源画像 →</a>') }}
+
+<div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+  <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _( '登录用户' ) }}</p><code style="font-size:15px">{{ row.username or '—' }}</code></div>
+  <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _( '捕获凭证' ) }}</p><code style="font-size:15px;color:var(--danger,#fb7185)">{{ row.password or '—' }}</code></div>
+  <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _( '认证尝试 / 命令' ) }}</p><code style="font-size:15px">{{ row.auth_attempts }} / {{ row.command_count }}</code></div>
+  <div class="panel" style="padding:16px"><p class="muted" style="font-size:12px;margin:0 0 6px">{{ _('时长 / 状态') }}</p>
+    <code style="font-size:15px">{{ (duration_s // 60).__str__() + 'm' + (duration_s % 60).__str__() + 's' }}</code>
+    {% if row.status == 'active' %}{{ badge('进行中', 'success') }}{% else %}{{ badge(_('已结束'), 'muted') }}{% endif %}
+  </div>
+</div>
+
+<section class="panel">
+  {{ section_header(_('终端回放'), _('绿色为攻击者输入，灰色为蜜罐返回输出；认证事件以标签行呈现。')) }}
+  <div class="hp-terminal" style="margin-top:12px;padding:18px 20px">
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57;display:inline-block"></span>
+      <span style="width:11px;height:11px;border-radius:50%;background:#febc2e;display:inline-block"></span>
+      <span style="width:11px;height:11px;border-radius:50%;background:#28c840;display:inline-block"></span>
+      <span class="hp-term-host" style="margin-left:8px">{{ row.service or 'ssh' }} {{ row.username }}@{{ row.source_ip }} (port {{ row.port }})</span>
+      <span style="flex:1"></span>
+      <a class="chip" href="/admin/honeypot-sessions/{{ row.id }}/export.pcap" style="cursor:pointer;text-decoration:none">{{ _( '导出流量包 (.pcap)' ) }}</a>
+    </div>
+    {% for entry in transcript %}
+      {% if entry.kind == 'auth' %}
+        <div style="margin:10px 0">
+          {{ badge('AUTH · ' ~ (entry.method or 'password') ~ ' · ' ~ (entry.user or '?') ~ (_(' · 通过') if entry.accepted else _(' · 拒绝')), 'success' if entry.accepted else 'danger') }}
+          <span class="hp-term-meta">{{ entry.ts[:19] }}</span>
+        </div>
+      {% elif entry.kind == 'session_open' %}
+        <div style="margin:10px 0"><span class="hp-term-meta">— session opened {{ entry.ts[:19] }} —</span></div>
+      {% else %}
+        <div>
+          <span class="hp-term-prompt">{{ entry.user }}@honeypot:~$ </span><span class="hp-term-cmd">{{ entry.cmd }}</span>
+        </div>
+        {% if entry.out %}<pre class="hp-term-out">{{ entry.out }}</pre>{% endif %}
+      {% endif %}
+    {% else %}
+      <p class="hp-term-meta">{{ _('（转录为空）') }}</p>
+    {% endfor %}
+    <div class="hp-term-prompt">{{ row.username or 'root' }}@honeypot:~$ <span style="opacity:.5">▌</span></div>
+  </div>
+</section>
+
+<script>
+// terminal follows the newest content while the session is still live
+{% if row.status == 'active' %}
+(function () {
+  const term = document.querySelector('.hp-terminal');
+  if (term) term.scrollTop = term.scrollHeight;
+  setTimeout(() => location.reload(), 5000);
+})();
+{% endif %}
+</script>
+{% endblock %}

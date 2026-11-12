@@ -1,0 +1,1139 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_macros.html' import page_header, section_header, empty_state with context %}
+{% block content %}
+{% if embed %}<script>document.addEventListener('DOMContentLoaded', () => document.body.classList.add('topo-embed'));</script>
+<style>body.topo-embed .page-header, body.topo-embed #topo-palette, .topo-embed #topo-inspector { display:none !important; } body.topo-embed #topo-canvas-wrap { height: 100vh !important; }</style>
+{% endif %}
+{{ page_header('WF', _('接入拓扑'), _('互联网资产接入拓扑：拖拽节点编排布局，从左侧组件面板把蜜饵拖到资产节点上即完成绑定，右侧检查器管理节点配置。'), [_('资产节点'), _('蜜饵配置')]) }}
+
+<style>
+  #topo-app { display: flex; gap: 14px; padding: 14px; align-items: stretch; }
+  /* ── embed 模式（态势大屏内嵌）：只留画布 ─────────────────────── */
+  body.topo-embed .page-header, body.topo-embed #topo-palette, body.topo-embed #topo-inspector { display: none !important; }
+  body.topo-embed .layout, body.topo-embed main.main-shell { display: block !important; }
+  body.topo-embed .workspace { padding: 0 !important; }
+  body.topo-embed .content { max-width: none !important; padding: 0 !important; }
+  body.topo-embed .topo-shell { display: block !important; }
+  body.topo-embed #topo-canvas-wrap { height: 100vh !important; }
+
+  /* ── left palette (netviz-style blocks) ─────────────────────────── */
+  #topo-palette { flex: 0 0 196px; width: 196px; display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 12px 10px; }
+  .pal-title { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground);
+    font-family: "Fira Code", monospace; margin: 2px 2px 2px; }
+  .pal-block { display: flex; gap: 10px; align-items: center; border: 1px solid var(--border);
+    background: var(--secondary); border-radius: 10px; padding: 8px 10px; cursor: grab; text-align: left;
+    transition: border-color .18s ease, transform .18s ease; color: var(--foreground); width: 100%; }
+  .pal-block:hover { border-color: var(--ring); transform: translateY(-1px); }
+  .pal-block:active { cursor: grabbing; }
+  .pal-block b { display: block; font-size: 12.5px; font-weight: 600; }
+  .pal-block small { display: block; font-size: 10.5px; color: var(--muted-foreground); margin-top: 1px; }
+  .pal-icon { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; }
+  .pal-icon svg { width: 18px; height: 18px; }
+  .pal-icon.api { color: #34d399; background: rgba(52, 211, 153, .12); border: 1px solid rgba(52, 211, 153, .32); }
+  .pal-icon.credential { color: #fb7185; background: rgba(251, 113, 133, .12); border: 1px solid rgba(251, 113, 133, .32); }
+  .pal-icon.file { color: #f59e0b; background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .32); }
+  .pal-note { font-size: 10.5px; color: var(--muted-foreground); line-height: 1.6; margin-top: 4px; padding: 0 2px; }
+  .pal-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted-foreground); padding: 2px; }
+  .pal-legend .lg { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 10px; }
+  /* ── canvas ─────────────────────────────────────────────────────── */
+  #topo-canvas-wrap { position: relative; flex: 1 1 auto; min-width: 0; height: 600px;
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    background-image: radial-gradient(var(--topo-dot) 1.2px, transparent 1.2px);
+    background-size: 24px 24px; }
+  :root { --topo-dot: rgba(148, 163, 184, .20); }
+  [data-theme="light"] { --topo-dot: rgba(15, 23, 42, .14); }
+  #topo-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
+  #topo-svg.panning { cursor: grabbing; }
+  #topo-svg .edge { fill: none; stroke: var(--muted-foreground); stroke-opacity: .38; stroke-width: 1.5; stroke-dasharray: 7 6; }
+  #topo-svg .edge.dim { stroke-opacity: .20; stroke-width: 1.3; }
+  #topo-svg .edge.edge-agent { stroke: #f43f5e; stroke-opacity: .45; }
+  #topo-svg .edge-flow.edge-flow-agent { stroke: #f43f5e; stroke-opacity: .8; }
+  #topo-svg .zone-cap { fill: var(--muted-foreground); font-size: 10.5px; letter-spacing: .16em;
+    font-family: "Fira Code", monospace; }
+  #topo-svg .node .abody { fill: url(#node-body-grad); stroke: var(--border-strong); stroke-width: 1.3; rx: 10;
+    transition: stroke .15s ease, filter .15s ease; filter: drop-shadow(0 3px 4px rgba(2, 6, 23, .28)); }
+  [data-theme="light"] #topo-svg .node .abody { filter: drop-shadow(0 3px 4px rgba(15, 23, 42, .13)); }
+  #topo-svg .node:hover .abody, #topo-svg .node.sel .abody { stroke: var(--ring); }
+  /* attacker agent cards: hacker red/black theme */
+  #topo-svg .node.agent-node rect.chip { fill: rgba(2, 6, 23, .88); stroke: rgba(244, 63, 94, .65); }
+  #topo-svg .node.agent-node rect.abody { stroke: rgba(244, 63, 94, .38); }
+  #topo-svg .node.agent-node:hover .abody,
+  #topo-svg .node.agent-node.sel .abody { stroke: #f43f5e; }
+  #topo-svg .edge-flow { fill: none; stroke: var(--ring, #4493f8); stroke-opacity: .9; stroke-width: 1.9;
+    stroke-linecap: round; stroke-dasharray: 9 91; animation: topo-flow 2.4s linear infinite; }
+  @keyframes topo-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { #topo-svg .edge-flow { display: none; } }
+  [data-theme="light"] #topo-svg .edge-flow { stroke: rgba(37, 99, 235, .78); }
+  .globe-canvas { position: absolute; transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 1; }
+  #topo-svg .snap-guide { stroke: #f43f5e; stroke-width: 1; stroke-dasharray: 4 4;
+    pointer-events: none; }
+  #topo-svg .core-glow { animation: core-glow 3s ease-in-out infinite; }
+  @keyframes core-glow { 0%, 100% { opacity: .10; } 50% { opacity: .26; } }
+  @media (prefers-reduced-motion: reduce) { #topo-svg .core-glow { animation: none; } }
+  #topo-svg .node { cursor: grab; }
+  #topo-svg .node:active { cursor: grabbing; }
+  #topo-svg g.anchor { cursor: grab; }
+  #topo-svg g.anchor:active { cursor: grabbing; }
+  /* 3D card: gradient face + extruded side slab + drop shadow (lift on select) */
+  :root { --topo-card-hi: #17253f; --topo-side: rgba(2, 6, 23, .55); }
+  [data-theme="light"] { --topo-card-hi: #ffffff; --topo-side: rgba(15, 23, 42, .22); }
+  #node-body-grad stop.nb1 { stop-color: var(--topo-card-hi); }
+  #node-body-grad stop.nb2 { stop-color: var(--card); }
+  #topo-svg .node rect.side3d { fill: var(--topo-side); }
+  #topo-svg .node rect.body { fill: url(#node-body-grad); stroke: var(--border-strong); stroke-width: 1.4; rx: 12;
+    transition: stroke .15s ease, filter .15s ease;
+    filter: drop-shadow(0 4px 5px rgba(2, 6, 23, .30)); }
+  [data-theme="light"] #topo-svg .node rect.body { filter: drop-shadow(0 4px 5px rgba(15, 23, 42, .14)); }
+  #topo-svg .node:hover rect.body { stroke: var(--ring); }
+  #topo-svg .node.sel rect.body { stroke: var(--ring); stroke-width: 2;
+    filter: drop-shadow(0 8px 10px rgba(2, 6, 23, .40)); }
+  [data-theme="light"] #topo-svg .node.sel rect.body { filter: drop-shadow(0 8px 10px rgba(15, 23, 42, .20)); }
+  #topo-svg .node.droptgt rect.body { stroke: var(--success); stroke-width: 2; stroke-dasharray: 6 4; }
+  #node-chip-grad stop.nc1 { stop-color: rgba(68, 147, 248, .40); }
+  #node-chip-grad stop.nc2 { stop-color: rgba(68, 147, 248, .10); }
+  #topo-svg .node rect.chip { fill: url(#node-chip-grad); }
+  #topo-svg text { fill: var(--foreground); font-family: "Fira Sans", system-ui, sans-serif; pointer-events: none; }
+  #topo-svg .name { font-size: 13.5px; font-weight: 700; }
+  #topo-svg .meta { font-size: 10.5px; fill: var(--muted-foreground); font-family: "Fira Code", monospace; }
+  #topo-svg .cfg { font-size: 10px; fill: var(--muted-foreground); }
+  #topo-svg .badge { font-size: 10px; }
+  #topo-svg .chip { rx: 10; }
+  #topo-zoom { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+  #topo-zoom button { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--popover); color: var(--foreground); cursor: pointer; display: grid; place-items: center;
+    transition: border-color .15s ease; padding: 0; }
+  #topo-zoom button:hover { border-color: var(--ring); }
+  #topo-zoom svg { width: 15px; height: 15px; }
+  #topo-tip { position: absolute; top: 10px; left: 12px; font-size: 11px; color: var(--muted-foreground);
+    pointer-events: none; background: color-mix(in srgb, var(--card) 78%, transparent);
+    border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
+  /* ── right inspector ────────────────────────────────────────────── */
+  #topo-inspector { flex: 0 0 304px; width: 304px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card); padding: 14px; overflow: auto; max-height: 628px; position: relative; }
+  #topo-inspector[hidden] { display: none; }
+  .insp-close { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 8px;
+    border: 1px solid var(--border); background: none; color: var(--muted-foreground); cursor: pointer;
+    font-size: 14px; line-height: 1; }
+  .insp-close:hover { color: var(--foreground); border-color: var(--ring); }
+  .insp-kicker { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground);
+    font-family: "Fira Code", monospace; margin-bottom: 6px; }
+  .insp-name { font-size: 14.5px; font-weight: 700; margin: 0 0 2px; }
+  .insp-meta { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 2px; }
+  .insp-meta .row { display: flex; gap: 8px; font-size: 11.5px; align-items: baseline; }
+  .insp-meta .k { flex: 0 0 58px; color: var(--muted-foreground); }
+  .insp-meta .v { font-family: "Fira Code", monospace; font-size: 11px; word-break: break-all; }
+  .insp-sub { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground);
+    font-family: "Fira Code", monospace; margin: 14px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .insp-cfg { display: flex; gap: 9px; align-items: flex-start; border: 1px solid var(--border);
+    border-radius: 9px; background: var(--secondary); padding: 8px 10px; margin-bottom: 6px; }
+  .insp-cfg .dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .insp-cfg .dot.api_route { background: #34d399; }
+  .insp-cfg .dot.credential { background: #fb7185; }
+  .insp-cfg .dot.file { background: #f59e0b; }
+  .insp-cfg .inf { flex: 1 1 auto; min-width: 0; }
+  .insp-cfg b { display: block; font-size: 12px; font-weight: 600; }
+  .insp-cfg code { display: block; font-size: 10.5px; color: var(--muted-foreground); word-break: break-all; margin-top: 1px; }
+  .insp-cfg form { margin: 0; flex: 0 0 auto; }
+  .insp-cfg form button { background: none; border: none; color: var(--muted-foreground); cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px; }
+  .insp-cfg form button:hover { color: var(--danger); }
+  .insp-empty { font-size: 11.5px; color: var(--muted-foreground); padding: 6px 2px; }
+  #topo-inspector .stack { display: flex; flex-direction: column; gap: 8px; }
+  #topo-inspector .stack .field-label { display: flex; flex-direction: column; gap: 4px; font-size: 11px;
+    color: var(--muted-foreground); }
+  #topo-inspector .stack input, #topo-inspector .stack select { font-size: 12px; }
+  @media (max-width: 1180px) {
+    #topo-app { flex-wrap: wrap; }
+    #topo-palette { width: 100%; flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .pal-title { width: 100%; }
+    .pal-block { width: auto; }
+    #topo-canvas-wrap { order: 3; flex: 1 1 100%; height: 460px; }
+    #topo-inspector { order: 4; width: 100%; flex: 1 1 100%; max-height: none; }
+  }
+</style>
+
+{% set ns = namespace(api_configs=0) %}
+{% for sys in systems %}{% for cfg in sys.configs %}{% if cfg.type == 'api_route' %}{% set ns.api_configs = ns.api_configs + 1 %}{% endif %}{% endfor %}{% endfor %}
+{% for cfg in unassigned %}{% if cfg.type == 'api_route' %}{% set ns.api_configs = ns.api_configs + 1 %}{% endif %}{% endfor %}
+
+<div class="cards" style="margin-bottom:16px">
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('资产节点') }}</div><div class="stat-card-value">{{ systems|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('已绑定配置') }}</div><div class="stat-card-value">{{ total_configs - unassigned|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('未关联配置') }}</div><div class="stat-card-value">{{ unassigned|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('API 路由配置') }}</div><div class="stat-card-value">{{ ns.api_configs }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('上线 Agent') }}</div><div class="stat-card-value">{{ online_agents|length }}</div></div>
+  <div class="card metric-card"><div class="muted metric-card-label">{{ _('运行中蜜罐') }}</div><div class="stat-card-value">{{ running_honeypots|length }}</div></div>
+</div>
+
+<div class="panel" style="padding:0; overflow:hidden">
+  <div id="topo-app">
+    <aside id="topo-palette">
+      <div class="pal-title">{{ _('蜜饵组件') }}</div>
+      <div class="pal-block" draggable="true" tabindex="0" role="button" data-decoy-type="api_route">
+        <span class="pal-icon api"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+        <span><b>{{ _('API 路由蜜饵') }}</b><small>{{ _('伪装接口 · 捕获探测') }}</small></span>
+      </div>
+      <div class="pal-block" draggable="true" tabindex="0" role="button" data-decoy-type="credential">
+        <span class="pal-icon credential"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span>
+        <span><b>{{ _('凭证蜜饵') }}</b><small>{{ _('假账号密码 · 溯源水印') }}</small></span>
+      </div>
+      <div class="pal-block" draggable="true" tabindex="0" role="button" data-decoy-type="file">
+        <span class="pal-icon file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+        <span><b>{{ _('文件蜜饵') }}</b><small>{{ _('诱饵文档 · 下载告警') }}</small></span>
+      </div>
+      <div class="pal-title" style="margin-top:8px">{{_('操作')}}</div>
+      <div class="pal-note">{{ _('把组件拖到资产节点上即可绑定；或单击节点后在右侧检查器中添加。拖动节点调整布局，拖动空白处平移，滚轮缩放。') }}</div>
+      <div class="pal-title" style="margin-top:8px">{{ _('图例') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#34d399"></span>{{ _('API 路由') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#fb7185"></span>{{ _('凭证蜜饵') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#f59e0b"></span>{{ _('文件蜜饵') }}</div>
+      <div class="pal-legend"><span class="lg" style="border:1.5px dashed var(--muted-foreground)"></span>{{ _('捕获链路') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:#f43f5e;border-radius:50%"></span>{{ _('上线 Agent · 黑客主机，单击进入控制') }}</div>
+      <div class="pal-legend"><span class="lg" style="background:linear-gradient(135deg,#8fbcf5,#2e6fc4)"></span>{{ _('蜜罐服务 · 单击查看部署') }}</div>
+    </aside>
+
+    <div id="topo-canvas-wrap">
+      <svg id="topo-svg" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="topo-tip">{{ _('拖动节点 · 拖动空白平移 · 滚轮缩放') }}</div>
+      <div id="topo-zoom">
+        <button type="button" id="z-in" title="{{ _('放大') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" id="z-out" title="{{ _('缩小') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+        <button type="button" id="z-fit" title="{{ _('重置视图') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+      </div>
+    </div>
+
+    <aside id="topo-inspector" hidden>
+      <button type="button" class="insp-close" id="insp-close" title="{{ _('关闭') }}">✕</button>
+      {% for sys in systems %}
+      <div class="insp-body" id="insp-{{ sys.id }}" hidden>
+        <div class="insp-kicker">{{ _('节点检查器') }}</div>
+        <h4 class="insp-name">{{ sys.name }}</h4>
+        <div class="insp-meta">
+          <div class="row"><span class="k">{{ _('域名') }}</span><span class="v">{{ sys.domain }}</span></div>
+          <div class="row"><span class="k">{{ _('状态') }}</span>
+            <span class="v" style="color:{{ '#34d399' if sys.is_enabled else '#f59e0b' }}">{{ _('运行中') if sys.is_enabled else _('已暂停') }} · {{ sys.status }}</span></div>
+          <div class="row"><span class="k">{{ _('上游') }}</span><span class="v">{{ sys.upstream_url or '—' }}</span></div>
+        </div>
+        <div class="insp-sub">{{ _('绑定配置') }} · {{ sys.configs|length }}</div>
+        {% for cfg in sys.configs %}
+        <div class="insp-cfg">
+          <span class="dot {{ cfg.type }}"></span>
+          <div class="inf"><b>{{ cfg.name }}</b><code>{{ cfg.path }}</code></div>
+          <form method="post" action="/admin/internet-topology/configs/{{ cfg.id }}/delete" data-confirm="{{ _('删除该配置？相关蜜饵部署与自动模板将一并移除。') }}">
+            <button type="submit" title="{{ _('删除') }}">✕</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="insp-empty">{{ _('暂无绑定配置——从左侧拖入蜜饵组件，或使用下方表单。') }}</div>
+        {% endfor %}
+        <div class="insp-sub">{{ _('添加配置') }}</div>
+        <form method="post" action="/admin/internet-topology/configs/create" class="stack">
+          <input type="hidden" name="system_id" value="{{ sys.id }}">
+          <label class="field-label"><span>{{ _('配置类型') }}</span>
+            <select name="decoy_type" id="dtype-{{ sys.id }}">
+              <option value="api_route">{{ _('API 路由蜜饵') }}</option>
+              <option value="file">{{ _('文件蜜饵') }}</option>
+              <option value="credential">{{ _('凭证蜜饵') }}</option>
+            </select>
+          </label>
+          <label class="field-label"><span>{{ _('配置名称 *') }}</span><input name="name" required placeholder="{{ _('如 内部重建 API') }}"></label>
+          <label class="field-label"><span>{{ _('API 路由（仅 API 路由蜜饵需要）') }}</span><input name="route_path" placeholder="{{ _('如 /api/internal/reindex') }}"></label>
+          <label class="field-label"><span>{{ _('说明') }}</span><input name="description" placeholder="{{ _('用途说明（可选）') }}"></label>
+          <button type="submit" class="primary btn-sm">{{ _('创建并绑定到该节点') }}</button>
+        </form>
+      </div>
+      {% endfor %}
+      <div class="insp-body" id="insp-hp" hidden>
+        <div class="insp-kicker">{{ _('蜜罐服务检查器') }}</div>
+        <h4 class="insp-name" id="hp-insp-name"></h4>
+        <div class="insp-meta">
+          <div class="row"><span class="k">{{ _('类别') }}</span><span class="v" id="hp-insp-category"></span></div>
+          <div class="row"><span class="k">{{ _('端口') }}</span><span class="v" id="hp-insp-port"></span></div>
+          <div class="row"><span class="k">{{ _('状态') }}</span><span class="v" style="color:#34d399">● {{ _('运行中') }}</span></div>
+        </div>
+        <div class="insp-sub">{{ _('画布显示名') }}</div>
+        <form id="hp-alias-form" class="stack" onsubmit="return false">
+          <label class="field-label"><span>{{ _('仅更新拓扑显示，服务不停转') }}</span>
+            <input id="hp-alias-input" maxlength="40" placeholder="{{ _('留空则恢复默认名称') }}"></label>
+          <button type="button" class="secondary btn-sm" id="hp-alias-save">{{ _('保存显示名') }}</button>
+        </form>
+        <div class="insp-sub">{{ _('服务控制') }}</div>
+        <form method="post" id="hp-toggle-form" data-confirm="{{ _('确认变更该蜜罐服务的运行状态？') }}">
+          <input type="hidden" name="next" value="/admin/internet-topology">
+          <button type="submit" class="danger btn-sm" id="hp-toggle-btn" style="width:100%">{{ _('停止该蜜罐') }}</button>
+        </form>
+        <div style="margin-top:12px"><a class="chip" href="/admin/honeypots">{{ _('查看蜜罐部署') }}</a></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+{% if unassigned %}
+<div style="margin-top:16px">
+  {{ section_header(_('未关联配置'), _('以下蜜饵部署未绑定到任何资产节点，可在对应系统节点中重新创建绑定。')) }}
+  <div class="table-wrap"><table>
+    <thead><tr><th>{{ _('类型') }}</th><th>{{ _('名称') }}</th><th>{{ _('路径') }}</th><th>{{ _('原部署位置') }}</th></tr></thead>
+    <tbody>
+      {% for cfg in unassigned %}
+      <tr>
+        <td>{{ cfg.type }}</td>
+        <td>{{ cfg.name }}</td>
+        <td><code style="font-size:11px">{{ cfg.path }}</code></td>
+        <td class="muted">{{ cfg.host or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+<script id="topo-data" type="application/json">{{ topo_data_json | safe }}</script>
+<script src="/static/world-land.js?v=1"></script>
+<script>
+  (function () {
+    var DATA = JSON.parse(document.getElementById('topo-data').textContent);
+    var svg = document.getElementById('topo-svg');
+    var NS = 'http://www.w3.org/2000/svg';
+    var W = 1600, H = 640;
+    var view = { x: 0, y: 0, w: W, h: H };
+    var INT = {
+      cx: 170, cy: H / 2, ox: (DATA.layout.int || [0])[0] || 0, oy: (DATA.layout.int || [0, 0])[1] || 0,
+    };
+    var CORE = {
+      cx: W - 210, cy: H / 2, ox: (DATA.layout.core || [0])[0] || 0, oy: (DATA.layout.core || [0, 0])[1] || 0,
+    };
+
+    function el(tag, attrs, parent) {
+      var e = document.createElementNS(NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      (parent || svg).appendChild(e);
+      return e;
+    }
+    function apply() {
+      svg.setAttribute('viewBox', view.x + ' ' + view.y + ' ' + view.w + ' ' + view.h);
+      if (typeof syncGlobeCanvas === 'function') syncGlobeCanvas();
+    }
+    function clientToWorld(cx, cy) {
+      var pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    function worldPerPx() {
+      var r = svg.getBoundingClientRect();
+      return { x: view.w / r.width, y: view.h / r.height };
+    }
+    function zoomAt(factor, cx, cy) {
+      var p = clientToWorld(cx, cy);
+      var nw = Math.min(W * 2, Math.max(320, view.w / factor));
+      var k = nw / view.w;
+      view.x = p.x - (p.x - view.x) * k;
+      view.y = p.y - (p.y - view.y) * k;
+      view.w = nw; view.h = view.h * k;
+      apply();
+    }
+    svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      zoomAt(ev.deltaY < 0 ? 1.15 : 1 / 1.15, ev.clientX, ev.clientY);
+    }, { passive: false });
+    document.getElementById('z-in').addEventListener('click', function () {
+      var r = svg.getBoundingClientRect(); zoomAt(1.25, r.left + r.width / 2, r.top + r.height / 2);
+    });
+    document.getElementById('z-out').addEventListener('click', function () {
+      var r = svg.getBoundingClientRect(); zoomAt(1 / 1.25, r.left + r.width / 2, r.top + r.height / 2);
+    });
+    document.getElementById('z-fit').addEventListener('click', function () {
+      view = { x: 0, y: 0, w: W, h: H }; apply();
+    });
+
+    // ── world objects ──────────────────────────────────────────────
+    var sysNodes = DATA.systems.map(function (sys, i) {
+      var saved = DATA.layout[sys.id];
+      var col = Math.floor(i / Math.max(1, Math.ceil(DATA.systems.length / 2)));
+      var row = i % Math.max(1, Math.ceil(DATA.systems.length / 2));
+      return {
+        sys: sys,
+        x: saved ? saved[0] : 470 + col * 300,
+        y: saved ? saved[1] : 80 + row * 200,
+        w: 244, h: 82,
+      };
+    });
+    // online C2 / managed agent hosts (top row) and running honeypots (bottom row)
+    var agentNodes = (DATA.agents || []).map(function (a, i) {
+      var saved = DATA.layout['agent:' + a.id];
+      return { a: a, x: saved ? saved[0] : 480 + i * 196, y: 12, w: 184, h: 58 };
+    });
+    var hpNodes = (DATA.honeypots || []).map(function (h, i) {
+      var saved = DATA.layout['hp:' + h.key];
+      var sx = null, sy = null, alias = '';
+      if (Array.isArray(saved)) { sx = saved[0]; sy = saved[1]; }
+      else if (saved && typeof saved === 'object') {
+        sx = saved.x; sy = saved.y; alias = saved.alias || '';
+      }
+      return {
+        hp: h, alias: alias, g: null, labelEl: null,
+        x: sx != null ? sx : 1446, y: sy != null ? sy : 88 + i * 96, w: 140, h: 78,
+      };
+    });
+
+    var edgeLayer = el('g', { style: 'pointer-events:none' });
+    // ── smart snap-align: dragged nodes snap to other nodes' centers and
+    // edges; red guide lines show the active alignment while dragging ──
+    var guideLayer = null;
+    var SNAP_TOL = 9; // screen px, converted per-frame
+
+    function snapGuides(n, w, h) {
+      var k = (worldPerPx().x + worldPerPx().y) / 2;
+      var tol = SNAP_TOL * k;
+      var targets = [];
+      function collect(arr, self) {
+        arr.forEach(function (o) { if (o !== self) targets.push(o); });
+      }
+      collect(sysNodes, n.hp ? null : n);
+      collect(agentNodes, n.a ? n : null);
+      collect(hpNodes, n.hp ? n : null);
+      if (n.anchorKey !== 'int') {
+        targets.push({ x: INT.cx + INT.ox - 46, y: INT.cy + INT.oy - 46, w: 92, h: 92 });
+      }
+      if (n.anchorKey !== 'core') {
+        targets.push({ x: CORE.cx + CORE.ox - 40, y: CORE.cy + CORE.oy - 40, w: 80, h: 80 });
+      }
+
+      var guides = [];
+      // nearest (mine, theirs) pair per axis across centers + edges
+      function bestAxis(mineList, theirList) {
+        var bv = null, bt = null, bd = tol;
+        mineList.forEach(function (mv) {
+          theirList.forEach(function (tv) {
+            var d = Math.abs(mv - tv);
+            if (d < bd) { bd = d; bv = mv; bt = tv; }
+          });
+        });
+        return bv === null ? null : { mine: bv, theirs: bt };
+      }
+      var xT = [], yT = [];
+      targets.forEach(function (o) {
+        xT.push(o.x, o.x + o.w / 2, o.x + o.w);
+        yT.push(o.y, o.y + o.h / 2, o.y + o.h);
+      });
+      var bx = bestAxis([n.x, n.x + w / 2, n.x + w], xT);
+      var by = bestAxis([n.y, n.y + h / 2, n.y + h], yT);
+      var meCx = n.x + w / 2, meCy = n.y + h / 2;
+      if (bx) {
+        n.x += bx.theirs - bx.mine;
+        meCx = bx.theirs;
+        guides.push({ x1: bx.theirs, y1: by ? by.theirs : n.y - 24, x2: bx.theirs, y2: n.y + h + 24 });
+      }
+      if (by) {
+        n.y += by.theirs - by.mine;
+        meCy = by.theirs;
+        guides.push({ x1: bx ? bx.theirs : n.x - 24, y1: by.theirs, x2: n.x + w + 24, y2: by.theirs });
+      }
+      return guides;
+    }
+    function renderGuides(guides) {
+      if (!guideLayer) guideLayer = el('g', { style: 'pointer-events:none' });
+      guideLayer.innerHTML = '';
+      guides.forEach(function (g) {
+        el('line', { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, class: 'snap-guide' }, guideLayer);
+      });
+    }
+    function orthPath(x1, y1, x2, y2) {
+      if (Math.abs(y2 - y1) < 3) return 'M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2;
+      var r = Math.min(14, Math.abs(y2 - y1) / 2);
+      var mx = (x1 + x2) / 2;
+      var s = y2 > y1 ? 1 : -1;
+      return 'M' + x1 + ' ' + y1 +
+        'L' + (mx - r) + ' ' + y1 + 'Q' + mx + ' ' + y1 + ' ' + mx + ' ' + (y1 + s * r) +
+        'L' + mx + ' ' + (y2 - s * r) + 'Q' + mx + ' ' + y2 + ' ' + (mx + r) + ' ' + y2 +
+        'L' + x2 + ' ' + y2;
+    }
+    function drawEdges() {
+      // Edge pool: one slot per rendered link, base + optional flow path.
+      // Inbound links (internet -> agent/honeypot) render dim without flow;
+      // capture/report links (-> platform) carry the marching pulse.
+      var edgePool = edgeLayer.__pool || (edgeLayer.__pool = []);
+      var i = 0;
+      function emit(d, dim, withFlow, red) {
+        var p = edgeSlot(i++);
+        p.base.setAttribute('d', d);
+        p.base.setAttribute('class', 'edge' + (dim ? ' dim' : '') + (red ? ' edge-agent' : ''));
+        p.base.style.display = '';
+        p.flow.setAttribute('class', 'edge-flow' + (red ? ' edge-flow-agent' : ''));
+        if (withFlow) {
+          p.flow.setAttribute('d', d);
+          p.flow.style.display = '';
+        } else {
+          p.flow.style.display = 'none';
+        }
+      }
+      sysNodes.forEach(function (n) {
+        var cyL = n.y + n.h / 2;
+        emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), false, true);
+        emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy), false, true);
+      });
+      agentNodes.forEach(function (n) {
+        var cyL = n.y + n.h / 2;
+        var sys = null;
+        if (n.a.system_id != null) {
+          for (var s = 0; s < sysNodes.length; s++) {
+            if (sysNodes[s].sys.id === n.a.system_id) { sys = sysNodes[s]; break; }
+          }
+        }
+        if (sys) {
+          // recruited through this asset: red 上线 link from the system card
+          emit(orthPath(sys.x + sys.w / 2, sys.y, n.x + n.w / 2, n.y + n.h), false, true, true);
+        } else {
+          emit(orthPath(INT.cx + INT.ox + 52, INT.cy + INT.oy, n.x, cyL), true, false);
+        }
+        // attacker C2 traffic: the whole link reads red
+        emit(orthPath(n.x + n.w, cyL, CORE.cx + CORE.ox - 38, CORE.cy + CORE.oy - 14), false, true, true);
+      });
+      hpNodes.forEach(function (n) {
+        // services operated by the platform: short links from the right column
+        emit(orthPath(n.x + n.w / 2 - 21, n.y + 22, CORE.cx + CORE.ox + 52, CORE.cy + CORE.oy - 8), false, true);
+      });
+      for (; i < edgePool.length; i++) {
+        edgePool[i].base.style.display = 'none';
+        edgePool[i].flow.style.display = 'none';
+      }
+    }
+    function edgeSlot(i) {
+      var pool = edgeLayer.__pool || (edgeLayer.__pool = []);
+      while (pool.length <= i) {
+        var idx = pool.length;
+        var pair = {
+          base: el('path', { class: 'edge' }, edgeLayer),
+          flow: el('path', { class: 'edge-flow' }, edgeLayer),
+        };
+        pair.flow.style.animationDelay = (-((idx * 0.7) % 2.4)).toFixed(2) + 's';
+        pool.push(pair);
+      }
+      return pool[i];
+    }
+
+    function drawInternet() {
+      // real 3D rotating earth: a canvas overlay (see startGlobe) with real
+      // continent outlines; this holder keeps drag/anchor gestures + label
+      var holder = el('g', { class: 'anchor' });
+      INT.holder = holder;
+      holder.setAttribute('transform', 'translate(' + INT.ox + ',' + INT.oy + ')');
+      el('circle', { cx: INT.cx, cy: INT.cy, r: 50,
+        style: 'fill:transparent;pointer-events:all' }, holder);
+      var t = el('text', { x: INT.cx, y: INT.cy + 76, 'text-anchor': 'middle', class: 'name' }, holder);
+      t.textContent = {{ _('互联网 / 攻击者') | tojson }};
+      return holder;
+    }
+    // ── real 3D globe (canvas, orthographic projection) ────────────
+    var globeCanvas = null, gctx = null, globeRot = 0, globeLastTs = 0;
+    var globeReduced = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function startGlobe() {
+      var wrapEl = document.getElementById('topo-canvas-wrap');
+      globeCanvas = document.createElement('canvas');
+      globeCanvas.className = 'globe-canvas';
+      wrapEl.appendChild(globeCanvas);
+      gctx = globeCanvas.getContext('2d');
+      requestAnimationFrame(globeFrame);
+    }
+    function syncGlobeCanvas() {
+      if (!globeCanvas) return;
+      var k = 1;
+      try {
+        var m = svg.getScreenCTM();
+        if (m) {
+          var pt = svg.createSVGPoint(); pt.x = INT.cx + INT.ox; pt.y = INT.cy + INT.oy;
+          var c = pt.matrixTransform(m);
+          var wrapRect = wrapEl2();
+          k = m.a || 1;
+          globeCanvas.style.left = (c.x - wrapRect.left) + 'px';
+          globeCanvas.style.top = (c.y - wrapRect.top) + 'px';
+        }
+      } catch (e) { /* canvas stays at last position */ }
+      // 232-box maps to 116*k CSS px so the drawn sphere (R=92) renders
+      // at exactly the world-space radius (46*k)
+      var size = Math.max(60, 116 * k);
+      globeCanvas.style.width = size + 'px';
+      globeCanvas.style.height = size + 'px';
+      var wantLeft = c.x - wrapRect.left, wantTop = c.y - wrapRect.top;
+      if (!globeCanvas.style.left) {
+        globeCanvas.style.left = wantLeft + 'px';
+        globeCanvas.style.top = wantTop + 'px';
+        return;
+      }
+      // feedback correction: nudge the stored position until the measured
+      // canvas center lands exactly on the anchor point — absorbs any
+      // CSS-scale shell / translate / rounding residual every frame
+      var cvr = globeCanvas.getBoundingClientRect();
+      globeCanvas.style.left = (parseFloat(globeCanvas.style.left) + c.x - cvr.x - cvr.width / 2) + 'px';
+      globeCanvas.style.top = (parseFloat(globeCanvas.style.top) + c.y - cvr.y - cvr.height / 2) + 'px';
+    }
+    function wrapEl2() {
+      return document.getElementById('topo-canvas-wrap').getBoundingClientRect();
+    }
+    function globeFrame(ts) {
+      if (!globeLastTs) globeLastTs = ts;
+      var dt = Math.min(64, ts - globeLastTs);
+      globeLastTs = ts;
+      if (!globeReduced && !document.hidden) globeRot += dt * 0.012; // ~30s / revolution
+      drawGlobeFrame();
+      syncGlobeCanvas();
+      requestAnimationFrame(globeFrame);
+    }
+    function drawGlobeFrame() {
+      if (!gctx || !window.WORLD_LAND) return;
+      var size = parseFloat(globeCanvas.style.width) || 122;
+      var dpr = window.devicePixelRatio || 1;
+      var px = Math.round(size * dpr);
+      if (globeCanvas.width !== px) { globeCanvas.width = px; globeCanvas.height = px; }
+      var s = px / 232;
+      var ctx = gctx;
+      ctx.setTransform(s, 0, 0, s, 0, 0);
+      ctx.clearRect(0, 0, 232, 232);
+      var cx = 116, cy = 116, R = 92;
+      // atmosphere glow
+      var glow = ctx.createRadialGradient(cx, cy, R, cx, cy, R + 16);
+      glow.addColorStop(0, 'rgba(74, 222, 128, .30)');
+      glow.addColorStop(1, 'rgba(74, 222, 128, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, 232, 232);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+      // ocean
+      var og = ctx.createRadialGradient(cx - R * .35, cy - R * .35, R * .1, cx, cy, R * 1.25);
+      og.addColorStop(0, '#3b96e0');
+      og.addColorStop(.55, '#1d5fb0');
+      og.addColorStop(1, '#0d2f63');
+      ctx.fillStyle = og;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+      function project(lon, lat) {
+        var la = lat * Math.PI / 180, lo = (lon + globeRot) * Math.PI / 180;
+        return {
+          x: cx + R * Math.cos(la) * Math.sin(lo),
+          y: cy - R * Math.sin(la),
+          f: Math.cos(la) * Math.cos(lo) >= 0,
+        };
+      }
+      // graticule: parallels + rotating meridians
+      ctx.strokeStyle = 'rgba(255, 255, 255, .13)';
+      ctx.lineWidth = 1;
+      for (var lat = -60; lat <= 60; lat += 30) {
+        var y = cy - R * Math.sin(lat * Math.PI / 180);
+        var half = R * Math.cos(lat * Math.PI / 180);
+        ctx.beginPath(); ctx.moveTo(cx - half, y); ctx.lineTo(cx + half, y); ctx.stroke();
+      }
+      ctx.beginPath();
+      for (var lon0 = 0; lon0 < 180; lon0 += 30) {
+        var pen = false;
+        for (var la2 = -90; la2 <= 90; la2 += 6) {
+          var p = project(lon0, la2);
+          if (p.f) { pen ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), pen = true); }
+          else pen = false;
+        }
+      }
+      ctx.stroke();
+      // real continents (front hemisphere only)
+      ctx.fillStyle = '#3f9e5f';
+      ctx.strokeStyle = '#3f9e5f';
+      ctx.lineWidth = 1.2;
+      ctx.lineJoin = 'round';
+      WORLD_LAND.forEach(function (ring) {
+        ctx.beginPath();
+        var pen = false;
+        for (var i = 0; i < ring.length; i++) {
+          var q = project(ring[i][0], ring[i][1]);
+          if (q.f) { pen ? ctx.lineTo(q.x, q.y) : (ctx.moveTo(q.x, q.y), pen = true); }
+          else pen = false;
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+      // day-side highlight
+      var hi = ctx.createRadialGradient(cx - R * .45, cy - R * .45, 2, cx - R * .45, cy - R * .45, R * 1.2);
+      hi.addColorStop(0, 'rgba(255, 255, 255, .22)');
+      hi.addColorStop(.4, 'rgba(255, 255, 255, .05)');
+      hi.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = hi;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+      ctx.restore();
+      // limb
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(52, 211, 153, .55)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    function drawCore() {
+      // isometric two-tier server platform: gradient top faces, shaded side
+      // faces, glowing vent strips + status LEDs, breathing under-glow
+      var defs = el('defs', {});
+      function linGrad(id, stops) {
+        var g2 = el('linearGradient', { id: id, x1: '0%', y1: '0%', x2: '0%', y2: '100%' }, defs);
+        stops.forEach(function (s) {
+          el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] }, g2);
+        });
+      }
+      linGrad('core-top', [['0%', '#b7d9ff', '0.95'], ['100%', '#4493f8', '0.60']]);
+      linGrad('core-left', [['0%', '#143a6e', '0.95'], ['100%', '#0a1c38', '0.98']]);
+      linGrad('core-right', [['0%', '#2e6fc4', '0.92'], ['100%', '#12325e', '0.96']]);
+      var blur = el('filter', { id: 'core-blur', x: '-50%', y: '-150%', width: '200%', height: '400%' }, defs);
+      el('feGaussianBlur', { stdDeviation: 7 }, blur);
+
+      var cx = CORE.cx, cy = CORE.cy;
+      var holder = el('g', { class: 'anchor' });
+      CORE.holder = holder;
+      holder.setAttribute('transform', 'translate(' + CORE.ox + ',' + CORE.oy + ')');
+      var g = el('g', {}, holder);
+      // breathing under-glow
+      el('ellipse', { cx: cx, cy: cy + 30, rx: 48, ry: 12, class: 'core-glow',
+        style: 'fill:#4493f8;opacity:.16;filter:url(#core-blur)' }, g);
+      // base slab: top rhombus N(cx,cy-34) E(+52,cy-8) S(cx,cy+18) W(-52,cy-8), depth 14
+      el('polygon', { points: (cx - 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx - 52) + ',' + (cy + 6),
+        fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, g);
+      el('polygon', { points: (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + cx + ',' + (cy + 32) + ' ' + (cx + 52) + ',' + (cy + 6),
+        fill: 'url(#core-right)', stroke: '#4493f8', 'stroke-opacity': .35, 'stroke-width': 1 }, g);
+      el('polygon', { points: cx + ',' + (cy - 34) + ' ' + (cx + 52) + ',' + (cy - 8) + ' ' + cx + ',' + (cy + 18) + ' ' + (cx - 52) + ',' + (cy - 8),
+        fill: 'url(#core-top)', stroke: '#8fbcf5', 'stroke-opacity': .8, 'stroke-width': 1.1 }, g);
+      // upper slab: top rhombus N(cx,cy-47) E(+33,cy-30) S(cx,cy-13) W(-33,cy-30), depth 13
+      el('polygon', { points: (cx - 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx - 33) + ',' + (cy - 17),
+        fill: 'url(#core-left)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, g);
+      el('polygon', { points: (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + cx + ',' + cy + ' ' + (cx + 33) + ',' + (cy - 17),
+        fill: 'url(#core-right)', stroke: '#4493f8', 'stroke-opacity': .4, 'stroke-width': 1 }, g);
+      el('polygon', { points: cx + ',' + (cy - 47) + ' ' + (cx + 33) + ',' + (cy - 30) + ' ' + cx + ',' + (cy - 13) + ' ' + (cx - 33) + ',' + (cy - 30),
+        fill: 'url(#core-top)', stroke: '#9ecbff', 'stroke-opacity': .9, 'stroke-width': 1.1 }, g);
+      // glowing vent strips on the upper front faces
+      [[cx - 29, cy - 22, cx - 4, cy - 9], [cx + 29, cy - 22, cx + 4, cy - 9]].forEach(function (s) {
+        el('line', { x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+          style: 'stroke:#9ecbff;stroke-opacity:.9;stroke-width:2;stroke-linecap:round' }, g);
+      });
+      // status LEDs along the base front-left face
+      [[cx - 36, cy + 6, '#34d399'], [cx - 26, cy + 11, '#9ecbff'], [cx - 16, cy + 16, '#9ecbff']].forEach(function (d) {
+        el('circle', { cx: d[0], cy: d[1], r: 2, style: 'fill:' + d[2] + ';opacity:.9' }, g);
+      });
+      var t = el('text', { x: CORE.cx, y: CORE.cy + 62, 'text-anchor': 'middle', class: 'name' }, g);
+      t.textContent = {{ _('AgentCapture 平台') | tojson }};
+      return g;
+    }
+
+    drawInternet();
+    drawCore();
+    drawEdges();
+
+    // shared node gradients (stops themed via CSS vars, see .nb1/.nb2)
+    var nodeDefs = el('defs', {});
+    var bodyGrad = el('linearGradient', { id: 'node-body-grad', x1: '0%', y1: '0%', x2: '55%', y2: '100%' }, nodeDefs);
+    el('stop', { offset: '0%', 'class': 'nb1' }, bodyGrad);
+    el('stop', { offset: '100%', 'class': 'nb2' }, bodyGrad);
+    var chipGrad = el('linearGradient', { id: 'node-chip-grad', x1: '0%', y1: '0%', x2: '0%', y2: '100%' }, nodeDefs);
+    el('stop', { offset: '0%', 'class': 'nc1' }, chipGrad);
+    el('stop', { offset: '100%', 'class': 'nc2' }, chipGrad);
+
+    sysNodes.forEach(function (n) {
+      var g = el('g', { class: 'node', id: 'node-' + n.sys.id });
+      g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      // extruded side slab (bottom-right sliver = card thickness)
+      el('rect', { x: 3, y: 5, width: n.w - 3, height: n.h, rx: 12, class: 'side3d' }, g);
+      el('rect', { x: 0, y: 0, width: n.w, height: n.h, class: 'body', rx: 12 }, g);
+      // icon chip (netviz style, accent-gradient face)
+      el('rect', { x: 12, y: 12, width: 38, height: 38, rx: 10, class: 'chip',
+        style: 'stroke:rgba(68,147,248,.4);stroke-width:1.4' }, g);
+      el('rect', { x: 20, y: 20, width: 22, height: 9, rx: 2, style: 'fill:none;stroke:#4493f8;stroke-width:1.5' }, g);
+      el('rect', { x: 20, y: 33, width: 22, height: 9, rx: 2, style: 'fill:none;stroke:#4493f8;stroke-width:1.5' }, g);
+      el('circle', { cx: 24, cy: 24.5, r: 1.3, style: 'fill:#4493f8' }, g);
+      el('circle', { cx: 24, cy: 37.5, r: 1.3, style: 'fill:#4493f8' }, g);
+      var name = el('text', { x: 60, y: 26, class: 'name' }, g);
+      name.textContent = n.sys.name.length > 12 ? n.sys.name.slice(0, 11) + '…' : n.sys.name;
+      var domain = el('text', { x: 60, y: 43, class: 'meta' }, g);
+      domain.textContent = n.sys.domain;
+      el('circle', { cx: 17, cy: 62, r: 4, style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
+      var st = el('text', { x: 27, y: 66, class: 'badge',
+        style: 'fill:' + (n.sys.enabled ? '#34d399' : '#f59e0b') }, g);
+      st.textContent = n.sys.enabled ? {{ _('运行中') | tojson }} : {{ _('已暂停') | tojson }};
+      // config count badge — details live in the node inspector
+      if (n.sys.configs.length) {
+        var count = String(n.sys.configs.length);
+        var bw = 18 + count.length * 7;
+        el('rect', { x: n.w - bw - 12, y: 52, width: bw, height: 18, rx: 9,
+          style: 'fill:rgba(68,147,248,.10);stroke:rgba(68,147,248,.35);stroke-width:1' }, g);
+        var cnt = el('text', { x: n.w - 12 - bw / 2, y: 64, 'text-anchor': 'middle', class: 'cfg',
+          style: 'fill:#4493f8;font-size:10px' }, g);
+        cnt.textContent = count + ' 配置';
+      }
+
+      // ── drag (move/up on window: gestures survive leaving bounds) ──
+      var drag = null;
+      g.addEventListener('pointerdown', function (ev) {
+        drag = { cx: ev.clientX, cy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+        ev.preventDefault();
+      });
+      window.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        var k = worldPerPx();
+        var dxw = (ev.clientX - drag.cx) * k.x, dyw = (ev.clientY - drag.cy) * k.y;
+        if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
+        // no bounds: nodes follow the pointer freely (pan to recover strays)
+        n.x = drag.ox + dxw;
+        n.y = drag.oy + dyw;
+        renderGuides(snapGuides(n, n.w, n.h));
+        g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+        drawEdges();
+      });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        var wasDrag = drag;
+        drag = null;
+        renderGuides([]);
+        if (wasDrag.moved) {
+          fetchSaveLayout();
+        } else {
+          select(n.sys.id);
+        }
+      });
+
+      // ── palette drop target ──────────────────────────────────────
+      g.addEventListener('dragover', function (ev) { ev.preventDefault(); g.classList.add('droptgt'); });
+      g.addEventListener('dragleave', function () { g.classList.remove('droptgt'); });
+      g.addEventListener('drop', function (ev) {
+        ev.preventDefault();
+        g.classList.remove('droptgt');
+        var type = ev.dataTransfer.getData('text/decoy-type');
+        select(n.sys.id);
+        if (type) {
+          var sel = document.getElementById('dtype-' + n.sys.id);
+          if (sel) sel.value = type;
+        }
+        var nameInput = document.querySelector('#insp-' + n.sys.id + ' input[name="name"]');
+        if (nameInput) nameInput.focus();
+      });
+    });
+
+    // ── online agent hosts (top row) ────────────────────────────────
+    function collectLayout() {
+      var layout = {};
+      sysNodes.forEach(function (sn) { layout[sn.sys.id] = [Math.round(sn.x), Math.round(sn.y)]; });
+      agentNodes.forEach(function (an) { layout['agent:' + an.a.id] = [Math.round(an.x), Math.round(an.y)]; });
+      hpNodes.forEach(function (hn) {
+        layout['hp:' + hn.hp.key] = {
+          x: Math.round(hn.x), y: Math.round(hn.y), alias: hn.alias || '',
+        };
+      });
+      layout.int = [Math.round(INT.ox), Math.round(INT.oy)];
+      layout.core = [Math.round(CORE.ox), Math.round(CORE.oy)];
+      return layout;
+    }
+    function fetchSaveLayout() {
+      fetch('/admin/internet-topology/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layout: collectLayout() }),
+      }).catch(function () {});
+    }
+    // endpoint anchors (internet / platform) are draggable too: offsets
+    // shift the drawn group and every edge anchor follows
+    function attachAnchorDrag(state, w, h, anchorKey) {
+      var drag = null;
+      state.w = w; state.h = h; state.anchorKey = anchorKey;
+      state.holder.addEventListener('pointerdown', function (ev) {
+        drag = { cx: ev.clientX, cy: ev.clientY, ox: state.ox, oy: state.oy };
+        ev.preventDefault();
+      });
+      window.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        var k = worldPerPx();
+        state.ox = drag.ox + (ev.clientX - drag.cx) * k.x;
+        state.oy = drag.oy + (ev.clientY - drag.cy) * k.y;
+        var proxy = { x: state.cx + state.ox - w / 2, y: state.cy + state.oy - h / 2, anchorKey: anchorKey };
+        renderGuides(snapGuides(proxy, w, h));
+        state.ox = proxy.x - state.cx + w / 2;
+        state.oy = proxy.y - state.cy + h / 2;
+        state.holder.setAttribute('transform', 'translate(' + state.ox + ',' + state.oy + ')');
+        drawEdges();
+      });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        drag = null;
+        renderGuides([]);
+        fetchSaveLayout();
+      });
+    }
+
+    // shared mini-node drag (same window-level gesture pattern)
+    function attachMiniDrag(g, n, onClick) {
+      var drag = null;
+      g.addEventListener('pointerdown', function (ev) {
+        drag = { cx: ev.clientX, cy: ev.clientY, ox: n.x, oy: n.y, moved: false };
+        ev.preventDefault();
+      });
+      window.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        var k = worldPerPx();
+        var dxw = (ev.clientX - drag.cx) * k.x, dyw = (ev.clientY - drag.cy) * k.y;
+        if (Math.abs(ev.clientX - drag.cx) + Math.abs(ev.clientY - drag.cy) > 4) drag.moved = true;
+        // no bounds: nodes follow the pointer freely (pan to recover strays)
+        n.x = drag.ox + dxw;
+        n.y = drag.oy + dyw;
+        renderGuides(snapGuides(n, n.w, n.h));
+        g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+        drawEdges();
+      });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        var wasDrag = drag;
+        drag = null;
+        renderGuides([]);
+        if (wasDrag.moved) fetchSaveLayout();
+        else onClick();
+      });
+    }
+    agentNodes.forEach(function (n) {
+      var g = el('g', { class: 'node agent-node' });
+      g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      var title = el('title', {}, g);
+      title.textContent = (n.a.kind === 'c2' ? 'C2 Agent' : 'Managed Beacon') + ' · ' + n.a.id;
+      if (n.a.system_domain) {
+        title.textContent += ' · ' + {{ _('上线于') | tojson }} + ' ' + n.a.system_domain;
+      }
+      el('rect', { x: 3, y: 4, width: n.w - 3, height: n.h, rx: 10, class: 'side3d' }, g);
+      el('rect', { x: 0, y: 0, width: n.w, height: n.h, rx: 10, class: 'abody' }, g);
+      // hacker chip: black slab + red skull logo (红黑黑客标识)
+      el('rect', { x: 10, y: 15, width: 26, height: 26, rx: 7, class: 'chip agent-chip' }, g);
+      var logo = el('g', { transform: 'translate(12, 16.5) scale(0.92)',
+        style: 'stroke:#fb4d5d;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round' }, g);
+      el('path', { d: 'M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20' }, logo);
+      el('path', { d: 'M8 20v2h8v-2' }, logo);
+      el('path', { d: 'm12.5 17-.5-1-.5 1h1z' }, logo);
+      el('circle', { cx: 9, cy: 12, r: 1, style: 'fill:#fb4d5d;stroke:none' }, logo);
+      el('circle', { cx: 15, cy: 12, r: 1, style: 'fill:#fb4d5d;stroke:none' }, logo);
+      var label = el('text', { x: 44, y: 24, class: 'name', style: 'font-size:12px' }, g);
+      label.textContent = n.a.label.length > 14 ? n.a.label.slice(0, 13) + '…' : n.a.label;
+      var ip = el('text', { x: 44, y: 42, class: 'meta', style: 'fill:#fb7185' }, g);
+      ip.textContent = n.a.ip;
+      el('circle', { cx: n.w - 14, cy: n.h / 2, r: 4, style: 'fill:#f43f5e' }, g);
+      attachMiniDrag(g, n, function () {
+        window.location.assign(n.a.kind === 'c2'
+          ? '/admin/c2/agents/' + n.a.id : '/admin/c2/console');
+      });
+    });
+    attachAnchorDrag(INT, 92, 92, 'int');
+    attachAnchorDrag(CORE, 80, 80, 'core');
+    startGlobe();
+    window.addEventListener('resize', syncGlobeCanvas);
+
+
+    // ── running honeypots (bottom row) ──────────────────────────────
+    // per-service official-style logo chip (品牌配色 + 官方标志形态)
+    function drawHpLogo(g, cx, cy, n) {
+      var key = n.hp.key, kind = n.hp.kind;
+      function chip(fill, stroke) {
+        el('rect', { x: cx - 21, y: cy - 21, width: 42, height: 42, rx: 10,
+          style: 'fill:' + fill + ';stroke:' + stroke + ';stroke-width:1.1' }, g);
+      }
+      function wordmark(parts, dy, size, mono) {
+        var t = el('text', { x: cx, y: cy + dy, 'text-anchor': 'middle',
+          style: 'font-weight:700;font-size:' + size + 'px;font-family:' +
+            (mono ? '"Fira Code",ui-monospace,monospace' : '"Fira Sans",system-ui,sans-serif') }, g);
+        parts.forEach(function (p) {
+          var sp = document.createElementNS(NS, 'tspan');
+          sp.setAttribute('fill', p[0]);
+          sp.textContent = p[1];
+          t.appendChild(sp);
+        });
+      }
+      if (kind === 'docker') {
+        // Docker: whale-blue chip, white container stack + hull
+        chip('#1D63ED', 'rgba(0,0,0,.12)');
+        for (var r2 = 0; r2 < 2; r2++) {
+          for (var c2 = 0; c2 < 4; c2++) {
+            el('rect', { x: cx - 15 + c2 * 8, y: cy - 9 + r2 * 8, width: 6, height: 6, rx: 1,
+              style: 'fill:#ffffff;opacity:.95' }, g);
+          }
+        }
+        el('rect', { x: cx - 20, y: cy + 7, width: 40, height: 7, rx: 3.5,
+          style: 'fill:#ffffff;opacity:.95' }, g);
+      } else if (key === 'redis') {
+        // Redis: the iconic stacked red cubes
+        chip('#ffffff', 'rgba(216, 44, 32, .45)');
+        var layers = [[cy + 2, '#b71c1c'], [cy - 6, '#d32f2f'], [cy - 14, '#e53935']];
+        layers.forEach(function (L) {
+          el('polygon', { points: (cx - 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] + 11) + ' ' + (cx + 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] - 3),
+            style: 'fill:' + L[1] }, g);
+          el('polygon', { points: cx + ',' + (L[0] - 3) + ' ' + (cx + 15) + ',' + (L[0] + 4) + ' ' + (cx + 15) + ',' + (L[0] + 10) + ' ' + cx + ',' + (L[0] + 3),
+            style: 'fill:' + L[1] }, g);
+          el('polygon', { points: (cx - 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] + 11) + ' ' + cx + ',' + (L[0] + 17) + ' ' + (cx - 15) + ',' + (L[0] + 10),
+            style: 'fill:#8e1610' }, g);
+          el('polygon', { points: (cx + 15) + ',' + (L[0] + 4) + ' ' + cx + ',' + (L[0] + 11) + ' ' + cx + ',' + (L[0] + 17) + ' ' + (cx + 15) + ',' + (L[0] + 10),
+            style: 'fill:#a51c15' }, g);
+        });
+      } else if (key === 'elasticsearch') {
+        // ElasticSearch: three staggered rounded bars in brand colors
+        chip('#ffffff', 'rgba(15, 23, 42, .15)');
+        el('rect', { x: cx - 15, y: cy - 13, width: 21, height: 7, rx: 3.5, style: 'fill:#FEC514' }, g);
+        el('rect', { x: cx - 8, y: cy - 3.5, width: 23, height: 7, rx: 3.5, style: 'fill:#00BFB3' }, g);
+        el('rect', { x: cx - 15, y: cy + 6, width: 17, height: 7, rx: 3.5, style: 'fill:#006BB4' }, g);
+      } else if (key === 'mysql') {
+        // MySQL: two-tone official wordmark (My teal / SQL orange)
+        chip('#ffffff', 'rgba(0, 117, 143, .45)');
+        wordmark([['#00758F', 'My'], ['#F29111', 'SQL']], 5, 12);
+      } else if (key === 'ssh') {
+        // OpenSSH: dark slate terminal with the green prompt
+        chip('#1D2B35', 'rgba(255, 255, 255, .12)');
+        wordmark([['#4ade80', '>_']], 5, 12, true);
+      } else if (key === 'ftp') {
+        chip('#334155', 'rgba(255, 255, 255, .12)');
+        wordmark([['#ffffff', 'FTP']], 4, 10);
+      } else if (key === 'thinkphp') {
+        chip('#3D7DC8', 'rgba(255, 255, 255, .2)');
+        wordmark([['#ffffff', 'TP']], 5, 13);
+      } else {
+        chip('#475569', 'rgba(255, 255, 255, .12)');
+        wordmark([['#ffffff', (n.hp.name || 'HP').slice(0, 3).toUpperCase()]], 4, 10);
+      }
+    }
+
+    hpNodes.forEach(function (n) {
+      var g = el('g', { class: 'node' });
+      n.g = g;
+      g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+      var title = el('title', {}, g);
+      title.textContent = {{ _('蜜罐服务') | tojson }} + ' · ' + n.hp.name + ' · ' + {{ _('单击编辑') | tojson }};
+      drawHpLogo(g, n.w / 2, 22, n);
+      var name = el('text', { x: n.w / 2, y: 58, 'text-anchor': 'middle', class: 'name', style: 'font-size:11.5px' }, g);
+      n.labelEl = name;
+      var shown = n.alias || n.hp.name;
+      name.textContent = shown.length > 15 ? shown.slice(0, 14) + '…' : shown;
+      var st = el('text', { x: n.w / 2, y: 71, 'text-anchor': 'middle', class: 'badge', style: 'fill:#34d399;font-size:9.5px' }, g);
+      st.textContent = '● ' + {{ _('运行中') | tojson }};
+      attachMiniDrag(g, n, function () {
+        openHpInspector(n);
+      });
+    });
+
+    // ── canvas pan + click-empty deselect ───────────────────────────
+    var pan = null;
+    svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target !== svg) return;
+      pan = { cx: ev.clientX, cy: ev.clientY, vx: view.x, vy: view.y, moved: false };
+      svg.classList.add('panning');
+    });
+    window.addEventListener('pointermove', function (ev) {
+      if (!pan) return;
+      var k = worldPerPx();
+      if (Math.abs(ev.clientX - pan.cx) + Math.abs(ev.clientY - pan.cy) > 4) pan.moved = true;
+      view.x = Math.max(-W, Math.min(W, pan.vx - (ev.clientX - pan.cx) * k.x));
+      view.y = Math.max(-H, Math.min(H, pan.vy - (ev.clientY - pan.cy) * k.y));
+      apply();
+    });
+    window.addEventListener('pointerup', function () {
+      if (!pan) return;
+      var wasPan = pan;
+      pan = null;
+      svg.classList.remove('panning');
+      if (!wasPan.moved) deselect();
+    });
+
+    // ── inspector ───────────────────────────────────────────────────
+    var inspector = document.getElementById('topo-inspector');
+    var current = null;
+    var currentHp = null;
+    function clearHpSelection() {
+      if (currentHp && currentHp.g) currentHp.g.classList.remove('sel');
+      currentHp = null;
+    }
+    function select(sysId) {
+      clearHpSelection();
+      if (current !== null) {
+        var prev = document.getElementById('node-' + current);
+        if (prev) prev.classList.remove('sel');
+      }
+      current = sysId;
+      var g = document.getElementById('node-' + sysId);
+      if (g) g.classList.add('sel');
+      inspector.hidden = false;
+      var bodies = inspector.querySelectorAll('.insp-body');
+      for (var i = 0; i < bodies.length; i++) bodies[i].hidden = bodies[i].id !== 'insp-' + sysId;
+    }
+    function openHpInspector(n) {
+      if (current !== null) {
+        var prev = document.getElementById('node-' + current);
+        if (prev) prev.classList.remove('sel');
+        current = null;
+      }
+      clearHpSelection();
+      currentHp = n;
+      if (n.g) n.g.classList.add('sel');
+      inspector.hidden = false;
+      var bodies = inspector.querySelectorAll('.insp-body');
+      for (var i = 0; i < bodies.length; i++) bodies[i].hidden = bodies[i].id !== 'insp-hp';
+      var shown = n.alias || n.hp.name;
+      document.getElementById('hp-insp-name').textContent = shown;
+      document.getElementById('hp-insp-category').textContent =
+        n.hp.kind === 'docker' ? {{ _('Docker 镜像蜜罐') | tojson }} : n.hp.category;
+      document.getElementById('hp-insp-port').textContent = n.hp.port || '—';
+      document.getElementById('hp-alias-input').value = n.alias || '';
+      var form = document.getElementById('hp-toggle-form');
+      if (n.hp.kind === 'service') {
+        form.style.display = '';
+        form.action = '/admin/services/' + n.hp.service_id + '/stop';
+      } else {
+        form.style.display = 'none';
+      }
+    }
+    function deselect() {
+      clearHpSelection();
+      if (current !== null) {
+        var g = document.getElementById('node-' + current);
+        if (g) g.classList.remove('sel');
+      }
+      current = null;
+      inspector.hidden = true;
+    }
+    document.getElementById('insp-close').addEventListener('click', deselect);
+    // honeypot alias: canvas metadata only — saved with the layout, the
+    // running service is never touched (不停转)
+    document.getElementById('hp-alias-save').addEventListener('click', function () {
+      if (!currentHp) return;
+      currentHp.alias = document.getElementById('hp-alias-input').value.trim();
+      var shown = currentHp.alias || currentHp.hp.name;
+      if (currentHp.labelEl) {
+        currentHp.labelEl.textContent = shown.length > 15 ? shown.slice(0, 14) + '…' : shown;
+      }
+      document.getElementById('hp-insp-name').textContent = shown;
+      fetchSaveLayout();
+      var btn = document.getElementById('hp-alias-save');
+      var old = btn.textContent;
+      btn.textContent = {{ _('已保存（服务未受影响）') | tojson }};
+      setTimeout(function () { btn.textContent = old; }, 1600);
+    });
+
+    // ── palette: HTML5 drag to nodes, click applies to selection ────
+    var palBlocks = document.querySelectorAll('.pal-block');
+    palBlocks.forEach(function (b) {
+      b.addEventListener('dragstart', function (ev) {
+        ev.dataTransfer.setData('text/decoy-type', b.getAttribute('data-decoy-type'));
+        ev.dataTransfer.effectAllowed = 'copy';
+      });
+      b.addEventListener('click', function () {
+        applyPalette(b);
+      });
+      b.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); applyPalette(b); }
+      });
+    });
+    function applyPalette(b) {
+      if (current === null) return;
+      var sel = document.getElementById('dtype-' + current);
+      if (sel) sel.value = b.getAttribute('data-decoy-type');
+      var nameInput = document.querySelector('#insp-' + current + ' input[name="name"]');
+      if (nameInput) nameInput.focus();
+    }
+
+    if (!sysNodes.length) {
+      var t = el('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', class: 'meta',
+        style: 'font-size:13px' });
+      t.textContent = {{ _('暂无资产节点——先在「互联网系统」中接入域名') | tojson }};
+    }
+    apply();
+  })();
+  </script>
+{% endblock %}
